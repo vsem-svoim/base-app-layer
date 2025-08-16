@@ -1,0 +1,39 @@
+# Опциональная интеграция AWS SageMaker HyperPod для distributed training
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyperpod-integration-config
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: distributed-training
+    cloud.provider: aws
+    integration.type: hyperpod
+data:
+  HYPERPOD_ENABLED: "false"  # Опционально включается
+  HYPERPOD_CLUSTER_NAME: "data-ingestion-cluster"
+  HYPERPOD_REGION: "us-east-1"
+  HYPERPOD_INSTANCE_GROUP_NAME: "worker-group"
+  HYPERPOD_INSTANCE_TYPE: "ml.p4d.24xlarge"
+  HYPERPOD_MIN_CAPACITY: "0"
+  HYPERPOD_MAX_CAPACITY: "10"
+  HYPERPOD_EFA_ENABLED: "true"
+  HYPERPOD_FSX_LUSTRE_ENABLED: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hyperpod-credentials
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: distributed-training
+    cloud.provider: aws
+    integration.type: hyperpod
+type: Opaque
+stringData:
+  # Заполняется через Crossplane или внешне
+  HYPERPOD_CLUSTER_ARN: ""
+  FSX_LUSTRE_ID: ""
+  SECURITY_GROUP_IDS: ""
+  SUBNET_IDS: ""

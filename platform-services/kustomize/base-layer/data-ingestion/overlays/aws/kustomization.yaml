@@ -2,7 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # AWS-специфичные ресурсы только (базовые ресурсы развертываются через data-ingestion-app)
-resources: []
+resources:
+  - aws-bedrock-integration.yaml    # Опционально: AI обработка
+  - aws-sagemaker-integration.yaml  # Опционально: ML модели  
+  - aws-hyperpod-integration.yaml   # Опционально: distributed training
 
 # AWS-специфичные образы контейнеров
 images:
@@ -41,16 +44,6 @@ patches:
           name: AWS_REGION
           value: us-east-1
       - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: AWS_BEDROCK_REGION
-          value: us-east-1
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: AWS_SAGEMAKER_ENDPOINT_PREFIX
-          value: data-ingestion
-      - op: add
         path: /spec/template/spec/nodeSelector
         value:
           kubernetes.io/os: linux
@@ -86,6 +79,3 @@ configMapGenerator:
       - AWS_REGION=us-east-1
       - STORAGE_CLASS=gp2
       - LOAD_BALANCER_TYPE=nlb
-      - AWS_BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
-      - AWS_SAGEMAKER_EXECUTION_ROLE_ARN=arn:aws:iam::ACCOUNT:role/SageMakerExecutionRole
-      - AWS_BEDROCK_INFERENCE_ENDPOINT=bedrock-runtime.us-east-1.amazonaws.com

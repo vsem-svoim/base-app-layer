@@ -1,0 +1,35 @@
+# Опциональная интеграция AWS Bedrock для AI обработки данных
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bedrock-integration-config
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: ai-integration
+    cloud.provider: aws
+    integration.type: bedrock
+data:
+  BEDROCK_ENABLED: "false"  # Опционально включается
+  BEDROCK_REGION: "us-east-1"
+  BEDROCK_MODEL_ID: "anthropic.claude-3-sonnet-20240229-v1:0"
+  BEDROCK_ENDPOINT: "bedrock-runtime.us-east-1.amazonaws.com"
+  BEDROCK_MAX_TOKENS: "4096"
+  BEDROCK_TEMPERATURE: "0.1"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bedrock-credentials
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: ai-integration
+    cloud.provider: aws
+    integration.type: bedrock
+type: Opaque
+stringData:
+  # Заполняется через Crossplane или внешне
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  BEDROCK_ROLE_ARN: ""
