@@ -1,8 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# AWS-специфичные ресурсы только (базовые ресурсы развертываются через data-ingestion-app)
+# AWS-специфичные ресурсы + базовые ресурсы с AWS патчами
 resources:
+  - ../../base                      # Включаем базовые ресурсы для применения патчей
   - aws-bedrock-integration.yaml    # Опционально: AI обработка
   - aws-sagemaker-integration.yaml  # Опционально: ML модели  
   - aws-hyperpod-integration.yaml   # Опционально: distributed training
