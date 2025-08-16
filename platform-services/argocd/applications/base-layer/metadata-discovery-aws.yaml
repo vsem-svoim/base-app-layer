@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metadata-discovery-aws
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: metadata-discovery
+    app.kubernetes.io/part-of: base-system
+    base.io/category: metadata_discovery
+    base.io/provider: aws
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/kustomize/base-layer/metadata-discovery/overlays/aws
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-metadata-discovery
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 3

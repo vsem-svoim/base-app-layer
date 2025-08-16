@@ -1,0 +1,106 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: aws-postgresql
+  labels:
+    provider: aws
+    service: postgresql
+    crossplane.io/xrd: xdatabases.finportiq.io
+spec:
+  compositeTypeRef:
+    apiVersion: finportiq.io/v1alpha1
+    kind: XDatabase
+
+  resources:
+    - name: db-subnet-group
+      base:
+        apiVersion: rds.aws.upbound.io/v1beta1
+        kind: SubnetGroup
+        spec:
+          forProvider:
+            region: us-east-1
+            subnetIds: []
+            tags:
+              Name: ""
+              Environment: ""
+              Project: ""
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: metadata.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.subnetIds
+          toFieldPath: spec.forProvider.subnetIds
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.environment
+          toFieldPath: spec.forProvider.tags.Environment
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.project
+          toFieldPath: spec.forProvider.tags.Project
+
+    - name: db-instance
+      base:
+        apiVersion: rds.aws.upbound.io/v1beta1
+        kind: Instance
+        spec:
+          forProvider:
+            region: us-east-1
+            instanceClass: db.t3.micro
+            engine: postgres
+            engineVersion: "15.4"
+            allocatedStorage: 20
+            maxAllocatedStorage: 100
+            storageType: gp3
+            storageEncrypted: true
+            multiAz: false
+            publiclyAccessible: false
+            autoMinorVersionUpgrade: true
+            deletionProtection: false
+            skipFinalSnapshot: true
+            vpcSecurityGroupIds: []
+            dbName: ""
+            username: postgres
+            passwordSecretRef:
+              namespace: crossplane-system
+              name: ""
+              key: password
+            tags:
+              Name: ""
+              Environment: ""
+              Project: ""
+          writeConnectionSecretsToNamespace: crossplane-system
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: metadata.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: spec.forProvider.dbName
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: spec.forProvider.passwordSecretRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-password"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.instanceClass
+          transforms:
+            - type: map
+              map:
+                small: db.t3.micro
+                medium: db.t3.small
+                large: db.r5.large
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.storageSize
+          toFieldPath: spec.forProvider.allocatedStorage
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.environment
+          toFieldPath: spec.forProvider.tags.Environment
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.project
+          toFieldPath: spec.forProvider.tags.Project
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.subnetGroupName
+          toFieldPath: spec.forProvider.dbSubnetGroupName

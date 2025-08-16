@@ -1,0 +1,57 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-ingestion-connection-optimization-model
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: connection-optimization-model
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: model
+    base.io/function: connection-optimization
+spec:
+  type: "regression"
+  algorithm: "neural_network_ensemble"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/optimize-connection"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      network_architecture: "multi_layer_perceptron"
+      hidden_layers: [128, 64, 32]
+      activation: "relu"
+      optimizer: "adam"
+      learning_rate: 0.001
+      batch_size: 32
+      epochs: 100
+      dropout_rate: 0.2
+    feature_engineering:
+      feature_types:
+        - name: "connection_metrics"
+          features: ["latency", "throughput", "error_rate", "connection_time"]
+        - name: "resource_utilization"
+          features: ["cpu_usage", "memory_usage", "network_bandwidth"]
+        - name: "source_characteristics"
+          features: ["source_type", "data_volume", "update_frequency"]
+  inference:
+    optimization_parameters:
+      - "pool_size"
+      - "timeout_values"
+      - "retry_parameters"
+      - "batch_size"
+    prediction_config:
+      optimization_objective: "minimize_latency_maximize_throughput"
+      constraint_handling: true
+      performance_bounds: true

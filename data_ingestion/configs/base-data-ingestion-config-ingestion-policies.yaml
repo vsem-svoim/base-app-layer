@@ -1,0 +1,479 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-ingestion-policies
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: ingestion-policies
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: config
+    base.io/function: policy-enforcement
+spec:
+  configType: "ingestion-policies"
+  data:
+    # Data Quality Policies
+    quality_policies:
+      completeness:
+        name: "Data Completeness Policy"
+        description: "Ensures data meets minimum completeness requirements"
+        rules:
+          minimum_completeness:
+            threshold: 95.0
+            measurement: "percentage"
+            scope: "record_level"
+            action: "reject_below_threshold"
+          required_fields:
+            enforcement: "strict"
+            nullable_fields: []
+            action_on_missing: "quarantine"
+          empty_value_handling:
+            treat_as_null: ["", "N/A", "NULL", "null"]
+            allow_empty_strings: false
+        severity: "high"
+        notification_required: true
+        
+      accuracy:
+        name: "Data Accuracy Policy"
+        description: "Validates data accuracy and format compliance"
+        rules:
+          data_type_validation:
+            enforce_schema: true
+            allow_type_coercion: true
+            strict_numeric_formats: true
+          range_validation:
+            numeric_ranges: true
+            date_ranges: true
+            string_lengths: true
+          format_validation:
+            email_formats: true
+            phone_formats: true
+            currency_formats: true
+            date_formats: true
+          business_rules:
+            future_dates_allowed: false
+            negative_amounts_policy: "conditional"
+            currency_consistency: true
+        severity: "medium"
+        
+      consistency:
+        name: "Data Consistency Policy"  
+        description: "Ensures data consistency across sources and time"
+        rules:
+          cross_reference_validation:
+            enabled: true
+            reference_data_sources: 
+              - "master_data"
+              - "reference_tables"
+            orphan_records_policy: "flag_and_continue"
+          temporal_consistency:
+            chronological_order: true
+            duplicate_timestamps: "merge"
+            future_timestamp_tolerance: "1h"
+          referential_integrity:
+            foreign_key_validation: true
+            cascade_validation: false
+            missing_references_policy: "warn"
+        severity: "medium"
+        
+      timeliness:
+        name: "Data Timeliness Policy"
+        description: "Ensures data freshness and delivery SLAs"
+        rules:
+          freshness_requirements:
+            real_time_data_max_age: "30s"
+            batch_data_max_age: "24h"
+            reference_data_max_age: "7d"
+          delivery_sla:
+            critical_sources_sla: "5m"
+            high_priority_sla: "15m"
+            standard_sla: "1h"
+            low_priority_sla: "4h"
+          staleness_detection:
+            enabled: true
+            warning_threshold: "50% of SLA"
+            critical_threshold: "90% of SLA"
+        severity: "high"
+        
+    # Security and Privacy Policies  
+    security_policies:
+      data_classification:
+        name: "Data Classification Policy"
+        description: "Automatic classification and handling of sensitive data"
+        rules:
+          classification_levels:
+            public:
+              encryption_required: false
+              access_logging: false
+              retention_period: "unlimited"
+            internal:
+              encryption_required: true
+              access_logging: true
+              retention_period: "7y"
+            confidential:
+              encryption_required: true
+              access_logging: true
+              masking_required: true
+              retention_period: "7y"
+            restricted:
+              encryption_required: true
+              access_logging: true
+              masking_required: true
+              approval_required: true
+              retention_period: "3y"
+          classification_rules:
+            pii_detection:
+              enabled: true
+              patterns:
+                - "ssn"
+                - "credit_card"
+                - "email"
+                - "phone"
+              auto_classify: "confidential"
+            financial_data:
+              patterns:
+                - "account_number"
+                - "routing_number"
+                - "trading_position"
+              auto_classify: "confidential"
+        enforcement: "mandatory"
+        
+      access_control:
+        name: "Data Access Control Policy"
+        description: "Controls access to data during ingestion"
+        rules:
+          authentication_required: true
+          authorization_required: true
+          rbac_enforcement: true
+          source_ip_restrictions:
+            enabled: true
+            allowed_networks:
+              - "10.0.0.0/8"
+              - "192.168.0.0/16"
+          service_account_restrictions:
+            require_service_accounts: true
+            allowed_service_accounts:
+              - "base-data-collector"
+              - "base-data-converter"
+          audit_logging:
+            log_all_access: true
+            log_failed_attempts: true
+            retention_period: "2y"
+        enforcement: "mandatory"
+        
+      encryption:
+        name: "Data Encryption Policy"
+        description: "Encryption requirements for data in transit and at rest"
+        rules:
+          encryption_in_transit:
+            required: true
+            min_tls_version: "1.2"
+            cipher_suites:
+              - "TLS_AES_256_GCM_SHA384"
+              - "TLS_CHACHA20_POLY1305_SHA256"
+            certificate_validation: "strict"
+          encryption_at_rest:
+            required: true
+            algorithm: "AES-256"
+            key_management: "vault"
+            key_rotation_period: "90d"
+          field_level_encryption:
+            enabled: true
+            sensitive_fields:
+              - "account_number"
+              - "ssn"
+              - "tax_id"
+              - "credit_card"
+        enforcement: "mandatory"
+        
+    # Compliance Policies
+    compliance_policies:
+      gdpr_compliance:
+        name: "GDPR Compliance Policy"
+        description: "European data protection regulation compliance"
+        rules:
+          personal_data_handling:
+            consent_required: true
+            purpose_limitation: true
+            data_minimization: true
+            retention_limits: true
+          data_subject_rights:
+            right_of_access: true
+            right_to_rectification: true
+            right_to_erasure: true
+            right_to_portability: true
+          lawful_basis:
+            require_lawful_basis: true
+            document_basis: true
+            review_period: "12m"
+          breach_notification:
+            detection_required: true
+            notification_timeline: "72h"
+            authority_notification: true
+        geographic_scope: ["EU", "EEA"]
+        enforcement: "mandatory"
+        
+      sox_compliance:
+        name: "SOX Compliance Policy"
+        description: "Sarbanes-Oxley Act compliance for financial data"
+        rules:
+          financial_reporting_data:
+            identify_sox_data: true
+            enhanced_controls: true
+            segregation_of_duties: true
+            change_management: true
+          audit_requirements:
+            comprehensive_logging: true
+            immutable_audit_trail: true
+            access_reviews: "quarterly"
+            control_testing: "annual"
+          data_integrity:
+            checksums_required: true
+            digital_signatures: true
+            version_control: true
+            backup_verification: true
+        applicability: "public_companies"
+        enforcement: "mandatory"
+        
+      pci_dss:
+        name: "PCI DSS Compliance Policy"
+        description: "Payment Card Industry Data Security Standards"
+        rules:
+          cardholder_data:
+            identification_required: true
+            storage_minimization: true
+            encryption_required: true
+            access_restrictions: true
+          security_controls:
+            network_segmentation: true
+            access_control: true
+            vulnerability_management: true
+            monitoring: true
+          compliance_validation:
+            regular_testing: true
+            penetration_testing: "annual"
+            vulnerability_scanning: "quarterly"
+        applicability: "payment_processors"
+        enforcement: "conditional"
+        
+    # Performance and Resource Policies
+    performance_policies:
+      throughput_management:
+        name: "Throughput Management Policy"
+        description: "Controls data ingestion rates and resource usage"
+        rules:
+          rate_limiting:
+            max_requests_per_minute: 10000
+            burst_capacity: 20000
+            rate_limit_by_source: true
+            priority_based_limits: true
+          resource_allocation:
+            max_cpu_per_job: "4 cores"
+            max_memory_per_job: "8GB"
+            max_disk_space: "100GB"
+            temporary_storage_limit: "50GB"
+          concurrent_processing:
+            max_concurrent_jobs: 20
+            max_parallel_connections: 1000
+            connection_pooling: true
+            load_balancing: true
+        enforcement: "automatic"
+        
+      quality_gates:
+        name: "Quality Gate Policy"
+        description: "Defines quality thresholds for data promotion"
+        rules:
+          bronze_to_silver:
+            completeness_threshold: 90.0
+            accuracy_threshold: 95.0
+            schema_compliance: true
+            basic_validation: true
+          silver_to_gold:
+            completeness_threshold: 98.0
+            accuracy_threshold: 99.0
+            business_rule_validation: true
+            cross_reference_validation: true
+          quality_metrics:
+            calculate_quality_score: true
+            track_quality_trends: true
+            quality_degradation_alerts: true
+        enforcement: "blocking"
+        
+    # Data Lifecycle Policies
+    lifecycle_policies:
+      retention:
+        name: "Data Retention Policy"
+        description: "Defines how long different types of data are retained"
+        rules:
+          retention_periods:
+            transaction_data: "10y"
+            market_data: "7y" 
+            reference_data: "permanent"
+            log_data: "3y"
+            personal_data: "as_required_by_law"
+          archival_rules:
+            archive_after: "2y"
+            archive_format: "compressed_parquet"
+            archive_location: "cold_storage"
+            index_archived_data: true
+          deletion_rules:
+            soft_delete_period: "90d"
+            hard_delete_after_retention: true
+            deletion_approval_required: true
+            deletion_audit_trail: true
+        enforcement: "automatic"
+        
+      versioning:
+        name: "Data Versioning Policy"
+        description: "Controls data versioning and change management"
+        rules:
+          version_control:
+            enable_versioning: true
+            version_on_schema_change: true
+            version_on_source_change: true
+            max_versions_retained: 10
+          change_tracking:
+            track_data_changes: true
+            track_schema_changes: true
+            track_source_changes: true
+            change_approval_workflow: true
+          rollback_capabilities:
+            enable_rollback: true
+            rollback_window: "7d"
+            rollback_approval_required: true
+        enforcement: "mandatory"
+        
+    # Error Handling and Recovery Policies
+    error_handling_policies:
+      failure_tolerance:
+        name: "Failure Tolerance Policy"
+        description: "Defines acceptable failure rates and recovery procedures"
+        rules:
+          acceptable_failure_rates:
+            critical_sources: 0.1
+            high_priority_sources: 1.0
+            standard_sources: 5.0
+            low_priority_sources: 10.0
+          retry_policies:
+            max_retry_attempts: 5
+            exponential_backoff: true
+            circuit_breaker_threshold: 10
+            circuit_breaker_timeout: "5m"
+          escalation_procedures:
+            automatic_escalation: true
+            escalation_thresholds:
+              warning: "2% failure rate"
+              critical: "5% failure rate"
+              emergency: "10% failure rate"
+        enforcement: "automatic"
+        
+      data_recovery:
+        name: "Data Recovery Policy"
+        description: "Procedures for recovering from data loss or corruption"
+        rules:
+          backup_requirements:
+            backup_frequency: "daily"
+            backup_retention: "90d"
+            backup_verification: true
+            cross_region_backup: true
+          recovery_procedures:
+            recovery_time_objective: "4h"
+            recovery_point_objective: "15m"
+            disaster_recovery_testing: "quarterly"
+            recovery_documentation: true
+          data_validation:
+            post_recovery_validation: true
+            integrity_checks: true
+            business_validation: true
+        enforcement: "mandatory"
+        
+    # Monitoring and Alerting Policies
+    monitoring_policies:
+      observability:
+        name: "Data Observability Policy"  
+        description: "Comprehensive monitoring and observability requirements"
+        rules:
+          metrics_collection:
+            business_metrics: true
+            technical_metrics: true  
+            quality_metrics: true
+            performance_metrics: true
+          logging_requirements:
+            structured_logging: true
+            log_level: "info"
+            sensitive_data_masking: true
+            log_retention: "90d"
+          tracing_requirements:
+            distributed_tracing: true
+            trace_sampling_rate: 1.0
+            trace_retention: "7d"
+        enforcement: "mandatory"
+        
+      alerting:
+        name: "Alerting Policy"
+        description: "Alert generation and notification rules"
+        rules:
+          alert_categories:
+            critical:
+              response_time: "5m"
+              notification_channels: ["pagerduty", "slack", "email"]
+              escalation_after: "15m"
+            warning:
+              response_time: "30m"
+              notification_channels: ["slack", "email"]
+              escalation_after: "2h"
+            info:
+              response_time: "4h"
+              notification_channels: ["email"]
+          alert_suppression:
+            duplicate_suppression: true
+            maintenance_window_suppression: true
+            acknowledgment_suppression: true
+        enforcement: "automatic"
+        
+    # Policy Enforcement Configuration
+    enforcement_configuration:
+      policy_evaluation:
+        evaluation_points:
+          - "pre_ingestion"
+          - "post_ingestion"
+          - "pre_processing"
+          - "post_processing"
+        evaluation_mode: "real_time"
+        batch_evaluation: true
+        
+      violation_handling:
+        violation_actions:
+          block: "Stop processing and quarantine data"
+          warn: "Log warning and continue processing"
+          notify: "Send notification and continue"
+          escalate: "Trigger escalation workflow"
+        severity_mapping:
+          critical: "block"
+          high: "warn"
+          medium: "notify"
+          low: "log"
+          
+      policy_updates:
+        update_mechanism: "configuration_management"
+        approval_required: true
+        testing_required: true
+        rollback_capability: true
+        
+    # Integration with Other Systems
+    system_integration:
+      policy_engine:
+        service: "base-policy-engine"
+        endpoint: "/evaluate"
+        timeout: "30s"
+        
+      governance_platform:
+        service: "base-data-governance"
+        endpoint: "/policy-compliance"
+        reporting_frequency: "daily"
+        
+      audit_system:
+        service: "base-audit-service"
+        endpoint: "/audit-log"
+        real_time_logging: true

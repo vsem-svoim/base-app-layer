@@ -1,0 +1,539 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-ingestion-authentication-templates
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: authentication-templates
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: config
+    base.io/function: authentication
+spec:
+  configType: "authentication-templates"
+  data:
+    # OAuth 2.0 Templates
+    oauth2_templates:
+      client_credentials:
+        name: "OAuth 2.0 Client Credentials"
+        flow_type: "client_credentials"
+        grant_type: "client_credentials"
+        token_endpoint_auth_method: "client_secret_post"
+        scopes: []
+        token_format: "bearer"
+        token_location: "header"
+        token_prefix: "Bearer "
+        refresh_strategy: "automatic"
+        refresh_threshold_seconds: 300
+        cache_tokens: true
+        cache_duration_seconds: 3600
+        retry_config:
+          max_attempts: 3
+          backoff_strategy: "exponential"
+          initial_delay: "1s"
+          max_delay: "30s"
+        validation:
+          validate_ssl: true
+          validate_audience: false
+          validate_issuer: false
+        example_config:
+          client_id: "${CLIENT_ID}"
+          client_secret: "${CLIENT_SECRET}"
+          token_url: "https://auth.provider.com/oauth/token"
+          scope: "read write"
+          
+      authorization_code:
+        name: "OAuth 2.0 Authorization Code"
+        flow_type: "authorization_code"
+        grant_type: "authorization_code"
+        token_endpoint_auth_method: "client_secret_basic"
+        pkce_required: true
+        state_parameter: true
+        scopes: []
+        token_format: "bearer"
+        token_location: "header"
+        token_prefix: "Bearer "
+        refresh_strategy: "automatic"
+        refresh_threshold_seconds: 300
+        cache_tokens: true
+        validation:
+          validate_ssl: true
+          validate_audience: true
+          validate_issuer: true
+        example_config:
+          client_id: "${CLIENT_ID}"
+          client_secret: "${CLIENT_SECRET}"
+          authorization_url: "https://auth.provider.com/oauth/authorize"
+          token_url: "https://auth.provider.com/oauth/token"
+          redirect_uri: "https://app.company.com/callback"
+          scope: "openid profile email"
+          
+      device_code:
+        name: "OAuth 2.0 Device Code"
+        flow_type: "device_code"
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        poll_interval: 5
+        poll_max_attempts: 120
+        token_format: "bearer"
+        token_location: "header"
+        token_prefix: "Bearer "
+        refresh_strategy: "automatic"
+        example_config:
+          client_id: "${CLIENT_ID}"
+          device_authorization_url: "https://auth.provider.com/device/code"
+          token_url: "https://auth.provider.com/oauth/token"
+          scope: "data:read"
+          
+    # JWT (JSON Web Token) Templates
+    jwt_templates:
+      rs256_verification:
+        name: "JWT RS256 Token Verification"
+        algorithm: "RS256"
+        token_location: "header"
+        token_prefix: "Bearer "
+        verification:
+          verify_signature: true
+          verify_expiration: true
+          verify_not_before: true
+          verify_issuer: true
+          verify_audience: true
+          clock_skew_seconds: 30
+        jwks:
+          cache_duration_seconds: 3600
+          cache_refresh_ahead_seconds: 300
+          max_cached_keys: 100
+        example_config:
+          issuer: "https://auth.provider.com"
+          audience: "api.company.com"
+          jwks_uri: "https://auth.provider.com/.well-known/jwks.json"
+          
+      hs256_symmetric:
+        name: "JWT HS256 Symmetric Key"
+        algorithm: "HS256"
+        token_location: "header"
+        token_prefix: "Bearer "
+        verification:
+          verify_signature: true
+          verify_expiration: true
+          verify_not_before: true
+          verify_issuer: false
+          verify_audience: false
+        example_config:
+          secret_key: "${JWT_SECRET_KEY}"
+          issuer: "internal-service"
+          
+      es256_elliptic:
+        name: "JWT ES256 Elliptic Curve"
+        algorithm: "ES256"
+        token_location: "header"
+        token_prefix: "Bearer "
+        verification:
+          verify_signature: true
+          verify_expiration: true
+          verify_not_before: true
+          verify_issuer: true
+          verify_audience: true
+        example_config:
+          public_key_path: "/app/certs/ec_public.pem"
+          issuer: "trusted-authority"
+          audience: "data-ingestion"
+          
+    # API Key Templates
+    api_key_templates:
+      header_api_key:
+        name: "API Key in Header"
+        location: "header"
+        parameter_name: "X-API-Key"
+        prefix: ""
+        encoding: "plain"
+        rotation:
+          enabled: true
+          rotation_interval_days: 90
+          notification_days_before: 7
+        validation:
+          format_validation: true
+          length_validation: true
+          character_set: "alphanumeric"
+          min_length: 32
+          max_length: 64
+        example_config:
+          api_key: "${API_KEY}"
+          header_name: "X-API-Key"
+          
+      query_param_key:
+        name: "API Key in Query Parameter"
+        location: "query"
+        parameter_name: "api_key"
+        prefix: ""
+        encoding: "url_encoded"
+        rotation:
+          enabled: true
+          rotation_interval_days: 60
+        example_config:
+          api_key: "${API_KEY}"
+          param_name: "apikey"
+          
+      bearer_token:
+        name: "Bearer Token API Key"
+        location: "header"
+        parameter_name: "Authorization"
+        prefix: "Bearer "
+        encoding: "plain"
+        rotation:
+          enabled: true
+          rotation_interval_days: 30
+        example_config:
+          token: "${BEARER_TOKEN}"
+          
+    # Basic Authentication Templates
+    basic_auth_templates:
+      standard_basic:
+        name: "HTTP Basic Authentication"
+        encoding: "base64"
+        charset: "utf-8"
+        realm: "Protected Area"
+        credentials_location: "header"
+        header_name: "Authorization"
+        prefix: "Basic "
+        password_encryption: true
+        example_config:
+          username: "${BASIC_AUTH_USERNAME}"
+          password: "${BASIC_AUTH_PASSWORD}"
+          
+      digest_auth:
+        name: "HTTP Digest Authentication"
+        algorithm: "MD5"
+        qop: "auth"
+        realm: "Secure API"
+        nonce_timeout: 300
+        stale_handling: true
+        example_config:
+          username: "${DIGEST_USERNAME}"
+          password: "${DIGEST_PASSWORD}"
+          realm: "API Access"
+          
+    # Certificate-based Authentication Templates
+    certificate_templates:
+      mutual_tls:
+        name: "Mutual TLS (mTLS)"
+        certificate_type: "x509"
+        key_type: "rsa"
+        key_size: 2048
+        certificate_validation:
+          verify_chain: true
+          verify_hostname: true
+          verify_expiration: true
+          check_revocation: true
+        ca_validation:
+          enabled: true
+          ca_bundle_path: "/app/certs/ca-bundle.pem"
+        example_config:
+          client_cert_path: "/app/certs/client.crt"
+          client_key_path: "/app/certs/client.key"
+          ca_cert_path: "/app/certs/ca.crt"
+          
+      client_certificate:
+        name: "Client Certificate Authentication"
+        certificate_type: "x509"
+        key_type: "ec"
+        curve: "P-256"
+        certificate_validation:
+          verify_chain: true
+          verify_hostname: false
+          verify_expiration: true
+        example_config:
+          certificate_path: "/app/certs/client.pem"
+          private_key_path: "/app/certs/client-key.pem"
+          
+    # SAML Templates
+    saml_templates:
+      saml2_sso:
+        name: "SAML 2.0 Single Sign-On"
+        version: "2.0"
+        binding: "HTTP-POST"
+        signature_algorithm: "RSA-SHA256"
+        digest_algorithm: "SHA256"
+        assertion_signed: true
+        response_signed: true
+        name_id_format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+        attribute_consuming_service_index: 0
+        force_authn: false
+        is_passive: false
+        example_config:
+          entity_id: "urn:company:saml:sp"
+          sso_url: "${SAML_SSO_URL}"
+          sls_url: "${SAML_SLS_URL}"
+          x509_cert: "${SAML_X509_CERT}"
+          private_key: "${SAML_PRIVATE_KEY}"
+          
+    # LDAP/Active Directory Templates
+    ldap_templates:
+      active_directory:
+        name: "Active Directory LDAP"
+        protocol: "ldaps"
+        port: 636
+        base_dn: "DC=company,DC=com"
+        user_dn: "CN=Users,DC=company,DC=com"
+        group_dn: "CN=Groups,DC=company,DC=com"
+        user_filter: "(sAMAccountName={username})"
+        group_filter: "(member={userdn})"
+        attributes:
+          - "sAMAccountName"
+          - "displayName"
+          - "mail"
+          - "memberOf"
+        connection_pool:
+          initial_size: 2
+          max_size: 10
+          timeout: 30
+        example_config:
+          server: "${AD_SERVER}"
+          bind_dn: "${AD_BIND_DN}"
+          bind_password: "${AD_BIND_PASSWORD}"
+          
+      openldap:
+        name: "OpenLDAP Authentication"
+        protocol: "ldaps"
+        port: 636
+        base_dn: "dc=company,dc=org"
+        user_dn: "ou=people,dc=company,dc=org"
+        user_filter: "(uid={username})"
+        group_filter: "(memberUid={username})"
+        attributes:
+          - "uid"
+          - "cn"
+          - "mail"
+          - "ou"
+        example_config:
+          server: "${LDAP_SERVER}"
+          bind_dn: "${LDAP_BIND_DN}"
+          bind_password: "${LDAP_BIND_PASSWORD}"
+          
+    # Database Authentication Templates
+    database_templates:
+      postgresql:
+        name: "PostgreSQL Authentication"
+        ssl_mode: "require"
+        ssl_cert_verification: true
+        connection_timeout: 30
+        idle_timeout: 300
+        max_lifetime: 3600
+        auth_methods:
+          - "md5"
+          - "scram-sha-256"
+        example_config:
+          host: "${POSTGRES_HOST}"
+          port: 5432
+          database: "${POSTGRES_DB}"
+          username: "${POSTGRES_USER}"
+          password: "${POSTGRES_PASSWORD}"
+          ssl_mode: "require"
+          
+      mysql:
+        name: "MySQL Authentication"
+        ssl_mode: "REQUIRED"
+        ssl_ca_path: "/app/certs/ca.pem"
+        charset: "utf8mb4"
+        timeout: 30
+        max_allowed_packet: "64MB"
+        example_config:
+          host: "${MYSQL_HOST}"
+          port: 3306
+          database: "${MYSQL_DB}"
+          username: "${MYSQL_USER}"
+          password: "${MYSQL_PASSWORD}"
+          
+      mongodb:
+        name: "MongoDB Authentication"
+        auth_mechanism: "SCRAM-SHA-256"
+        auth_source: "admin"
+        ssl: true
+        ssl_cert_reqs: "CERT_REQUIRED"
+        ssl_ca_certs: "/app/certs/mongodb-ca.pem"
+        example_config:
+          host: "${MONGODB_HOST}"
+          port: 27017
+          database: "${MONGODB_DB}"
+          username: "${MONGODB_USER}"
+          password: "${MONGODB_PASSWORD}"
+          
+      oracle:
+        name: "Oracle Database Authentication"
+        service_name: "${ORACLE_SERVICE}"
+        connection_class: "POOLED"
+        purity: "SELF"
+        ssl_mode: "REQUIRED"
+        wallet_location: "/app/certs/oracle_wallet"
+        example_config:
+          host: "${ORACLE_HOST}"
+          port: 1521
+          service_name: "${ORACLE_SERVICE}"
+          username: "${ORACLE_USER}"
+          password: "${ORACLE_PASSWORD}"
+          
+    # Cloud Provider Templates
+    cloud_auth_templates:
+      aws_iam:
+        name: "AWS IAM Role Authentication"
+        auth_method: "iam_role"
+        region: "us-east-1"
+        session_duration: 3600
+        role_session_name: "base-data-ingestion"
+        external_id: "${AWS_EXTERNAL_ID}"
+        mfa_required: false
+        example_config:
+          role_arn: "${AWS_ROLE_ARN}"
+          access_key_id: "${AWS_ACCESS_KEY_ID}"
+          secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+          session_token: "${AWS_SESSION_TOKEN}"
+          
+      azure_service_principal:
+        name: "Azure Service Principal"
+        auth_method: "service_principal"
+        authority: "https://login.microsoftonline.com"
+        resource: "https://management.azure.com/"
+        example_config:
+          tenant_id: "${AZURE_TENANT_ID}"
+          client_id: "${AZURE_CLIENT_ID}"
+          client_secret: "${AZURE_CLIENT_SECRET}"
+          
+      gcp_service_account:
+        name: "GCP Service Account"
+        auth_method: "service_account"
+        scope: 
+          - "https://www.googleapis.com/auth/cloud-platform"
+        token_uri: "https://oauth2.googleapis.com/token"
+        example_config:
+          service_account_json: "${GCP_SERVICE_ACCOUNT_JSON}"
+          project_id: "${GCP_PROJECT_ID}"
+          
+    # Message Queue Authentication Templates
+    message_queue_templates:
+      kafka_sasl_ssl:
+        name: "Kafka SASL/SSL"
+        security_protocol: "SASL_SSL"
+        sasl_mechanism: "PLAIN"
+        ssl_check_hostname: true
+        ssl_cafile: "/app/certs/kafka-ca.pem"
+        example_config:
+          bootstrap_servers: "${KAFKA_BROKERS}"
+          sasl_username: "${KAFKA_USERNAME}"
+          sasl_password: "${KAFKA_PASSWORD}"
+          
+      rabbitmq_tls:
+        name: "RabbitMQ TLS Authentication"
+        ssl: true
+        ssl_options:
+          cert_reqs: "CERT_REQUIRED"
+          ca_certs: "/app/certs/rabbitmq-ca.pem"
+          certfile: "/app/certs/rabbitmq-client.pem"
+          keyfile: "/app/certs/rabbitmq-client-key.pem"
+        example_config:
+          host: "${RABBITMQ_HOST}"
+          port: 5671
+          virtual_host: "/"
+          username: "${RABBITMQ_USER}"
+          password: "${RABBITMQ_PASSWORD}"
+          
+    # Custom Authentication Templates
+    custom_templates:
+      hmac_signature:
+        name: "HMAC Signature Authentication"
+        algorithm: "sha256"
+        signature_header: "X-Signature"
+        timestamp_header: "X-Timestamp"
+        timestamp_tolerance: 300
+        body_encoding: "utf-8"
+        signature_format: "hex"
+        example_config:
+          secret_key: "${HMAC_SECRET_KEY}"
+          algorithm: "sha256"
+          
+      token_exchange:
+        name: "Token Exchange Pattern"
+        initial_auth_method: "basic"
+        token_endpoint: "/auth/token"
+        token_type: "bearer"
+        token_header: "Authorization"
+        refresh_endpoint: "/auth/refresh"
+        revoke_endpoint: "/auth/revoke"
+        example_config:
+          username: "${EXCHANGE_USERNAME}"
+          password: "${EXCHANGE_PASSWORD}"
+          client_id: "${EXCHANGE_CLIENT_ID}"
+          
+    # Authentication Profiles by Source Type
+    source_auth_profiles:
+      financial_apis:
+        default_auth: "oauth2"
+        fallback_auth: "api_key"
+        token_caching: true
+        retry_on_auth_failure: true
+        
+      internal_databases:
+        default_auth: "certificate"
+        connection_pooling: true
+        ssl_required: true
+        
+      cloud_storage:
+        default_auth: "iam_role"
+        cross_account_access: true
+        
+      message_queues:
+        default_auth: "sasl_ssl"
+        consumer_group_auth: true
+        
+    # Security Policies
+    security_policies:
+      credential_management:
+        rotation_policy:
+          api_keys: "90d"
+          certificates: "365d"
+          passwords: "90d"
+          oauth_tokens: "auto"
+        storage:
+          encryption_at_rest: true
+          encryption_key: "AES-256"
+          secret_manager: "vault"
+        access_control:
+          principle_of_least_privilege: true
+          role_based_access: true
+          audit_logging: true
+          
+      compliance_requirements:
+        pci_dss:
+          strong_cryptography: true
+          secure_key_management: true
+          access_logging: true
+        sox:
+          change_management: true
+          segregation_of_duties: true
+          audit_trail: true
+        gdpr:
+          data_encryption: true
+          access_controls: true
+          audit_logging: true
+          
+    # Monitoring and Alerting
+    monitoring:
+      authentication_metrics:
+        - "auth_success_rate"
+        - "auth_failure_rate"
+        - "token_refresh_rate"
+        - "certificate_expiry"
+        - "credential_rotation_status"
+        
+      alerts:
+        auth_failure_threshold:
+          condition: "failure_rate > 5%"
+          window: "5m"
+          severity: "warning"
+          
+        certificate_expiry:
+          condition: "expires_in < 30d"
+          severity: "critical"
+          
+        credential_rotation_overdue:
+          condition: "last_rotation > policy_interval"
+          severity: "high"

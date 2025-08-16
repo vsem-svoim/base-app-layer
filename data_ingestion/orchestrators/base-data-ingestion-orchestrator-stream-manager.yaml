@@ -1,0 +1,42 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-ingestion-orchestrator-stream-manager
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: stream-manager
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: orchestrator
+    base.io/function: stream-coordination
+spec:
+  type: "stream_coordinator"
+  coordination:
+    stream_management:
+      supported_streams: ["kafka", "kinesis", "pubsub", "rabbitmq"]
+      max_concurrent_streams: 100
+      stream_monitoring: true
+      auto_scaling: true
+    buffer_management:
+      buffer_size: "1GB"
+      flush_interval: "10s"
+      compression: true
+    backpressure_handling:
+      enabled: true
+      threshold: "80%"
+      strategy: "drop_oldest"
+  resources:
+    deployment:
+      replicas: 3
+      resources:
+        requests:
+          cpu: "2"
+          memory: "4Gi"
+        limits:
+          cpu: "8"
+          memory: "16Gi"
+    performance:
+      throughput_target: "10MB/s"
+      latency_target: "< 100ms"
+      checkpoint_interval: "30s"

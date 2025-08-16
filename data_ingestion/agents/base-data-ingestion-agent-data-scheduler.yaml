@@ -1,0 +1,549 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-data-scheduler-sa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: base-data-scheduler-role
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "patch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: base-data-scheduler-binding
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: base-data-scheduler-role
+subjects:
+- kind: ServiceAccount
+  name: base-data-scheduler-sa
+  namespace: base-ingestion
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-ingestion-agent-data-scheduler
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: agent
+    base.io/function: data-scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-data-scheduler
+        app.kubernetes.io/component: ingestion
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_ingestion
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-data-scheduler-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: data-scheduler
+        image: base/data-scheduler:v2.5.0-analytics-fixed
+        imagePullPolicy: Always
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9001
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MAX_CONCURRENT_JOBS
+          value: "100"
+        - name: SCHEDULING_INTERVAL
+          value: "30s"
+        - name: TIMEZONE
+          value: "UTC"
+        - name: ENABLE_CRON_JOBS
+          value: "true"
+        - name: ENABLE_EVENT_DRIVEN
+          value: "true"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+            ephemeral-storage: "2Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 20
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: schedules-volume
+          mountPath: /app/schedules
+          readOnly: true
+        - name: timezone-config
+          mountPath: /etc/localtime
+          readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-data-scheduler-config
+      - name: schedules-volume
+        configMap:
+          name: base-data-scheduler-schedules
+      - name: timezone-config
+        hostPath:
+          path: /usr/share/zoneinfo/UTC
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-data-scheduler-service
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+    app.kubernetes.io/component: ingestion
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 9001
+    targetPort: 9001
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-data-scheduler
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-scheduler-config
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+    app.kubernetes.io/component: ingestion
+data:
+  scheduler.yaml: |
+    # Data Scheduler Agent Configuration
+    scheduler:
+      # Agent Identity and Responsibility
+      name: "base-data-scheduler"
+      version: "v2.5.0"
+      responsibility: "Timing coordination and workflow scheduling for data collection operations"
+      
+      # Core Scheduling Configuration
+      scheduling:
+        default_timezone: "UTC"
+        max_concurrent_jobs: 100
+        job_timeout: "3600s"
+        retry_failed_jobs: true
+        cleanup_completed_jobs: true
+        completed_job_retention: "24h"
+        failed_job_retention: "7d"
+        
+      # Schedule Types Support
+      schedule_types:
+        cron:
+          enabled: true
+          timezone_support: true
+          second_precision: false
+          
+        interval:
+          enabled: true
+          min_interval: "60s"
+          max_interval: "24h"
+          
+        event_driven:
+          enabled: true
+          supported_events:
+            - "data_source_updated"
+            - "schema_changed"
+            - "quality_threshold_exceeded"
+            - "external_trigger"
+            
+        dependency_based:
+          enabled: true
+          max_dependency_depth: 5
+          circular_dependency_check: true
+          
+      # Business Hours and Constraints
+      business_constraints:
+        business_hours:
+          enabled: true
+          timezone: "America/New_York"
+          start_time: "09:00"
+          end_time: "17:00"
+          business_days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+          holidays:
+            - "2024-01-01"  # New Year's Day
+            - "2024-07-04"  # Independence Day
+            - "2024-12-25"  # Christmas Day
+            
+        maintenance_windows:
+          - name: "weekly_maintenance"
+            schedule: "0 2 * * 0"  # Sunday 2 AM
+            duration: "2h"
+            
+        resource_constraints:
+          max_cpu_usage: 0.8
+          max_memory_usage: 0.85
+          max_network_bandwidth: "1GB/s"
+          
+      # Dependency Management
+      dependencies:
+        resolution_strategy: "topological_sort"
+        parallel_execution: true
+        failure_propagation: "immediate"
+        dependency_timeout: "1800s"
+        
+      # Backfill Configuration
+      backfill:
+        enabled: true
+        max_backfill_period: "30d"
+        chunk_size: "1d"
+        parallel_backfill_jobs: 5
+        priority: "low"
+        
+      # Resource Management
+      resource_management:
+        job_queues:
+          high_priority:
+            max_concurrent: 20
+            timeout: "1800s"
+            retry_attempts: 3
+          normal_priority:
+            max_concurrent: 50
+            timeout: "3600s"
+            retry_attempts: 2
+          low_priority:
+            max_concurrent: 30
+            timeout: "7200s"
+            retry_attempts: 1
+            
+        resource_allocation:
+          cpu_per_job: "1"
+          memory_per_job: "2Gi"
+          ephemeral_storage_per_job: "10Gi"
+          
+      # Retry and Error Handling
+      retry_policy:
+        max_attempts: 3
+        backoff_strategy: "exponential"
+        base_delay: "60s"
+        max_delay: "1800s"
+        jitter: true
+        
+      failure_handling:
+        dead_letter_queue: true
+        alert_on_failure: true
+        auto_disable_failing_schedules: true
+        failure_threshold: 5
+        failure_window: "1h"
+        
+      # Integration Points
+      integration:
+        collector_service:
+          endpoint: "http://base-data-collector-service:8080"
+          timeout: "30s"
+        quality_service:
+          endpoint: "http://base-data-quality-service:8080"
+          health_check: true
+        event_service:
+          endpoint: "http://base-event-coordinator-service:8080"
+          events:
+            - "job_scheduled"
+            - "job_started"
+            - "job_completed"
+            - "job_failed"
+            - "schedule_disabled"
+        kubernetes:
+          namespace: "base-ingestion"
+          job_template: "base-data-collection-job"
+          
+      # Health and Performance Monitoring
+      monitoring:
+        health_checks:
+          enabled: true
+          interval: "30s"
+          timeout: "10s"
+          
+        performance_tracking:
+          job_execution_time: true
+          queue_depth: true
+          resource_utilization: true
+          schedule_drift: true
+          
+        sla_tracking:
+          enabled: true
+          target_execution_time: "300s"
+          target_success_rate: 0.99
+          target_schedule_accuracy: "±5min"
+          
+      # Security and Compliance
+      security:
+        audit_logging: true
+        rbac_integration: true
+        secret_management: "kubernetes"
+        
+    # Schedule Definitions
+    schedules:
+      financial_data_ingestion:
+        description: "Ingest financial market data every 15 minutes during market hours"
+        type: "cron"
+        expression: "*/15 9-16 * * 1-5"
+        timezone: "America/New_York"
+        enabled: true
+        priority: "high"
+        timeout: "600s"
+        
+      daily_batch_processing:
+        description: "Daily batch processing at 2 AM UTC"
+        type: "cron"
+        expression: "0 2 * * *"
+        timezone: "UTC"
+        enabled: true
+        priority: "normal"
+        timeout: "7200s"
+        
+      real_time_stream_monitoring:
+        description: "Monitor real-time data streams"
+        type: "interval"
+        interval: "30s"
+        enabled: true
+        priority: "high"
+        timeout: "60s"
+        
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      audit_enabled: true
+      
+    # Monitoring Configuration
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      custom_metrics:
+        - name: "scheduled_jobs_total"
+          type: "counter"
+          description: "Total number of jobs scheduled"
+        - name: "active_jobs"
+          type: "gauge"
+          description: "Number of currently active jobs"
+        - name: "job_execution_duration"
+          type: "histogram"
+          description: "Job execution time distribution"
+        - name: "schedule_drift"
+          type: "histogram"
+          description: "Time difference between scheduled and actual execution"
+        - name: "job_success_rate"
+          type: "gauge"
+          description: "Job success rate percentage"
+        - name: "queue_depth"
+          type: "gauge"
+          description: "Number of jobs waiting in queue"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-scheduler-schedules
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+    app.kubernetes.io/component: ingestion
+data:
+  market_data_schedules.yaml: |
+    # Market Data Collection Schedules
+    market_schedules:
+      nyse_data:
+        description: "NYSE market data collection"
+        cron: "*/5 9-16 * * 1-5"
+        timezone: "America/New_York"
+        enabled: true
+        source: "nyse_api"
+        
+      nasdaq_data:
+        description: "NASDAQ market data collection"
+        cron: "*/5 9-16 * * 1-5"
+        timezone: "America/New_York"
+        enabled: true
+        source: "nasdaq_api"
+        
+      forex_data:
+        description: "Forex data collection (24/5)"
+        cron: "*/15 * * * 1-5"
+        timezone: "UTC"
+        enabled: true
+        source: "forex_api"
+        
+      crypto_data:
+        description: "Cryptocurrency data (24/7)"
+        interval: "60s"
+        enabled: true
+        source: "crypto_api"
+        
+  batch_schedules.yaml: |
+    # Batch Processing Schedules
+    batch_jobs:
+      end_of_day_processing:
+        description: "End of day data consolidation"
+        cron: "0 18 * * 1-5"
+        timezone: "America/New_York"
+        enabled: true
+        timeout: "3600s"
+        
+      weekly_reconciliation:
+        description: "Weekly data reconciliation"
+        cron: "0 6 * * 1"
+        timezone: "UTC"
+        enabled: true
+        timeout: "7200s"
+        
+      monthly_archival:
+        description: "Monthly data archival"
+        cron: "0 2 1 * *"
+        timezone: "UTC"
+        enabled: true
+        timeout: "14400s"
+        
+  emergency_schedules.yaml: |
+    # Emergency and Override Schedules
+    emergency:
+      data_recovery:
+        description: "Emergency data recovery job"
+        enabled: false
+        manual_trigger: true
+        priority: "critical"
+        timeout: "1800s"
+        
+      system_health_check:
+        description: "System health verification"
+        cron: "*/30 * * * *"
+        enabled: true
+        priority: "high"
+        timeout: "300s"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-data-scheduler-netpol
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-scheduler
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-scheduler
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9001
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality  
+    - namespaceSelector:
+        matchLabels:
+          name: base-events
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # Kubernetes API
+    - protocol: TCP
+      port: 6443 # Kubernetes API alternative port

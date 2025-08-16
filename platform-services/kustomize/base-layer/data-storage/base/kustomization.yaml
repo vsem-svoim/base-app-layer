@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../../../data_storage/agents/
+  - ../../../../../data_storage/configs/
+  - ../../../../../data_storage/models/
+  - ../../../../../data_storage/orchestrators/
+  - ../../../../../data_storage/workflows/
+
+configMapGenerator:
+  - name: data-storage-prompts
+    files:
+      - ../../../../../data_storage/prompts/
+
+commonLabels:
+  app.kubernetes.io/part-of: base-system
+  base.io/category: data_storage
+
+namespace: base-data-storage
+namePrefix: base-data-storage-

@@ -1,0 +1,571 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-ingestion-format-specifications
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: format-specifications
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: config
+    base.io/function: format-handling
+spec:
+  configType: "format-specifications"
+  data:
+    # JSON Format Specifications
+    json_formats:
+      standard_json:
+        name: "Standard JSON"
+        mime_types:
+          - "application/json"
+          - "text/json"
+        file_extensions:
+          - ".json"
+        encoding: "utf-8"
+        max_size: "100MB"
+        validation:
+          validate_syntax: true
+          validate_schema: false
+          allow_comments: false
+          allow_trailing_commas: false
+        parsing_options:
+          strict_mode: true
+          parse_numbers_as_strings: false
+          preserve_order: false
+        compression_support:
+          - "gzip"
+          - "bzip2"
+          - "lz4"
+        schema_inference:
+          enabled: true
+          max_depth: 10
+          sample_size: 1000
+        example_config:
+          detect_arrays: true
+          detect_objects: true
+          infer_types: true
+          
+      json_lines:
+        name: "JSON Lines (NDJSON)"
+        mime_types:
+          - "application/x-ndjson"
+          - "text/x-ndjson"
+        file_extensions:
+          - ".jsonl"
+          - ".ndjson"
+        encoding: "utf-8"
+        max_size: "1GB"
+        line_delimiter: "\n"
+        streaming_support: true
+        batch_size: 1000
+        validation:
+          validate_each_line: true
+          skip_invalid_lines: false
+          log_invalid_lines: true
+        
+      json_api:
+        name: "JSON API Format"
+        mime_types:
+          - "application/vnd.api+json"
+        specification: "JSON:API v1.0"
+        validation:
+          validate_structure: true
+          require_data_field: true
+          validate_relationships: true
+        parsing_options:
+          extract_included: true
+          normalize_relationships: true
+          
+    # CSV Format Specifications  
+    csv_formats:
+      standard_csv:
+        name: "Standard CSV"
+        mime_types:
+          - "text/csv"
+          - "application/csv"
+        file_extensions:
+          - ".csv"
+        encoding: "utf-8"
+        max_size: "500MB"
+        delimiter: ","
+        quote_char: "\""
+        escape_char: "\\"
+        line_terminator: "\n"
+        header_row: true
+        skip_blank_lines: true
+        validation:
+          validate_headers: true
+          validate_row_length: true
+          allow_incomplete_rows: false
+        type_inference:
+          enabled: true
+          sample_rows: 1000
+          date_formats:
+            - "YYYY-MM-DD"
+            - "MM/DD/YYYY"
+            - "DD-MM-YYYY"
+          number_formats:
+            - "1234.56"
+            - "1,234.56"
+            - "1234,56"
+        compression_support:
+          - "gzip"
+          - "zip"
+          
+      tsv_format:
+        name: "Tab-Separated Values"
+        mime_types:
+          - "text/tab-separated-values"
+          - "text/tsv"
+        file_extensions:
+          - ".tsv"
+          - ".tab"
+        delimiter: "\t"
+        quote_char: "\""
+        encoding: "utf-8"
+        header_row: true
+        
+      pipe_delimited:
+        name: "Pipe-Delimited Format"
+        delimiter: "|"
+        quote_char: "\""
+        encoding: "utf-8"
+        common_in_sources:
+          - "financial_feeds"
+          - "trading_systems"
+          
+    # XML Format Specifications
+    xml_formats:
+      standard_xml:
+        name: "Standard XML"
+        mime_types:
+          - "application/xml"
+          - "text/xml"
+        file_extensions:
+          - ".xml"
+        encoding: "utf-8"
+        max_size: "200MB"
+        validation:
+          validate_syntax: true
+          validate_dtd: false
+          validate_schema: false
+          allow_external_entities: false
+        parsing_options:
+          preserve_whitespace: false
+          expand_entities: false
+          recover_from_errors: true
+        namespace_handling:
+          namespace_aware: true
+          preserve_prefixes: true
+        compression_support:
+          - "gzip"
+          - "bzip2"
+          
+      soap_xml:
+        name: "SOAP XML Format"
+        mime_types:
+          - "application/soap+xml"
+          - "text/xml"
+        envelope_required: true
+        validation:
+          validate_soap_envelope: true
+          validate_soap_headers: true
+          validate_soap_body: true
+        processing:
+          extract_soap_body: true
+          preserve_headers: true
+          
+      financial_xml:
+        name: "Financial XML (FpML, FIXML)"
+        standards:
+          - "FpML 5.12"
+          - "FIXML 5.0SP2"
+        validation:
+          validate_against_standard: true
+          require_schema: true
+        processing:
+          normalize_to_canonical: true
+          extract_trade_data: true
+          
+    # Binary Format Specifications
+    binary_formats:
+      parquet:
+        name: "Apache Parquet"
+        mime_types:
+          - "application/parquet"
+        file_extensions:
+          - ".parquet"
+          - ".pq"
+        max_size: "5GB"
+        compression_codecs:
+          - "SNAPPY"
+          - "GZIP"
+          - "LZO"
+          - "BROTLI"
+          - "LZ4"
+          - "ZSTD"
+        schema_evolution: true
+        predicate_pushdown: true
+        column_pruning: true
+        processing_options:
+          read_batch_size: 64000
+          use_pandas_metadata: true
+          coerce_int96_timestamp_unit: "ns"
+          
+      avro:
+        name: "Apache Avro"
+        mime_types:
+          - "application/avro"
+        file_extensions:
+          - ".avro"
+        max_size: "2GB"
+        schema_required: true
+        schema_evolution: true
+        compression_codecs:
+          - "null"
+          - "deflate"
+          - "snappy"
+          - "bzip2"
+          - "xz"
+        processing_options:
+          validate_schema: true
+          reader_schema_compatibility: true
+          
+      orc:
+        name: "Optimized Row Columnar"
+        mime_types:
+          - "application/orc"
+        file_extensions:
+          - ".orc"
+        max_size: "5GB"
+        compression_codecs:
+          - "NONE"
+          - "ZLIB"
+          - "SNAPPY"
+          - "LZO"
+          - "LZ4"
+          - "ZSTD"
+        stripe_size: "64MB"
+        row_index_stride: 10000
+        
+    # Spreadsheet Format Specifications
+    spreadsheet_formats:
+      excel_xlsx:
+        name: "Excel XLSX"
+        mime_types:
+          - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        file_extensions:
+          - ".xlsx"
+        max_size: "100MB"
+        max_sheets: 50
+        max_rows_per_sheet: 1048576
+        max_cols_per_sheet: 16384
+        processing_options:
+          read_only_active_sheet: false
+          skip_hidden_sheets: true
+          preserve_formatting: false
+          convert_formulas: true
+          header_row: 0
+        validation:
+          check_password_protection: true
+          validate_sheet_names: true
+          
+      excel_xls:
+        name: "Excel XLS (Legacy)"
+        mime_types:
+          - "application/vnd.ms-excel"
+        file_extensions:
+          - ".xls"
+        max_size: "50MB"
+        max_rows_per_sheet: 65536
+        max_cols_per_sheet: 256
+        processing_options:
+          encoding: "windows-1252"
+          preserve_formatting: false
+          
+      google_sheets:
+        name: "Google Sheets"
+        mime_types:
+          - "application/vnd.google-apps.spreadsheet"
+        api_access: true
+        authentication: "oauth2"
+        processing_options:
+          export_format: "csv"
+          include_formulas: false
+          
+    # Fixed-Width Format Specifications
+    fixed_width_formats:
+      standard_fixed:
+        name: "Standard Fixed-Width"
+        file_extensions:
+          - ".txt"
+          - ".dat"
+          - ".fix"
+        encoding: "ascii"
+        line_terminator: "\n"
+        padding_char: " "
+        alignment: "left"
+        validation:
+          validate_record_length: true
+          validate_field_positions: true
+        processing_options:
+          trim_whitespace: true
+          skip_header_lines: 0
+          skip_footer_lines: 0
+          
+      cobol_copybook:
+        name: "COBOL Copybook Format"
+        file_extensions:
+          - ".cob"
+          - ".cpy"
+        ebcdic_support: true
+        packed_decimal_support: true
+        occurs_clause_support: true
+        redefines_support: true
+        
+    # Financial Data Formats
+    financial_formats:
+      swift_mt:
+        name: "SWIFT MT Messages"
+        message_types:
+          - "MT103"
+          - "MT202"
+          - "MT940"
+          - "MT950"
+        validation:
+          validate_message_structure: true
+          validate_field_formats: true
+          validate_checksums: true
+        processing_options:
+          parse_blocks: true
+          extract_fields: true
+          validate_bic_codes: true
+          
+      iso20022:
+        name: "ISO 20022 XML"
+        mime_types:
+          - "application/xml"
+        message_types:
+          - "pacs.008"
+          - "camt.053"
+          - "pain.001"
+        validation:
+          validate_against_schema: true
+          validate_business_rules: true
+        processing_options:
+          normalize_currency_codes: true
+          extract_transaction_details: true
+          
+      fix_protocol:
+        name: "FIX Protocol Messages"
+        versions:
+          - "FIX 4.2"
+          - "FIX 4.4"
+          - "FIX 5.0"
+        field_delimiter: "|"
+        validation:
+          validate_checksum: true
+          validate_required_fields: true
+          validate_field_types: true
+        processing_options:
+          parse_repeating_groups: true
+          resolve_field_names: true
+          
+    # Log Format Specifications
+    log_formats:
+      common_log:
+        name: "Common Log Format"
+        pattern: '%h %l %u %t "%r" %>s %O "%{Referer}i" "%{User-Agent}i"'
+        timestamp_format: "[%d/%b/%Y:%H:%M:%S %z]"
+        
+      json_logs:
+        name: "Structured JSON Logs"
+        required_fields:
+          - "timestamp"
+          - "level"
+          - "message"
+        optional_fields:
+          - "logger"
+          - "thread"
+          - "mdc"
+        timestamp_formats:
+          - "ISO8601"
+          - "RFC3339"
+          
+      syslog:
+        name: "Syslog Format"
+        rfc: "RFC5424"
+        facility_codes: true
+        severity_levels: true
+        structured_data: true
+        
+    # Database Export Formats
+    database_formats:
+      sql_dump:
+        name: "SQL Dump"
+        file_extensions:
+          - ".sql"
+        encoding: "utf-8"
+        statement_delimiter: ";"
+        include_schema: true
+        include_data: true
+        
+      db2_load:
+        name: "DB2 Load Format"
+        field_delimiter: ","
+        string_delimiter: "\""
+        decimal_separator: "."
+        date_format: "YYYY-MM-DD"
+        timestamp_format: "YYYY-MM-DD HH:MI:SS.NNNNNN"
+        
+    # Image and Document Formats
+    document_formats:
+      pdf:
+        name: "Portable Document Format"
+        mime_types:
+          - "application/pdf"
+        file_extensions:
+          - ".pdf"
+        max_size: "50MB"
+        text_extraction: true
+        table_extraction: true
+        metadata_extraction: true
+        
+      tiff:
+        name: "Tagged Image File Format"
+        mime_types:
+          - "image/tiff"
+        file_extensions:
+          - ".tiff"
+          - ".tif"
+        ocr_enabled: true
+        text_extraction: true
+        
+    # Format Detection Rules
+    format_detection:
+      magic_numbers:
+        pdf: "%PDF"
+        xlsx: "PK\x03\x04"
+        zip: "PK\x03\x04"
+        gzip: "\x1f\x8b"
+        
+      content_analysis:
+        json:
+          starts_with: ["{", "["]
+          contains: [":", ",", "\""]
+          max_sample_size: 1024
+          
+        csv:
+          delimiter_patterns: [",", ";", "\t", "|"]
+          quote_patterns: ["\"", "'"]
+          max_lines_to_analyze: 10
+          
+        xml:
+          starts_with: ["<?xml", "<"]
+          contains: ["<", ">", "</"]
+          max_sample_size: 1024
+          
+      file_extension_mapping:
+        ".json": "json"
+        ".csv": "csv"
+        ".xml": "xml"
+        ".xlsx": "excel_xlsx"
+        ".xls": "excel_xls"
+        ".parquet": "parquet"
+        ".avro": "avro"
+        ".orc": "orc"
+        
+    # Format Conversion Rules
+    format_conversion:
+      standardization_targets:
+        tabular_data: "parquet"
+        document_data: "json"
+        streaming_data: "avro"
+        
+      conversion_priorities:
+        high_priority:
+          - "csv_to_parquet"
+          - "json_to_avro"
+          - "xml_to_json"
+        medium_priority:
+          - "excel_to_csv"
+          - "fixed_width_to_csv"
+        low_priority:
+          - "pdf_to_text"
+          - "image_to_text"
+          
+      conversion_rules:
+        preserve_schema: true
+        validate_after_conversion: true
+        retain_original: true
+        compress_output: true
+        
+    # Quality and Validation Rules
+    quality_rules:
+      general_validation:
+        max_file_size: "1GB"
+        min_file_size: "1B"
+        encoding_validation: true
+        corruption_detection: true
+        
+      data_type_validation:
+        numeric_formats:
+          - "integer"
+          - "float"
+          - "decimal"
+          - "currency"
+        date_formats:
+          - "ISO8601"
+          - "US_DATE"
+          - "EU_DATE"
+          - "TIMESTAMP"
+        string_formats:
+          - "email"
+          - "url"
+          - "phone"
+          - "postal_code"
+          
+      business_validation:
+        financial_data:
+          - "positive_amounts"
+          - "valid_currency_codes"
+          - "future_value_dates"
+          - "business_day_validation"
+        reference_data:
+          - "unique_identifiers"
+          - "referential_integrity"
+          - "valid_lookup_codes"
+          
+    # Performance Optimization
+    performance_settings:
+      parallel_processing:
+        max_threads: 8
+        chunk_size: "10MB"
+        memory_limit: "2GB"
+        
+      streaming_thresholds:
+        enable_streaming_above: "100MB"
+        streaming_chunk_size: "1MB"
+        
+      caching:
+        cache_parsed_schemas: true
+        cache_format_detections: true
+        cache_duration: "1h"
+        
+    # Error Handling
+    error_handling:
+      parsing_errors:
+        strategy: "skip_and_log"
+        max_error_rate: "5%"
+        sample_errors: 10
+        
+      validation_errors:
+        strategy: "quarantine"
+        notification: true
+        manual_review_required: true
+        
+      conversion_errors:
+        strategy: "retry_with_fallback"
+        retry_attempts: 3
+        fallback_format: "raw_text"

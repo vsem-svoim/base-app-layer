@@ -1,0 +1,95 @@
+# Kubeflow values for AWS Fargate
+global:
+  cloudProvider: aws
+  region: us-east-1
+
+kubeflow:
+  # Central Dashboard
+  centralDashboard:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+    nodeSelector: {}
+    tolerations:
+      - key: eks.amazonaws.com/compute-type
+        operator: Equal
+        value: fargate
+        effect: NoSchedule
+    podAnnotations:
+      eks.amazonaws.com/fargate-profile: ml-platform
+
+  # Kubeflow Pipelines
+  pipelines:
+    apiServer:
+      resources:
+        limits:
+          cpu: 1
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      nodeSelector: {}
+      tolerations:
+        - key: eks.amazonaws.com/compute-type
+          operator: Equal
+          value: fargate
+          effect: NoSchedule
+      podAnnotations:
+        eks.amazonaws.com/fargate-profile: ml-platform
+
+    ui:
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+      nodeSelector: {}
+      tolerations:
+        - key: eks.amazonaws.com/compute-type
+          operator: Equal
+          value: fargate
+          effect: NoSchedule
+      podAnnotations:
+        eks.amazonaws.com/fargate-profile: ml-platform
+
+  # Katib (Hyperparameter Tuning)
+  katib:
+    controller:
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+      nodeSelector: {}
+      tolerations:
+        - key: eks.amazonaws.com/compute-type
+          operator: Equal
+          value: fargate
+          effect: NoSchedule
+      podAnnotations:
+        eks.amazonaws.com/fargate-profile: ml-platform
+
+    ui:
+      resources:
+        limits:
+          cpu: 250m
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      nodeSelector: {}
+      tolerations:
+        - key: eks.amazonaws.com/compute-type
+          operator: Equal
+          value: fargate
+          effect: NoSchedule
+      podAnnotations:
+        eks.amazonaws.com/fargate-profile: ml-platform

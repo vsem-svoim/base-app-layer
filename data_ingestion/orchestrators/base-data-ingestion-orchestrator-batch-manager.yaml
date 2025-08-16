@@ -1,0 +1,43 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-ingestion-orchestrator-batch-manager
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: batch-manager
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: orchestrator
+    base.io/function: batch-coordination
+spec:
+  type: "batch_coordinator"
+  coordination:
+    batch_processing:
+      max_batch_size: "1GB"
+      batch_timeout: "5m"
+      parallel_batches: 20
+      retry_failed_batches: true
+    job_scheduling:
+      scheduler: "kubernetes_jobs"
+      resource_allocation: "dynamic"
+      priority_queue: true
+    dependency_management:
+      dag_execution: true
+      dependency_resolution: "topological_sort"
+      failure_isolation: true
+  resources:
+    deployment:
+      replicas: 2
+      resources:
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+        limits:
+          cpu: "4"
+          memory: "8Gi"
+    job_resources:
+      default_cpu: "500m"
+      default_memory: "1Gi"
+      max_cpu: "16"
+      max_memory: "64Gi"

@@ -1,0 +1,433 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-ingestion-source-detection-model
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: source-detection-model
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: model
+    base.io/function: source-detection
+spec:
+  type: "classification"
+  algorithm: "random_forest_ensemble"
+  deployment:
+    # Model Deployment Configuration
+    deployment_type: "kubernetes"
+    replicas: 3
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+        ephemeral-storage: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+        ephemeral-storage: "8Gi"
+    auto_scaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 10
+      target_cpu_utilization: 70
+      target_memory_utilization: 80
+    
+    # Model Serving Configuration
+    serving:
+      framework: "scikit-learn"
+      runtime: "python:3.9"
+      inference_endpoint: "/predict"
+      health_endpoint: "/health"
+      metrics_endpoint: "/metrics"
+      batch_prediction: true
+      real_time_prediction: true
+      
+    # Container Configuration
+    container:
+      image: "base/ml-models:source-detection-v3.2.0"
+      image_pull_policy: "Always"
+      ports:
+        - name: "http-inference"
+          container_port: 8080
+        - name: "grpc-inference"
+          container_port: 9000
+        - name: "metrics"
+          container_port: 9090
+      environment:
+        - name: "MODEL_NAME"
+          value: "source-detection"
+        - name: "MODEL_VERSION"
+          value: "2.1.0"
+        - name: "LOG_LEVEL"
+          value: "info"
+        - name: "PREDICTION_TIMEOUT"
+          value: "30s"
+        - name: "BATCH_SIZE"
+          value: "100"
+        - name: "CACHE_PREDICTIONS"
+          value: "true"
+          
+  training:
+    # Model Training Configuration
+    algorithm_details:
+      ensemble_method: "random_forest"
+      base_estimators: 100
+      max_depth: 15
+      min_samples_split: 10
+      min_samples_leaf: 5
+      max_features: "sqrt"
+      bootstrap: true
+      oob_score: true
+      class_weight: "balanced"
+      random_state: 42
+      
+    # Feature Engineering
+    feature_engineering:
+      feature_types:
+        - name: "url_features"
+          description: "URL-based features for API endpoints"
+          features:
+            - "domain_name"
+            - "path_structure" 
+            - "query_parameters"
+            - "protocol_type"
+            - "port_number"
+            - "subdomain_count"
+            - "path_depth"
+            
+        - name: "content_features"
+          description: "Data content analysis features"
+          features:
+            - "file_extension"
+            - "mime_type"
+            - "file_size"
+            - "compression_type"
+            - "encoding_type"
+            - "header_structure"
+            - "data_patterns"
+            
+        - name: "metadata_features"
+          description: "Source metadata features" 
+          features:
+            - "source_system"
+            - "authentication_type"
+            - "update_frequency"
+            - "data_classification"
+            - "geographic_region"
+            - "business_domain"
+            
+        - name: "temporal_features"
+          description: "Time-based features"
+          features:
+            - "creation_timestamp"
+            - "last_modified"
+            - "access_pattern"
+            - "update_frequency"
+            - "business_hours_alignment"
+            - "timezone_offset"
+            
+        - name: "schema_features"
+          description: "Data schema characteristics"
+          features:
+            - "column_count"
+            - "data_types_distribution"
+            - "null_percentage"
+            - "unique_values_ratio"
+            - "numerical_columns_ratio"
+            - "text_columns_ratio"
+            - "date_columns_ratio"
+            
+    # Training Data Configuration
+    training_data:
+      data_sources:
+        - name: "historical_source_classifications"
+          type: "database"
+          connection: "postgres://training-db:5432/ml_models"
+          query: "SELECT * FROM source_classifications WHERE created_at > NOW() - INTERVAL '2 years'"
+          
+        - name: "expert_labeled_sources"
+          type: "file"
+          path: "/data/training/expert_labeled_sources.parquet"
+          
+        - name: "synthetic_source_examples"
+          type: "file" 
+          path: "/data/training/synthetic_examples.json"
+          
+      data_preprocessing:
+        missing_value_strategy: "median_mode"
+        categorical_encoding: "target_encoding"
+        numerical_scaling: "robust_scaling"
+        feature_selection:
+          method: "recursive_feature_elimination"
+          n_features: 50
+        class_balancing:
+          method: "smote"
+          sampling_ratio: "auto"
+          
+      train_test_split:
+        test_size: 0.2
+        validation_size: 0.15
+        stratify: true
+        random_state: 42
+        
+    # Model Validation
+    validation:
+      cross_validation:
+        method: "stratified_k_fold"
+        n_folds: 5
+        shuffle: true
+        random_state: 42
+        
+      evaluation_metrics:
+        primary_metric: "f1_macro"
+        additional_metrics:
+          - "accuracy"
+          - "precision_macro"
+          - "recall_macro"
+          - "roc_auc_ovr"
+          - "confusion_matrix"
+          
+      performance_thresholds:
+        minimum_accuracy: 0.85
+        minimum_f1_score: 0.80
+        maximum_false_positive_rate: 0.05
+        
+    # Training Schedule
+    training_schedule:
+      initial_training: "on_deployment"
+      retraining_frequency: "monthly"
+      automated_retraining: true
+      retraining_triggers:
+        - "performance_degradation"
+        - "concept_drift_detection" 
+        - "new_source_types_detected"
+        - "manual_trigger"
+        
+      retraining_conditions:
+        min_new_samples: 1000
+        performance_drop_threshold: 0.05
+        data_drift_threshold: 0.1
+        
+  # Model Inference Configuration  
+  inference:
+    # Prediction Classes
+    target_classes:
+      api_sources:
+        - "bloomberg_api"
+        - "reuters_api" 
+        - "nyse_api"
+        - "nasdaq_api"
+        - "custom_financial_api"
+        - "rest_api_generic"
+        - "graphql_api"
+        - "soap_api"
+        
+      database_sources:
+        - "postgresql"
+        - "mysql"
+        - "oracle"
+        - "sql_server"
+        - "mongodb"
+        - "cassandra"
+        - "redis"
+        - "influxdb"
+        
+      file_sources:
+        - "csv_file"
+        - "json_file"
+        - "xml_file"
+        - "parquet_file"
+        - "avro_file"
+        - "orc_file"
+        - "excel_file"
+        - "pdf_file"
+        
+      cloud_storage:
+        - "aws_s3"
+        - "azure_blob"
+        - "google_cloud_storage"
+        - "hdfs"
+        - "ftp_server"
+        - "sftp_server"
+        
+      streaming_sources:
+        - "kafka_stream"
+        - "kinesis_stream"
+        - "pubsub_stream"
+        - "rabbitmq_queue"
+        - "activemq_queue"
+        - "websocket_stream"
+        
+    # Prediction Configuration
+    prediction_config:
+      confidence_threshold: 0.7
+      multi_label_prediction: false
+      probability_outputs: true
+      top_k_predictions: 3
+      prediction_explanation: true
+      
+    # Feature Importance
+    feature_importance:
+      calculate_importance: true
+      importance_method: "permutation"
+      global_importance: true
+      local_importance: true  # SHAP values
+      
+    # Prediction Caching
+    caching:
+      cache_predictions: true
+      cache_duration: "1h"
+      cache_key_features:
+        - "url_hash"
+        - "content_signature"
+        - "metadata_hash"
+        
+  # Model Monitoring and Observability
+  monitoring:
+    # Performance Monitoring
+    performance_monitoring:
+      track_prediction_accuracy: true
+      track_confidence_distribution: true
+      track_feature_drift: true
+      track_prediction_latency: true
+      
+      alerting:
+        accuracy_drop_threshold: 0.05
+        confidence_drop_threshold: 0.1
+        latency_threshold: "5s"
+        drift_threshold: 0.15
+        
+    # Data Quality Monitoring
+    data_quality_monitoring:
+      input_validation: true
+      feature_range_validation: true
+      missing_value_detection: true
+      outlier_detection: true
+      
+    # Model Health Checks
+    health_checks:
+      model_loading_check: true
+      prediction_endpoint_check: true
+      feature_pipeline_check: true
+      dependency_check: true
+      
+    # Logging and Metrics
+    logging:
+      log_predictions: true
+      log_confidence_scores: true
+      log_feature_importance: false  # Too verbose
+      log_errors: true
+      
+    metrics:
+      business_metrics:
+        - name: "classification_accuracy"
+          type: "gauge"
+          description: "Overall classification accuracy"
+        - name: "predictions_per_second"
+          type: "counter"
+          description: "Number of predictions processed per second"
+        - name: "high_confidence_predictions"
+          type: "gauge"
+          description: "Percentage of high confidence predictions"
+          
+      technical_metrics:
+        - name: "model_loading_time"
+          type: "histogram"
+          description: "Time taken to load model"
+        - name: "prediction_latency"
+          type: "histogram" 
+          description: "Time taken for individual predictions"
+        - name: "feature_processing_time"
+          type: "histogram"
+          description: "Time taken for feature engineering"
+          
+  # Integration Configuration
+  integration:
+    # Input Sources
+    input_integration:
+      data_collector_agent:
+        endpoint: "http://base-data-collector-service:8080/source-info"
+        timeout: "10s"
+        retry_attempts: 3
+        
+      metadata_service:
+        endpoint: "http://base-metadata-discovery-service:8080/metadata"
+        timeout: "5s"
+        
+    # Output Integration
+    output_integration:
+      source_mapping_service:
+        endpoint: "http://base-source-mapping-service:8080/classify"
+        format: "json"
+        
+      audit_service:
+        endpoint: "http://base-audit-service:8080/log-classification"
+        async: true
+        
+      event_coordination:
+        service: "base-event-coordinator"
+        events:
+          - "source_classified"
+          - "classification_confidence_low"
+          - "new_source_type_detected"
+          
+  # Model Versioning and Lifecycle
+  versioning:
+    versioning_strategy: "semantic_versioning"
+    model_registry: "mlflow"
+    artifact_storage: "s3://base-ml-models/source-detection/"
+    
+    version_management:
+      automatic_versioning: true
+      version_on_retraining: true
+      keep_last_n_versions: 5
+      
+    rollback_capability:
+      enable_rollback: true
+      rollback_criteria:
+        - "performance_degradation"
+        - "critical_bug"
+        - "manual_trigger"
+        
+    a_b_testing:
+      enable_a_b_testing: true
+      traffic_split: 0.1  # 10% to new model
+      success_criteria:
+        - "accuracy_improvement > 0.02"
+        - "latency_increase < 0.5s"
+        - "no_critical_errors"
+        
+  # Security and Compliance
+  security:
+    model_encryption: true
+    access_control:
+      rbac_enabled: true
+      service_accounts_only: true
+      
+    audit_logging:
+      log_model_access: true
+      log_predictions: true
+      log_training_data_access: true
+      
+    privacy:
+      data_anonymization: true
+      feature_anonymization: false
+      gdpr_compliance: true
+      
+  # Cost Optimization
+  cost_optimization:
+    resource_optimization:
+      cpu_optimization: true
+      memory_optimization: true
+      auto_scaling_aggressive: false
+      
+    prediction_optimization:
+      batch_prediction_preferred: true
+      cache_common_predictions: true
+      compress_model_artifacts: true
+      
+    training_optimization:
+      incremental_training: true
+      transfer_learning: false
+      efficient_hyperparameter_tuning: true

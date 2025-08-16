@@ -1,0 +1,565 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-ingestion-source-mappings
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: source-mappings
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: config
+    base.io/function: source-mapping
+spec:
+  configType: "source-mappings"
+  data:
+    # Financial Data Sources Configuration
+    financial_sources:
+      # Market Data Providers
+      market_data:
+        bloomberg:
+          id: "bloomberg-api"
+          name: "Bloomberg Terminal API"
+          type: "rest_api"
+          category: "market_data"
+          priority: "high"
+          sla:
+            availability: "99.9%"
+            latency: "< 500ms"
+            throughput: "10,000 req/min"
+          connection:
+            base_url: "https://api.bloomberg.com/eap"
+            authentication: "oauth2"
+            rate_limit: "1000/minute"
+            timeout: "30s"
+          data_types:
+            - "real_time_quotes"
+            - "historical_prices"
+            - "corporate_actions"
+            - "reference_data"
+          formats:
+            - "json"
+            - "xml"
+          collection_frequency: "real_time"
+          retention_policy: "7_years"
+          
+        reuters:
+          id: "reuters-eikon"
+          name: "Refinitiv Eikon API"
+          type: "rest_api"
+          category: "market_data"
+          priority: "high"
+          sla:
+            availability: "99.8%"
+            latency: "< 1s"
+            throughput: "5,000 req/min"
+          connection:
+            base_url: "https://api.refinitiv.com/data"
+            authentication: "api_key"
+            rate_limit: "500/minute"
+            timeout: "45s"
+          data_types:
+            - "equity_prices"
+            - "fx_rates"
+            - "commodities"
+            - "fixed_income"
+          formats:
+            - "json"
+          collection_frequency: "real_time"
+          retention_policy: "5_years"
+          
+        nyse:
+          id: "nyse-cloud"
+          name: "NYSE Cloud Data Service"
+          type: "rest_api"
+          category: "exchange_data"
+          priority: "high"
+          sla:
+            availability: "99.95%"
+            latency: "< 200ms"
+            throughput: "20,000 req/min"
+          connection:
+            base_url: "https://cloud.nyse.com/api/v1"
+            authentication: "jwt"
+            rate_limit: "2000/minute"
+            timeout: "20s"
+          data_types:
+            - "trade_data"
+            - "order_book"
+            - "market_status"
+          formats:
+            - "json"
+            - "avro"
+          collection_frequency: "real_time"
+          retention_policy: "10_years"
+          
+        nasdaq:
+          id: "nasdaq-data-link"
+          name: "NASDAQ Data Link"
+          type: "rest_api"
+          category: "exchange_data"
+          priority: "medium"
+          sla:
+            availability: "99.5%"
+            latency: "< 1s"
+            throughput: "1,000 req/min"
+          connection:
+            base_url: "https://data.nasdaq.com/api/v3"
+            authentication: "api_key"
+            rate_limit: "300/minute"
+            timeout: "60s"
+          data_types:
+            - "end_of_day_prices"
+            - "fundamentals"
+            - "options_data"
+          formats:
+            - "json"
+            - "csv"
+          collection_frequency: "daily"
+          retention_policy: "permanent"
+          
+      # Alternative Data Sources
+      alternative_data:
+        social_sentiment:
+          id: "social-sentiment-api"
+          name: "Social Sentiment Analysis"
+          type: "rest_api"
+          category: "alternative_data"
+          priority: "medium"
+          connection:
+            base_url: "https://api.socialsentiment.io/v2"
+            authentication: "oauth2"
+            rate_limit: "100/minute"
+          data_types:
+            - "twitter_sentiment"
+            - "news_sentiment"
+            - "reddit_sentiment"
+          formats:
+            - "json"
+          collection_frequency: "hourly"
+          
+        economic_indicators:
+          id: "fred-economic-data"
+          name: "Federal Reserve Economic Data"
+          type: "rest_api"
+          category: "economic_data"
+          priority: "medium"
+          connection:
+            base_url: "https://api.stlouisfed.org/fred"
+            authentication: "api_key"
+            rate_limit: "120/minute"
+          data_types:
+            - "gdp"
+            - "inflation"
+            - "employment"
+            - "interest_rates"
+          formats:
+            - "json"
+            - "xml"
+          collection_frequency: "daily"
+          
+        satellite_data:
+          id: "satellite-imagery"
+          name: "Satellite Imagery Analysis"
+          type: "rest_api"
+          category: "geospatial_data"
+          priority: "low"
+          connection:
+            base_url: "https://api.satellite.com/v1"
+            authentication: "api_key"
+            rate_limit: "50/hour"
+          data_types:
+            - "crop_monitoring"
+            - "oil_storage"
+            - "shipping_traffic"
+          formats:
+            - "json"
+            - "geotiff"
+          collection_frequency: "weekly"
+          
+    # Database Sources
+    database_sources:
+      internal_databases:
+        portfolio_db:
+          id: "portfolio-postgres"
+          name: "Portfolio Management Database"
+          type: "postgresql"
+          category: "internal_data"
+          priority: "critical"
+          sla:
+            availability: "99.99%"
+            latency: "< 100ms"
+          connection:
+            host: "${PORTFOLIO_DB_HOST}"
+            port: 5432
+            database: "portfolio_management"
+            ssl_mode: "require"
+            pool_size: 20
+          data_types:
+            - "positions"
+            - "transactions"
+            - "performance"
+            - "risk_metrics"
+          collection_frequency: "real_time"
+          
+        risk_db:
+          id: "risk-mysql"
+          name: "Risk Management Database"
+          type: "mysql"
+          category: "internal_data"
+          priority: "critical"
+          connection:
+            host: "${RISK_DB_HOST}"
+            port: 3306
+            database: "risk_management"
+            ssl_mode: "required"
+          data_types:
+            - "var_calculations"
+            - "stress_tests"
+            - "compliance_reports"
+          collection_frequency: "daily"
+          
+        analytics_db:
+          id: "analytics-mongo"
+          name: "Analytics Database"
+          type: "mongodb"
+          category: "internal_data"
+          priority: "high"
+          connection:
+            uri: "${MONGODB_URI}"
+            database: "analytics"
+            auth_source: "admin"
+          data_types:
+            - "research_reports"
+            - "model_outputs"
+            - "backtests"
+          collection_frequency: "batch"
+          
+      external_databases:
+        vendor_db:
+          id: "vendor-oracle"
+          name: "Vendor Data Warehouse"
+          type: "oracle"
+          category: "vendor_data"
+          priority: "medium"
+          connection:
+            host: "${VENDOR_DB_HOST}"
+            port: 1521
+            service_name: "VENDORDB"
+            ssl_mode: "required"
+          data_types:
+            - "market_reference"
+            - "corporate_hierarchies"
+            - "instrument_master"
+          collection_frequency: "daily"
+          
+    # File-based Sources
+    file_sources:
+      cloud_storage:
+        s3_reports:
+          id: "s3-daily-reports"
+          name: "Daily Reports S3 Bucket"
+          type: "s3"
+          category: "batch_files"
+          priority: "high"
+          connection:
+            bucket: "${S3_REPORTS_BUCKET}"
+            region: "us-east-1"
+            prefix: "daily-reports/"
+          data_types:
+            - "performance_reports"
+            - "risk_reports"
+            - "compliance_reports"
+          formats:
+            - "csv"
+            - "excel"
+            - "pdf"
+          collection_frequency: "daily"
+          
+        azure_blob:
+          id: "azure-research-data"
+          name: "Research Data Azure Blob"
+          type: "azure_blob"
+          category: "research_data"
+          priority: "medium"
+          connection:
+            account_name: "${AZURE_STORAGE_ACCOUNT}"
+            container_name: "research-data"
+          data_types:
+            - "research_models"
+            - "backtest_results"
+            - "market_analysis"
+          formats:
+            - "parquet"
+            - "json"
+          collection_frequency: "weekly"
+          
+        gcs_backup:
+          id: "gcs-backup-data"
+          name: "Backup Data GCS Bucket"
+          type: "gcs"
+          category: "backup_data"
+          priority: "low"
+          connection:
+            bucket: "${GCS_BACKUP_BUCKET}"
+            project_id: "${GCP_PROJECT_ID}"
+          data_types:
+            - "historical_backups"
+            - "archive_data"
+          formats:
+            - "compressed_json"
+            - "parquet"
+          collection_frequency: "monthly"
+          
+      sftp_sources:
+        prime_brokerage:
+          id: "pb-sftp"
+          name: "Prime Brokerage SFTP"
+          type: "sftp"
+          category: "prime_brokerage"
+          priority: "critical"
+          connection:
+            host: "${PB_SFTP_HOST}"
+            port: 22
+            username: "${PB_SFTP_USER}"
+            key_file: "/app/secrets/pb_sftp_key"
+          data_types:
+            - "positions_file"
+            - "transactions_file"
+            - "cash_balances"
+          formats:
+            - "fixed_width"
+            - "csv"
+            - "xml"
+          collection_frequency: "daily"
+          schedule: "06:00 UTC"
+          
+        custodian:
+          id: "custodian-sftp"
+          name: "Custodian SFTP"
+          type: "sftp"
+          category: "custodian_data"
+          priority: "high"
+          connection:
+            host: "${CUSTODIAN_SFTP_HOST}"
+            port: 22
+            username: "${CUSTODIAN_SFTP_USER}"
+          data_types:
+            - "holdings_file"
+            - "corporate_actions"
+            - "income_file"
+          formats:
+            - "csv"
+            - "xlsx"
+          collection_frequency: "daily"
+          schedule: "07:00 UTC"
+          
+    # Streaming Sources
+    streaming_sources:
+      message_queues:
+        kafka_market_data:
+          id: "kafka-market-stream"
+          name: "Market Data Kafka Stream"
+          type: "kafka"
+          category: "real_time_market"
+          priority: "critical"
+          sla:
+            availability: "99.99%"
+            latency: "< 10ms"
+            throughput: "1M msg/sec"
+          connection:
+            brokers:
+              - "${KAFKA_BROKER_1}"
+              - "${KAFKA_BROKER_2}"
+              - "${KAFKA_BROKER_3}"
+            security_protocol: "SASL_SSL"
+            sasl_mechanism: "PLAIN"
+          topics:
+            - "market.quotes.equity"
+            - "market.quotes.fx"
+            - "market.trades.all"
+          data_types:
+            - "real_time_quotes"
+            - "trade_executions"
+            - "market_depth"
+          formats:
+            - "avro"
+            - "json"
+          collection_frequency: "real_time"
+          
+        rabbitmq_orders:
+          id: "rabbitmq-order-stream"
+          name: "Order Management RabbitMQ"
+          type: "rabbitmq"
+          category: "order_management"
+          priority: "critical"
+          connection:
+            host: "${RABBITMQ_HOST}"
+            port: 5672
+            virtual_host: "/"
+            ssl: true
+          queues:
+            - "orders.new"
+            - "orders.filled"
+            - "orders.cancelled"
+          data_types:
+            - "order_events"
+            - "execution_reports"
+            - "allocation_instructions"
+          formats:
+            - "json"
+          collection_frequency: "real_time"
+          
+        kinesis_logs:
+          id: "kinesis-audit-logs"
+          name: "Audit Logs Kinesis Stream"
+          type: "kinesis"
+          category: "audit_logs"
+          priority: "high"
+          connection:
+            stream_name: "${KINESIS_AUDIT_STREAM}"
+            region: "us-east-1"
+          data_types:
+            - "user_actions"
+            - "system_events"
+            - "security_events"
+          formats:
+            - "json"
+          collection_frequency: "real_time"
+          
+    # Source Mapping Rules
+    mapping_rules:
+      data_type_mapping:
+        # Map external data types to internal schema
+        price_data:
+          bloomberg: "real_time_quotes"
+          reuters: "equity_prices"
+          nyse: "trade_data"
+          nasdaq: "end_of_day_prices"
+        
+        position_data:
+          portfolio_db: "positions"
+          prime_brokerage: "positions_file"
+          custodian: "holdings_file"
+        
+        transaction_data:
+          portfolio_db: "transactions"
+          prime_brokerage: "transactions_file"
+          rabbitmq_orders: "execution_reports"
+          
+      priority_mapping:
+        critical:
+          - "portfolio-postgres"
+          - "risk-mysql"
+          - "pb-sftp"
+          - "kafka-market-stream"
+          - "rabbitmq-order-stream"
+        high:
+          - "bloomberg-api"
+          - "reuters-eikon"
+          - "nyse-cloud"
+          - "analytics-mongo"
+          - "s3-daily-reports"
+        medium:
+          - "nasdaq-data-link"
+          - "social-sentiment-api"
+          - "fred-economic-data"
+          - "vendor-oracle"
+          - "azure-research-data"
+        low:
+          - "satellite-imagery"
+          - "gcs-backup-data"
+          
+      collection_strategy:
+        real_time:
+          max_latency: "100ms"
+          retry_attempts: 3
+          circuit_breaker: true
+          backoff_strategy: "exponential"
+        
+        batch:
+          batch_size: 10000
+          parallel_workers: 5
+          retry_attempts: 5
+          failure_tolerance: "10%"
+        
+        scheduled:
+          timezone: "UTC"
+          retry_window: "2h"
+          notification_on_failure: true
+          
+    # Quality and Compliance Rules
+    data_quality:
+      validation_rules:
+        price_data:
+          - "price > 0"
+          - "timestamp within last 24h"
+          - "currency code valid"
+        
+        position_data:
+          - "quantity != 0"
+          - "instrument_id not null"
+          - "settlement_date >= trade_date"
+          
+        transaction_data:
+          - "amount != 0"
+          - "counterparty not null"
+          - "trade_date <= settlement_date"
+          
+      compliance_checks:
+        - "pii_detection"
+        - "gdpr_compliance"
+        - "sox_compliance"
+        - "mifid_compliance"
+        
+    # Integration Points
+    integration:
+      downstream_services:
+        data_quality:
+          service: "base-data-quality"
+          endpoint: "/validate"
+          timeout: "30s"
+        
+        feature_engineering:
+          service: "base-feature-engineering"
+          endpoint: "/process"
+          timeout: "60s"
+          
+        metadata_discovery:
+          service: "base-metadata-discovery"
+          endpoint: "/catalog"
+          timeout: "15s"
+          
+      event_coordination:
+        service: "base-event-coordinator"
+        events:
+          - "source_mapped"
+          - "source_validation_failed"
+          - "source_priority_changed"
+          - "source_offline"
+          
+    # Monitoring and Alerting
+    monitoring:
+      health_checks:
+        interval: "5m"
+        timeout: "30s"
+        failure_threshold: 3
+        
+      metrics:
+        - "source_availability"
+        - "data_freshness"
+        - "collection_success_rate"
+        - "sla_compliance"
+        
+      alerts:
+        critical_source_down:
+          condition: "source unavailable for > 5min"
+          channels: ["pagerduty", "slack"]
+        
+        sla_breach:
+          condition: "sla compliance < 95%"
+          channels: ["email", "slack"]
+          
+        data_quality_degradation:
+          condition: "validation failure rate > 5%"
+          channels: ["slack", "email"]

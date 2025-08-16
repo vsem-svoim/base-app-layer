@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: aws-infrastructure
+  namespace: argocd
+spec:
+  description: "AWS Infrastructure management with Crossplane"
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://charts.crossplane.io/stable'
+  - 'https://charts.jetstack.io'
+
+  destinations:
+  - namespace: 'crossplane-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'cert-manager'
+    server: https://kubernetes.default.svc
+  - namespace: 'aws-*'
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  roles:
+  - name: aws-admin
+    description: "AWS infrastructure administrators"
+    policies:
+    - p, proj:aws-infrastructure:aws-admin, applications, *, aws-infrastructure/*, allow
+    groups:
+    - platform-engineering

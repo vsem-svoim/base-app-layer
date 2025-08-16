@@ -1,0 +1,629 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-data-fetch-retry-sa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-ingestion-agent-data-fetch-retry
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: agent
+    base.io/function: data-fetch-retry
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-fetch-retry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-data-fetch-retry
+        app.kubernetes.io/component: ingestion
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_ingestion
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-data-fetch-retry-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: data-fetch-retry
+        image: base/data-fetch-retry:v2.5.0-fixed
+        imagePullPolicy: Always
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9003
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: MAX_RETRY_ATTEMPTS
+          value: "10"
+        - name: DEFAULT_BACKOFF_STRATEGY
+          value: "exponential_backoff"
+        - name: CIRCUIT_BREAKER_ENABLED
+          value: "true"
+        - name: DEAD_LETTER_QUEUE_ENABLED
+          value: "true"
+        - name: FAILURE_ANALYSIS_ENABLED
+          value: "true"
+        - name: MANUAL_INTERVENTION_THRESHOLD
+          value: "5"
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 20
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: retry-policies
+          mountPath: /app/policies
+          readOnly: true
+        - name: dead-letter-storage
+          mountPath: /app/dlq
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-data-fetch-retry-config
+      - name: retry-policies
+        configMap:
+          name: base-data-fetch-retry-policies
+      - name: dead-letter-storage
+        persistentVolumeClaim:
+          claimName: base-data-fetch-retry-dlq-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-data-fetch-retry-service
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+    app.kubernetes.io/component: ingestion
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 9003
+    targetPort: 9003
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-data-fetch-retry
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: base-data-fetch-retry-dlq-pvc
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-fetch-retry-config
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+    app.kubernetes.io/component: ingestion
+data:
+  retry.yaml: |
+    # Data Fetch Retry Agent Configuration
+    retry_agent:
+      # Agent Identity and Responsibility
+      name: "base-data-fetch-retry"
+      version: "v2.5.0"
+      responsibility: "Resilience and error handling for failed data fetches"
+      
+      # Core Retry Configuration
+      retry_engine:
+        max_concurrent_retries: 20
+        queue_processing_interval: "10s"
+        failure_analysis_enabled: true
+        machine_learning_enhanced: true
+        
+      # Retry Strategies
+      retry_strategies:
+        exponential_backoff:
+          enabled: true
+          initial_delay: "1s"
+          max_delay: "300s"
+          multiplier: 2.0
+          jitter: true
+          jitter_factor: 0.1
+          
+        linear_backoff:
+          enabled: true
+          initial_delay: "5s"
+          increment: "5s"
+          max_delay: "300s"
+          jitter: false
+          
+        fixed_interval:
+          enabled: true
+          interval: "30s"
+          jitter: true
+          jitter_factor: 0.2
+          
+        adaptive_backoff:
+          enabled: true
+          success_factor: 0.8
+          failure_factor: 1.5
+          min_delay: "1s"
+          max_delay: "600s"
+          
+      # Circuit Breaker Configuration
+      circuit_breaker:
+        enabled: true
+        failure_threshold: 5
+        success_threshold: 3
+        timeout: "30s"
+        half_open_max_calls: 3
+        rolling_window_size: 100
+        min_throughput_threshold: 10
+        
+      # Failure Classification
+      failure_classification:
+        enabled: true
+        categories:
+          transient:
+            - "connection_timeout"
+            - "read_timeout"
+            - "temporary_unavailable"
+            - "rate_limited"
+            - "network_error"
+          persistent:
+            - "authentication_failed"
+            - "authorization_denied"
+            - "not_found"
+            - "bad_request"
+            - "configuration_error"
+          partial:
+            - "incomplete_response"
+            - "corrupted_data"
+            - "partial_timeout"
+          systematic:
+            - "out_of_memory"
+            - "disk_full"
+            - "service_overloaded"
+            
+      # Recovery Strategies
+      recovery_strategies:
+        fallback_sources:
+          enabled: true
+          max_fallback_attempts: 3
+          fallback_timeout: "60s"
+          quality_threshold: 0.8
+          
+        partial_retry:
+          enabled: true
+          segment_size: "10MB"
+          max_segments: 100
+          parallel_segments: 5
+          
+        cache_recovery:
+          enabled: true
+          cache_ttl: "1h"
+          stale_while_revalidate: true
+          stale_ttl: "24h"
+          
+      # Dead Letter Queue
+      dead_letter_queue:
+        enabled: true
+        max_size: 10000
+        retention_period: "7d"
+        batch_processing: true
+        batch_size: 100
+        processing_interval: "5min"
+        alert_threshold: 1000
+        
+      # Manual Intervention
+      manual_intervention:
+        enabled: true
+        trigger_threshold: 5
+        escalation_delay: "1h"
+        notification_channels:
+          - "slack"
+          - "email"
+          - "pagerduty"
+        required_approvals: 1
+        
+      # Performance Configuration
+      performance:
+        worker_threads: 10
+        queue_capacity: 1000
+        processing_timeout: "300s"
+        memory_limit: "2Gi"
+        metrics_collection_interval: "30s"
+        
+      # Integration Points
+      integration:
+        collector_service:
+          endpoint: "http://base-data-collector-service:8080"
+          timeout: "30s"
+          retry_original_request: true
+        connector_service:
+          endpoint: "http://base-data-connector-service:8080"
+          connection_validation: true
+        event_service:
+          endpoint: "http://base-event-coordinator-service:8080"
+          events:
+            - "retry_started"
+            - "retry_succeeded"
+            - "retry_failed"
+            - "circuit_breaker_opened"
+            - "circuit_breaker_closed"
+            - "fallback_activated"
+            - "manual_intervention_required"
+        notification_service:
+          endpoint: "http://base-notification-service:8080"
+          alert_templates: "/app/config/alerts"
+          
+      # Analytics and Learning
+      analytics:
+        failure_pattern_analysis: true
+        success_rate_tracking: true
+        performance_optimization: true
+        adaptive_strategy_selection: true
+        ml_model_endpoint: "http://base-ml-service:8080/retry-optimization"
+        
+      # Security Configuration
+      security:
+        audit_logging: true
+        sensitive_data_masking: true
+        access_control: "rbac"
+        encryption_at_rest: true
+        
+    # Retry Policies by Source Type
+    source_policies:
+      api_sources:
+        default_strategy: "exponential_backoff"
+        max_attempts: 5
+        circuit_breaker_enabled: true
+        fallback_enabled: true
+        
+      database_sources:
+        default_strategy: "linear_backoff"
+        max_attempts: 3
+        circuit_breaker_enabled: false
+        connection_pool_aware: true
+        
+      file_sources:
+        default_strategy: "fixed_interval"
+        max_attempts: 10
+        partial_retry_enabled: true
+        checksum_validation: true
+        
+      stream_sources:
+        default_strategy: "adaptive_backoff"
+        max_attempts: -1  # Unlimited for streams
+        checkpoint_recovery: true
+        offset_management: true
+        
+    # Business Rules
+    business_rules:
+      market_data:
+        critical_hours: "09:00-16:00 EST"
+        max_staleness: "5min"
+        priority: "high"
+        escalation_required: true
+        
+      reference_data:
+        max_staleness: "1h"
+        priority: "medium"
+        batch_retry_allowed: true
+        
+      historical_data:
+        max_staleness: "24h"
+        priority: "low"
+        off_hours_retry: true
+        
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      include_stack_trace: true
+      mask_sensitive_data: true
+      
+    # Monitoring Configuration
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      custom_metrics:
+        - name: "retry_attempts_total"
+          type: "counter"
+          description: "Total number of retry attempts"
+          labels: ["source", "strategy", "outcome"]
+        - name: "retry_success_rate"
+          type: "gauge"
+          description: "Success rate of retry operations"
+        - name: "circuit_breaker_state"
+          type: "gauge"
+          description: "Circuit breaker state (0=closed, 1=open, 2=half-open)"
+        - name: "dead_letter_queue_size"
+          type: "gauge"
+          description: "Number of items in dead letter queue"
+        - name: "failure_analysis_time"
+          type: "histogram"
+          description: "Time taken for failure analysis"
+        - name: "recovery_time"
+          type: "histogram"
+          description: "Time from failure to successful recovery"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-fetch-retry-policies
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+    app.kubernetes.io/component: ingestion
+data:
+  api_retry_policies.yaml: |
+    # API-specific Retry Policies
+    api_policies:
+      financial_apis:
+        bloomberg:
+          max_attempts: 5
+          strategy: "exponential_backoff"
+          initial_delay: "2s"
+          max_delay: "60s"
+          rate_limit_aware: true
+          
+        reuters:
+          max_attempts: 3
+          strategy: "linear_backoff"
+          increment: "10s"
+          circuit_breaker_threshold: 3
+          
+        nyse:
+          max_attempts: 7
+          strategy: "adaptive_backoff"
+          business_hours_only: true
+          fallback_sources: ["nasdaq", "local_cache"]
+          
+      external_apis:
+        rate_limited:
+          max_attempts: 10
+          strategy: "fixed_interval"
+          interval: "60s"
+          respect_retry_after: true
+          
+        unreliable:
+          max_attempts: 8
+          strategy: "exponential_backoff"
+          jitter_factor: 0.3
+          circuit_breaker_enabled: true
+          
+  database_retry_policies.yaml: |
+    # Database-specific Retry Policies
+    database_policies:
+      transactional:
+        max_attempts: 3
+        strategy: "linear_backoff"
+        increment: "5s"
+        deadlock_detection: true
+        
+      analytical:
+        max_attempts: 5
+        strategy: "exponential_backoff"
+        query_timeout: "300s"
+        partial_results_acceptable: true
+        
+      read_replica:
+        max_attempts: 2
+        strategy: "fixed_interval"
+        interval: "30s"
+        fallback_to_primary: true
+        
+  error_mapping.yaml: |
+    # Error Code to Retry Strategy Mapping
+    error_mappings:
+      http_errors:
+        "429": # Too Many Requests
+          strategy: "exponential_backoff"
+          respect_retry_after: true
+          max_attempts: 10
+        "502": # Bad Gateway
+          strategy: "linear_backoff"
+          max_attempts: 5
+        "503": # Service Unavailable
+          strategy: "exponential_backoff"
+          max_attempts: 7
+        "504": # Gateway Timeout
+          strategy: "linear_backoff"
+          max_attempts: 3
+          
+      database_errors:
+        "connection_timeout":
+          strategy: "exponential_backoff"
+          max_attempts: 5
+        "deadlock":
+          strategy: "linear_backoff"
+          max_attempts: 3
+          immediate_retry: false
+        "lock_timeout":
+          strategy: "fixed_interval"
+          interval: "10s"
+          max_attempts: 5
+          
+  fallback_configuration.yaml: |
+    # Fallback Source Configuration
+    fallback_sources:
+      market_data:
+        primary: "bloomberg_api"
+        fallbacks:
+          - source: "reuters_api"
+            quality_score: 0.9
+            latency_penalty: "2s"
+          - source: "yahoo_finance"
+            quality_score: 0.7
+            latency_penalty: "5s"
+          - source: "local_cache"
+            quality_score: 0.5
+            staleness_acceptable: "30min"
+            
+      reference_data:
+        primary: "master_database"
+        fallbacks:
+          - source: "backup_database"
+            quality_score: 1.0
+            replication_lag: "5min"
+          - source: "cached_snapshot"
+            quality_score: 0.8
+            max_age: "1h"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-data-fetch-retry-netpol
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-fetch-retry
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9003
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-events
+    - namespaceSelector:
+        matchLabels:
+          name: base-notifications
+    - namespaceSelector:
+        matchLabels:
+          name: base-ml
+  - {} # Allow external access for retry attempts
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: base-data-fetch-retry-dlq-processor
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-fetch-retry
+    app.kubernetes.io/component: dlq-processor
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: base-data-fetch-retry-sa
+          containers:
+          - name: dlq-processor
+            image: base/data-fetch-retry:v2.5.0-fixed
+            command: ["python", "/app/dlq_processor.py"]
+            env:
+            - name: DLQ_PATH
+              value: "/app/dlq"
+            - name: BATCH_SIZE
+              value: "100"
+            volumeMounts:
+            - name: dead-letter-storage
+              mountPath: /app/dlq
+          volumes:
+          - name: dead-letter-storage
+            persistentVolumeClaim:
+              claimName: base-data-fetch-retry-dlq-pvc
+          restartPolicy: OnFailure

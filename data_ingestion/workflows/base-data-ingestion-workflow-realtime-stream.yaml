@@ -1,0 +1,48 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-ingestion-workflow-realtime-stream
+  namespace: base-ingestion
+  labels:
+    base.io/category: data_ingestion
+    base.io/type: workflow
+    base.io/function: realtime-processing
+spec:
+  steps:
+    - name: "stream_connection"
+      agent: "stream-manager"
+      action: "establish_stream_connection"
+      timeout: "5m"
+      continuous: true
+      
+    - name: "continuous_processing"
+      agent: "data-collector"
+      action: "process_streaming_data"
+      continuous: true
+      latency_target: "< 1s"
+      dependencies: ["stream_connection"]
+      
+    - name: "real_time_validation"
+      agent: "external"
+      service: "base-data-quality"
+      action: "validate_streaming_data"
+      continuous: true
+      latency_target: "< 500ms"
+      dependencies: ["continuous_processing"]
+      
+    - name: "streaming_storage"
+      agent: "external"
+      service: "base-data-storage"
+      action: "store_streaming_data"
+      continuous: true
+      dependencies: ["real_time_validation"]
+      
+  triggers:
+    stream:
+      - "market_data_stream"
+      - "transaction_stream"
+      
+  dependencies:
+    streaming_services:
+      - "kafka_cluster"
+      - "stream_processing_engine"

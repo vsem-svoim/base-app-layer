@@ -1,0 +1,544 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-data-merger-sa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-ingestion-agent-data-merger
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: agent
+    base.io/function: data-merger
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-merger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-data-merger
+        app.kubernetes.io/component: ingestion
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_ingestion
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-data-merger-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: data-merger
+        image: base/data-merger:v2.5.0-analytics-fixed
+        imagePullPolicy: Always
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9002
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: MAX_CONCURRENT_MERGES
+          value: "5"
+        - name: MAX_MEMORY_USAGE
+          value: "16Gi"
+        - name: TEMP_STORAGE_PATH
+          value: "/app/temp"
+        - name: ENABLE_DEDUPLICATION
+          value: "true"
+        - name: ENABLE_SCHEMA_ALIGNMENT
+          value: "true"
+        - name: LINEAGE_TRACKING
+          value: "true"
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+            ephemeral-storage: "20Gi"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+            ephemeral-storage: "100Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 40
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: merge-rules
+          mountPath: /app/rules
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+        - name: cache-storage
+          mountPath: /app/cache
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-data-merger-config
+      - name: merge-rules
+        configMap:
+          name: base-data-merger-rules
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "100Gi"
+      - name: cache-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-data-merger-service
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+    app.kubernetes.io/component: ingestion
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 9002
+    targetPort: 9002
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-data-merger
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-merger-config
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+    app.kubernetes.io/component: ingestion
+data:
+  merger.yaml: |
+    # Data Merger Agent Configuration
+    merger:
+      # Agent Identity and Responsibility
+      name: "base-data-merger"
+      version: "v2.5.0"
+      responsibility: "Multi-source data consolidation and conflict resolution"
+      
+      # Core Merge Configuration
+      merge_engine:
+        max_concurrent_merges: 5
+        max_sources_per_merge: 10
+        memory_limit: "16Gi"
+        temp_storage: "100Gi"
+        streaming_threshold: "5GB"
+        batch_size: 10000
+        
+      # Supported Merge Strategies
+      merge_strategies:
+        time_based:
+          enabled: true
+          timestamp_field: "timestamp"
+          window_size: "1h"
+          alignment: "start"  # start, end, center
+          
+        priority_based:
+          enabled: true
+          source_priorities:
+            primary: 100
+            secondary: 75
+            tertiary: 50
+            fallback: 25
+            
+        rule_based:
+          enabled: true
+          rule_engine: "drools"
+          rule_cache_ttl: 3600s
+          
+        ml_based:
+          enabled: true
+          model_endpoint: "http://base-ml-service:8080/merge"
+          confidence_threshold: 0.8
+          
+      # Conflict Resolution Strategies
+      conflict_resolution:
+        last_write_wins:
+          enabled: true
+          timestamp_field: "updated_at"
+          timezone_handling: "normalize_utc"
+          
+        first_write_wins:
+          enabled: true
+          timestamp_field: "created_at"
+          ignore_duplicates: true
+          
+        weighted_average:
+          enabled: true
+          weight_field: "confidence"
+          numeric_fields_only: true
+          
+        custom_logic:
+          enabled: true
+          script_language: "javascript"
+          script_timeout: "30s"
+          
+      # Deduplication Configuration
+      deduplication:
+        enabled: true
+        algorithms:
+          exact_match:
+            enabled: true
+            fields: ["id", "external_id"]
+            case_sensitive: false
+            
+          fuzzy_match:
+            enabled: true
+            algorithm: "levenshtein"
+            threshold: 0.85
+            fields: ["name", "description"]
+            
+          probabilistic_match:
+            enabled: true
+            algorithm: "fellegi_sunter"
+            blocking_fields: ["category", "type"]
+            comparison_fields: ["name", "address", "phone"]
+            threshold: 0.9
+            
+        duplicate_handling:
+          strategy: "merge_and_mark"  # delete, merge_and_mark, keep_all
+          preserve_lineage: true
+          
+      # Schema Alignment
+      schema_alignment:
+        enabled: true
+        auto_mapping: true
+        fuzzy_field_matching: true
+        field_mapping_threshold: 0.8
+        type_coercion: true
+        missing_field_handling: "null"  # null, skip, default
+        
+      # Data Lineage Tracking
+      lineage_tracking:
+        enabled: true
+        track_field_level: true
+        track_transformation: true
+        provenance_metadata: true
+        storage_backend: "elasticsearch"
+        
+      # Performance Optimization
+      performance:
+        parallel_processing: true
+        worker_threads: 8
+        memory_management:
+          spill_to_disk: true
+          spill_threshold: "12Gi"
+          compression: "lz4"
+        indexing:
+          enabled: true
+          fields: ["id", "timestamp", "source"]
+          
+      # Quality Controls
+      quality_controls:
+        pre_merge_validation: true
+        post_merge_validation: true
+        completeness_check: true
+        consistency_check: true
+        min_completeness_threshold: 0.90
+        max_inconsistency_rate: 0.05
+        
+      # Error Handling and Recovery
+      error_handling:
+        partial_merge_recovery: true
+        checkpoint_frequency: "5min"
+        rollback_capability: true
+        dead_letter_queue: true
+        max_retry_attempts: 3
+        
+      # Integration Points
+      integration:
+        converter_service:
+          endpoint: "http://base-data-converter-service:8080"
+          timeout: "120s"
+        quality_service:
+          endpoint: "http://base-data-quality-service:8080"
+          validation_endpoint: "/validate"
+        storage_service:
+          endpoint: "http://base-data-storage-service:8080"
+          temp_storage_endpoint: "/temp"
+        event_service:
+          endpoint: "http://base-event-coordinator-service:8080"
+          events:
+            - "merge_started"
+            - "merge_completed"
+            - "merge_failed"
+            - "conflict_detected"
+            - "duplicate_found"
+            
+      # Security and Compliance
+      security:
+        encryption_at_rest: true
+        encryption_in_transit: true
+        audit_logging: true
+        pii_preservation: true
+        access_control: "rbac"
+        
+    # Business Rules Configuration
+    business_rules:
+      financial_data:
+        merge_priority:
+          - "primary_exchange"
+          - "secondary_exchange" 
+          - "market_maker"
+          - "external_feed"
+        conflict_resolution:
+          price_fields: "latest_timestamp"
+          volume_fields: "sum"
+          metadata_fields: "priority_based"
+        quality_thresholds:
+          min_price_accuracy: 0.9999
+          max_price_staleness: "5min"
+          
+      customer_data:
+        merge_priority:
+          - "crm_system"
+          - "transaction_system"
+          - "external_provider"
+        conflict_resolution:
+          contact_info: "most_recent"
+          transaction_data: "append"
+          preferences: "merge_and_flag"
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      include_lineage: true
+      mask_sensitive_data: true
+      
+    # Monitoring Configuration  
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      custom_metrics:
+        - name: "merge_operations_total"
+          type: "counter"
+          description: "Total number of merge operations"
+        - name: "merge_duration"
+          type: "histogram"
+          description: "Time taken for merge operations"
+        - name: "conflict_resolution_rate"
+          type: "gauge"
+          description: "Rate of conflict resolution success"
+        - name: "deduplication_ratio"
+          type: "gauge"
+          description: "Ratio of duplicates found and removed"
+        - name: "data_quality_score"
+          type: "gauge"
+          description: "Quality score of merged data"
+        - name: "memory_usage"
+          type: "gauge"
+          description: "Memory usage during merge operations"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-merger-rules
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+    app.kubernetes.io/component: ingestion
+data:
+  financial_merge_rules.yaml: |
+    # Financial Data Merge Rules
+    financial_rules:
+      equity_prices:
+        merge_strategy: "time_based"
+        conflict_resolution: "last_write_wins"
+        deduplication:
+          key_fields: ["symbol", "exchange", "timestamp"]
+          tolerance: "1s"
+        quality_checks:
+          - name: "price_validation"
+            condition: "price > 0"
+          - name: "volume_validation" 
+            condition: "volume >= 0"
+            
+      bond_data:
+        merge_strategy: "priority_based"
+        source_priorities:
+          bloomberg: 100
+          reuters: 80
+          manual: 60
+        conflict_resolution:
+          yield: "weighted_average"
+          rating: "highest_confidence"
+          
+      fx_rates:
+        merge_strategy: "time_based"
+        window_alignment: "center"
+        interpolation: "linear"
+        conflict_resolution: "weighted_average"
+        
+  customer_merge_rules.yaml: |
+    # Customer Data Merge Rules
+    customer_rules:
+      contact_information:
+        merge_strategy: "rule_based"
+        rules:
+          - "IF source == 'crm' THEN priority = 100"
+          - "IF source == 'transaction' AND field == 'email' THEN priority = 90"
+          - "IF verified == true THEN priority += 20"
+        deduplication:
+          fuzzy_match:
+            name_threshold: 0.9
+            email_threshold: 1.0
+            phone_threshold: 0.95
+            
+      transaction_history:
+        merge_strategy: "append"
+        deduplication:
+          key_fields: ["transaction_id", "timestamp"]
+          exact_match: true
+        ordering: ["timestamp ASC"]
+        
+  conflict_resolution_rules.yaml: |
+    # Custom Conflict Resolution Rules
+    resolution_rules:
+      numerical_conflicts:
+        - field_type: "currency"
+          strategy: "highest_confidence"
+        - field_type: "percentage"
+          strategy: "weighted_average"
+        - field_type: "count"
+          strategy: "sum"
+          
+      categorical_conflicts:
+        - field_type: "status"
+          strategy: "most_recent"
+        - field_type: "category"
+          strategy: "highest_priority_source"
+        - field_type: "flag"
+          strategy: "logical_or"
+          
+      temporal_conflicts:
+        - field_type: "datetime"
+          strategy: "most_precise"
+        - field_type: "date"
+          strategy: "most_recent"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-data-merger-netpol
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-merger
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9002
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-storage
+    - namespaceSelector:
+        matchLabels:
+          name: base-events
+    - namespaceSelector:
+        matchLabels:
+          name: base-ml
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: base-data-merger-pdb
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-merger
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-merger

@@ -1,0 +1,59 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-ingestion-format-recognition-model
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: format-recognition-model
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: model
+    base.io/function: format-recognition
+spec:
+  type: "multi_class_classification"
+  algorithm: "gradient_boosting_ensemble"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "300m"
+        memory: "512Mi"
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+    serving:
+      framework: "xgboost"
+      inference_endpoint: "/predict-format"
+      batch_prediction: true
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      boosting_type: "gbdt"
+      num_leaves: 127
+      max_depth: 8
+      learning_rate: 0.1
+      n_estimators: 200
+      subsample: 0.8
+      colsample_bytree: 0.8
+      reg_alpha: 0.1
+      reg_lambda: 0.1
+    feature_engineering:
+      feature_types:
+        - name: "file_signature_features"
+          features: ["magic_bytes", "header_pattern", "file_extension"]
+        - name: "content_structure_features"
+          features: ["delimiter_count", "quote_pattern", "bracket_nesting"]
+        - name: "statistical_features"
+          features: ["char_frequency", "line_length_variance", "token_distribution"]
+  inference:
+    target_classes:
+      structured_formats: ["csv", "tsv", "json", "xml", "yaml"]
+      binary_formats: ["parquet", "avro", "orc", "protobuf"]
+      document_formats: ["pdf", "docx", "xlsx", "txt"]
+      compressed_formats: ["gzip", "zip", "bz2", "lz4"]
+    prediction_config:
+      confidence_threshold: 0.8
+      multi_format_detection: true
+      format_validation: true

@@ -1,0 +1,21 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xdatabase
+spec:
+  compositeTypeRef:
+    apiVersion: platform.finportiq.io/v1alpha1
+    kind: XDatabase
+  resources:
+  - name: database
+    base:
+      apiVersion: rds.aws.crossplane.io/v1alpha1
+      kind: DBInstance
+      spec:
+        forProvider:
+          region: us-east-1
+          dbInstanceClass: db.t3.micro
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.size
+      toFieldPath: spec.forProvider.dbInstanceClass

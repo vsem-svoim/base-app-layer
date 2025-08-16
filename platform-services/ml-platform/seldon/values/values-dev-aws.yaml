@@ -1,0 +1,57 @@
+# Seldon Core values for AWS Fargate
+global:
+  cloudProvider: aws
+  region: us-east-1
+
+seldon-core:
+  manager:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+    nodeSelector: {}
+    tolerations:
+      - key: eks.amazonaws.com/compute-type
+        operator: Equal
+        value: fargate
+        effect: NoSchedule
+    podAnnotations:
+      eks.amazonaws.com/fargate-profile: ml-platform
+
+  webhook:
+    resources:
+      limits:
+        cpu: 250m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    nodeSelector: {}
+    tolerations:
+      - key: eks.amazonaws.com/compute-type
+        operator: Equal
+        value: fargate
+        effect: NoSchedule
+    podAnnotations:
+      eks.amazonaws.com/fargate-profile: ml-platform
+
+  # Default model serving configuration
+  defaultModelServing:
+    resources:
+      limits:
+        cpu: 1
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    nodeSelector: {}
+    tolerations:
+      - key: eks.amazonaws.com/compute-type
+        operator: Equal
+        value: fargate
+        effect: NoSchedule
+    podAnnotations:
+      eks.amazonaws.com/fargate-profile: ml-platform

@@ -1,0 +1,42 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-ingestion-orchestrator-api-manager
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: api-manager
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: orchestrator
+    base.io/function: api-coordination
+spec:
+  type: "api_coordinator"
+  coordination:
+    api_lifecycle:
+      connection_management: true
+      authentication_renewal: true
+      rate_limit_compliance: true
+      health_monitoring: true
+    session_management:
+      session_pooling: true
+      session_timeout: "30m"
+      max_sessions_per_api: 10
+    error_handling:
+      retry_strategies: ["exponential_backoff", "circuit_breaker"]
+      fallback_apis: true
+      degraded_mode: true
+  resources:
+    deployment:
+      replicas: 3
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+    rate_limiting:
+      global_rate_limit: "1000/min"
+      per_api_rate_limit: "100/min"
+      burst_capacity: "200"

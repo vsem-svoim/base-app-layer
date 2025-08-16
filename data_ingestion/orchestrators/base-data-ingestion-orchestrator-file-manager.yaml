@@ -1,0 +1,42 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-ingestion-orchestrator-file-manager
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: file-manager
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: orchestrator
+    base.io/function: file-coordination
+spec:
+  type: "file_coordinator"
+  coordination:
+    file_processing:
+      supported_protocols: ["sftp", "ftp", "s3", "azure_blob", "gcs"]
+      parallel_downloads: 10
+      chunk_size: "10MB"
+      integrity_verification: true
+    directory_watching:
+      watch_patterns: ["*.csv", "*.json", "*.xml", "*.parquet"]
+      polling_interval: "5m"
+      change_detection: "timestamp_and_size"
+    file_lifecycle:
+      quarantine_failed_files: true
+      archive_processed_files: true
+      cleanup_temp_files: true
+  resources:
+    deployment:
+      replicas: 2
+      resources:
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+        limits:
+          cpu: "4"
+          memory: "8Gi"
+    storage:
+      temp_storage: "100Gi"
+      archive_storage: "1Ti"
+      cleanup_interval: "24h"

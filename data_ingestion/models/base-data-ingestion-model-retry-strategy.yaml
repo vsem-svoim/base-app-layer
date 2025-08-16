@@ -1,0 +1,57 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-ingestion-retry-strategy-model
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: retry-strategy-model
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: model
+    base.io/function: retry-strategy
+spec:
+  type: "reinforcement_learning"
+  algorithm: "deep_q_network"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+    serving:
+      framework: "pytorch"
+      inference_endpoint: "/suggest-retry-strategy"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      network_type: "deep_q_network"
+      state_space_size: 20
+      action_space_size: 8
+      hidden_layers: [256, 128, 64]
+      learning_rate: 0.0001
+      epsilon_decay: 0.995
+      replay_buffer_size: 100000
+      batch_size: 64
+    feature_engineering:
+      feature_types:
+        - name: "error_context"
+          features: ["error_type", "error_frequency", "error_duration", "source_health"]
+        - name: "retry_history"
+          features: ["previous_attempts", "success_rate", "backoff_used", "circuit_breaker_state"]
+        - name: "system_state"
+          features: ["system_load", "network_conditions", "resource_availability"]
+  inference:
+    action_space:
+      retry_strategies: ["exponential_backoff", "linear_backoff", "fixed_delay", "fibonacci_backoff"]
+      backoff_multipliers: [1.5, 2.0, 2.5, 3.0]
+      max_attempts: [3, 5, 7, 10]
+    reward_function:
+      success_reward: 100
+      failure_penalty: -10
+      latency_penalty: -1
+      resource_penalty: -5

@@ -1,0 +1,76 @@
+# Airflow values for AWS Node Groups
+global:
+  cloudProvider: aws
+  region: us-east-1
+
+airflow:
+  image:
+    repository: apache/airflow
+    tag: 2.8.4
+
+  # Executor configuration
+  executor: KubernetesExecutor
+
+  # Database configuration (using external PostgreSQL)
+  postgresql:
+    enabled: false
+
+  externalDatabase:
+    type: postgres
+    host: postgresql-primary.postgresql.svc.cluster.local
+    port: 5432
+    database: airflow
+    user: airflow
+
+  # Enable persistence for node groups
+  persistence:
+    enabled: true
+    storageClass: gp3
+    size: 100Gi
+
+  # Web server
+  webserver:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 2
+        memory: 4Gi
+      requests:
+        cpu: 1
+        memory: 2Gi
+
+  # Scheduler
+  scheduler:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 2
+        memory: 4Gi
+      requests:
+        cpu: 1
+        memory: 2Gi
+
+  # Workers (for KubernetesExecutor)
+  workers:
+    resources:
+      limits:
+        cpu: 2
+        memory: 4Gi
+      requests:
+        cpu: 1
+        memory: 2Gi
+
+  # Service configuration
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+
+  # Node selector for node groups
+  nodeSelector:
+    node-type: platform-services
+    kubernetes.io/os: linux
+
+  # No Fargate tolerations needed
+  tolerations: []

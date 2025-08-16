@@ -1,0 +1,29 @@
+groups:
+- name: base-layer-alerts
+  rules:
+  - alert: HighCPUUsage
+    expr: cpu_usage_percent > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage detected"
+      description: "CPU usage is above 80% for more than 5 minutes"
+
+  - alert: HighMemoryUsage
+    expr: memory_usage_percent > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage detected"
+      description: "Memory usage is above 85% for more than 5 minutes"
+
+  - alert: BaseComponentDown
+    expr: up{job=~"base-.*"} == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "BASE component is down"
+      description: "BASE component {{ $labels.job }} has been down for more than 2 minutes"

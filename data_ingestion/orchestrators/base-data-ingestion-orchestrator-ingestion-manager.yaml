@@ -1,0 +1,471 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-ingestion-orchestrator-ingestion-manager
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: ingestion-manager
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: orchestrator
+    base.io/function: ingestion-coordination
+spec:
+  type: "master_coordinator"
+  coordination:
+    # Saga Pattern Implementation
+    orchestration_pattern: "saga"
+    coordination_model: "centralized"
+    state_management: "persistent"
+    transaction_boundaries: "per_source"
+    
+    # Workflow Coordination
+    workflow_management:
+      workflow_engine: "kubernetes_workflows"
+      parallel_execution: true
+      max_concurrent_workflows: 50
+      workflow_timeout: "4h"
+      retry_failed_workflows: true
+      
+    # Agent Coordination
+    agent_coordination:
+      coordination_protocol: "grpc"
+      service_discovery: "kubernetes_dns"
+      load_balancing: "round_robin"
+      health_check_interval: "30s"
+      
+      managed_agents:
+        - name: "data-collector"
+          instances: 3
+          coordination_endpoint: "base-data-collector-service:9000"
+          responsibilities: ["data_collection", "source_connection"]
+          
+        - name: "data-connector" 
+          instances: 2
+          coordination_endpoint: "base-data-connector-service:9000"
+          responsibilities: ["authentication", "connection_pooling"]
+          
+        - name: "data-converter"
+          instances: 4
+          coordination_endpoint: "base-data-converter-service:9000"
+          responsibilities: ["format_conversion", "schema_inference"]
+          
+        - name: "data-scheduler"
+          instances: 1
+          coordination_endpoint: "base-data-scheduler-service:9000"
+          responsibilities: ["schedule_management", "dependency_resolution"]
+          
+        - name: "data-merger"
+          instances: 2
+          coordination_endpoint: "base-data-merger-service:9000"
+          responsibilities: ["data_consolidation", "conflict_resolution"]
+          
+        - name: "data-fetch-retry"
+          instances: 2
+          coordination_endpoint: "base-data-retry-service:9000"
+          responsibilities: ["retry_logic", "failure_recovery"]
+    
+    # State Management
+    state_management:
+      persistence_backend: "postgresql"
+      state_store_connection: "postgres://state-db:5432/orchestrator_state"
+      state_retention_days: 30
+      checkpoint_interval: "5m"
+      state_consistency: "eventual"
+      
+    # Event-Driven Coordination
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "ingestion.workflow.started"
+          partitions: 12
+          replication_factor: 3
+        - name: "ingestion.workflow.completed"
+          partitions: 12
+          replication_factor: 3
+        - name: "ingestion.workflow.failed"
+          partitions: 6
+          replication_factor: 3
+        - name: "ingestion.agent.health"
+          partitions: 6
+          replication_factor: 3
+      
+      event_processing:
+        consumer_group: "ingestion-orchestrator"
+        batch_size: 100
+        processing_timeout: "30s"
+        retry_attempts: 3
+        dead_letter_queue: "ingestion.dlq"
+        
+  resources:
+    # Deployment Configuration
+    deployment:
+      replicas: 2  # High availability
+      deployment_strategy: "blue_green"
+      leader_election: true
+      leader_lease_duration: "30s"
+      leader_renew_deadline: "20s"
+      
+    # Resource Allocation
+    resource_allocation:
+      cpu:
+        requests: "1"
+        limits: "4"
+      memory:
+        requests: "2Gi"
+        limits: "8Gi"
+      storage:
+        requests: "10Gi"
+        limits: "50Gi"
+        
+    # Auto-scaling Configuration
+    auto_scaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 5
+      scaling_metrics:
+        - type: "cpu"
+          target_utilization: 70
+        - type: "memory"
+          target_utilization: 80
+        - type: "custom"
+          metric_name: "active_workflows"
+          target_value: 100
+          
+    # Performance Optimization
+    performance:
+      connection_pooling:
+        database_connections: 20
+        agent_connections: 100
+        connection_timeout: "30s"
+        idle_timeout: "5m"
+        
+      caching:
+        workflow_cache_size: "1GB"
+        state_cache_ttl: "10m"
+        agent_status_cache_ttl: "30s"
+        
+      batch_processing:
+        batch_size: 50
+        batch_timeout: "10s"
+        max_batch_wait: "30s"
+        
+  # Workflow Management Configuration
+  workflow_orchestration:
+    # Workflow Types
+    supported_workflows:
+      - name: "standard_ingestion"
+        description: "Standard data ingestion workflow"
+        steps: 
+          - "source_validation"
+          - "connection_establishment"
+          - "data_collection"
+          - "format_conversion"
+          - "quality_validation" 
+          - "data_storage"
+        parallelizable_steps: ["data_collection", "format_conversion"]
+        retry_strategy: "exponential_backoff"
+        timeout: "2h"
+        
+      - name: "secure_api_ingestion"
+        description: "Enhanced security workflow for sensitive APIs"
+        steps:
+          - "security_validation"
+          - "authentication_verification"
+          - "encrypted_connection"
+          - "secure_data_collection"
+          - "data_classification"
+          - "encrypted_storage"
+        security_level: "high"
+        audit_required: true
+        timeout: "3h"
+        
+      - name: "bulk_file_ingestion"
+        description: "Parallel processing of large file sets"
+        steps:
+          - "file_discovery"
+          - "parallel_file_processing"
+          - "format_standardization"
+          - "data_consolidation"
+          - "batch_validation"
+        parallel_workers: 10
+        chunk_size: "100MB"
+        timeout: "6h"
+        
+      - name: "realtime_stream_ingestion"
+        description: "Continuous streaming data ingestion"
+        steps:
+          - "stream_connection"
+          - "continuous_processing"
+          - "real_time_validation"
+          - "streaming_storage"
+        continuous: true
+        latency_target: "< 1s"
+        
+      - name: "resilient_fetch_recovery"
+        description: "Advanced error handling and recovery workflow"
+        steps:
+          - "failure_analysis"
+          - "recovery_strategy_selection" 
+          - "alternative_source_discovery"
+          - "data_reconstruction"
+          - "validation_and_storage"
+        failure_tolerance: "high"
+        fallback_sources: true
+        
+    # Workflow Execution Engine
+    execution_engine:
+      engine_type: "kubernetes_native"
+      workflow_crd: "Workflow"
+      step_execution: "containers"
+      
+      execution_options:
+        parallel_execution: true
+        pipeline_optimization: true
+        resource_optimization: true
+        failure_isolation: true
+        
+      monitoring:
+        step_level_monitoring: true
+        performance_tracking: true
+        resource_utilization_tracking: true
+        
+    # Workflow Scheduling
+    workflow_scheduling:
+      scheduling_strategy: "priority_based"
+      priority_levels:
+        critical: 1
+        high: 2
+        medium: 3
+        low: 4
+        
+      scheduling_constraints:
+        resource_constraints: true
+        dependency_constraints: true
+        time_window_constraints: true
+        sla_constraints: true
+        
+      queue_management:
+        max_queue_size: 1000
+        queue_overflow_strategy: "reject_lowest_priority"
+        queue_monitoring: true
+        
+  # Integration Configuration
+  integration:
+    # Upstream Integrations
+    upstream_services:
+      source_registry:
+        service: "base-source-registry"
+        endpoint: "/api/v1/sources"
+        timeout: "10s"
+        
+      policy_engine:
+        service: "base-policy-engine"
+        endpoint: "/api/v1/policies"
+        timeout: "5s"
+        
+      scheduler_service:
+        service: "base-scheduler"
+        endpoint: "/api/v1/schedules"
+        timeout: "10s"
+        
+    # Downstream Integrations
+    downstream_services:
+      data_quality:
+        service: "base-data-quality"
+        endpoint: "/api/v1/validate"
+        timeout: "60s"
+        batch_validation: true
+        
+      feature_engineering:
+        service: "base-feature-engineering"
+        endpoint: "/api/v1/process"
+        timeout: "120s"
+        
+      data_security:
+        service: "base-data-security"
+        endpoint: "/api/v1/classify-encrypt"
+        timeout: "30s"
+        
+      data_storage:
+        service: "base-data-storage"
+        endpoint: "/api/v1/store"
+        timeout: "300s"
+        
+    # Cross-cutting Integrations
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        kafka_brokers: "${KAFKA_BROKERS}"
+        
+      metadata_discovery:
+        service: "base-metadata-discovery"
+        endpoint: "/api/v1/catalog"
+        
+      monitoring_service:
+        service: "base-monitoring"
+        metrics_endpoint: "/metrics"
+        alerts_endpoint: "/alerts"
+        
+  # Monitoring and Observability
+  observability:
+    # Metrics Collection
+    metrics:
+      business_metrics:
+        - name: "workflows_executed_total"
+          type: "counter"
+          description: "Total number of workflows executed"
+          labels: ["workflow_type", "status", "priority"]
+          
+        - name: "workflow_execution_duration"
+          type: "histogram"
+          description: "Time taken to execute workflows"
+          buckets: [30, 60, 300, 600, 1800, 3600, 7200]
+          
+        - name: "active_workflows"
+          type: "gauge"
+          description: "Number of currently active workflows"
+          
+        - name: "agent_coordination_latency"
+          type: "histogram"
+          description: "Latency in agent coordination calls"
+          
+        - name: "workflow_success_rate"
+          type: "gauge"
+          description: "Success rate of workflow execution"
+          
+      technical_metrics:
+        - name: "orchestrator_cpu_utilization"
+          type: "gauge"
+          description: "CPU utilization of orchestrator"
+          
+        - name: "orchestrator_memory_utilization"
+          type: "gauge"
+          description: "Memory utilization of orchestrator"
+          
+        - name: "event_processing_lag"
+          type: "gauge"
+          description: "Lag in event processing"
+          
+    # Health Checks
+    health_checks:
+      liveness_check:
+        endpoint: "/health/live"
+        interval: "10s"
+        timeout: "5s"
+        failure_threshold: 3
+        
+      readiness_check:
+        endpoint: "/health/ready"
+        interval: "5s"
+        timeout: "3s"
+        failure_threshold: 3
+        
+      dependency_checks:
+        - name: "database_connection"
+          check: "postgres_ping"
+          critical: true
+          
+        - name: "kafka_connection"
+          check: "kafka_broker_health"
+          critical: true
+          
+        - name: "agent_connectivity"
+          check: "agent_ping_all"
+          critical: false
+          
+    # Alerting
+    alerting:
+      alert_rules:
+        critical_alerts:
+          - name: "orchestrator_down"
+            condition: "up == 0"
+            duration: "1m"
+            
+          - name: "workflow_failure_rate_high"
+            condition: "rate(workflow_failures_total[5m]) > 0.1"
+            duration: "2m"
+            
+          - name: "agent_coordination_failures"
+            condition: "rate(agent_coordination_errors[5m]) > 0.05"
+            duration: "3m"
+            
+        warning_alerts:
+          - name: "workflow_queue_size_high"
+            condition: "workflow_queue_size > 500"
+            duration: "5m"
+            
+          - name: "resource_utilization_high"
+            condition: "cpu_utilization > 0.8 OR memory_utilization > 0.8"
+            duration: "10m"
+            
+      notification_channels:
+        critical: ["pagerduty", "slack"]
+        warning: ["slack", "email"]
+        info: ["email"]
+        
+  # Security Configuration
+  security:
+    # Access Control
+    access_control:
+      rbac_enabled: true
+      service_account: "base-ingestion-orchestrator"
+      
+      permissions:
+        - apiGroups: ["base.io"]
+          resources: ["agents", "workflows", "configs"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+          
+        - apiGroups: ["apps"]
+          resources: ["deployments", "replicasets"]
+          verbs: ["get", "list", "watch"]
+          
+    # Network Security
+    network_security:
+      network_policies: true
+      allowed_ingress:
+        - from_namespaces: ["base-ingestion", "base-monitoring"]
+          ports: [8080, 9090]
+          
+      allowed_egress:
+        - to_namespaces: ["base-ingestion", "base-platform"]
+          ports: [5432, 9092, 8080]
+          
+    # Data Security
+    data_security:
+      encryption_in_transit: true
+      encryption_at_rest: true
+      secret_management: "kubernetes_secrets"
+      
+      audit_logging:
+        enabled: true
+        log_level: "info"
+        retention_days: 90
+        
+  # Disaster Recovery
+  disaster_recovery:
+    backup_strategy:
+      state_backup:
+        frequency: "hourly"
+        retention: "7d"
+        destination: "s3://base-backups/orchestrator-state/"
+        
+      configuration_backup:
+        frequency: "daily"
+        retention: "30d"
+        version_control: true
+        
+    recovery_procedures:
+      rto_target: "15m"
+      rpo_target: "5m"
+      
+      recovery_steps:
+        - "restore_configuration"
+        - "restore_state"
+        - "verify_agent_connectivity"
+        - "resume_workflows"
+        
+    failover_configuration:
+      cross_region_failover: false
+      multi_az_deployment: true
+      leader_election_enabled: true

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-streaming-${ENVIRONMENT}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: data_streaming
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-streaming
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

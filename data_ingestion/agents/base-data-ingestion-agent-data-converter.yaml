@@ -1,0 +1,545 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-data-converter-sa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-ingestion-agent-data-converter
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: agent
+    base.io/function: data-converter
+spec:
+  replicas: 4
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-converter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-data-converter
+        app.kubernetes.io/component: ingestion
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_ingestion
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-data-converter-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: data-converter
+        image: base/data-converter:v2.5.0-fixed
+        imagePullPolicy: Always
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9000
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: MAX_PARALLEL_CONVERSIONS
+          value: "10"
+        - name: CHUNK_SIZE_MB
+          value: "100"
+        - name: MEMORY_LIMIT_GB
+          value: "8"
+        - name: TEMP_DIR
+          value: "/app/temp"
+        - name: SCHEMA_INFERENCE_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "10Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "50Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+        - name: schema-cache
+          mountPath: /app/cache/schemas
+        - name: conversion-rules
+          mountPath: /app/rules
+          readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-data-converter-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "50Gi"
+      - name: schema-cache
+        emptyDir:
+          sizeLimit: "5Gi"
+      - name: conversion-rules
+        configMap:
+          name: base-data-converter-rules
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-data-converter-service
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+    app.kubernetes.io/component: ingestion
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 9000
+    targetPort: 9000
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-data-converter
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-converter-config
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+    app.kubernetes.io/component: ingestion
+data:
+  converter.yaml: |
+    # Data Converter Agent Configuration
+    converter:
+      # Agent Identity and Responsibility
+      name: "base-data-converter"
+      version: "v2.5.0"
+      responsibility: "Format standardization and schema transformation"
+      
+      # Supported Input and Output Formats
+      supported_formats:
+        input:
+          - "CSV"
+          - "JSON"
+          - "XML"
+          - "Parquet"
+          - "Avro"
+          - "ORC"
+          - "Excel"
+          - "TSV"
+          - "JSONL"
+          - "YAML"
+          - "Protocol Buffers"
+        output:
+          - "JSON"
+          - "Avro"
+          - "Parquet"
+          - "CSV"
+          
+      # Performance Configuration
+      performance:
+        max_parallel_conversions: 10
+        chunk_size: "100MB"
+        memory_limit: "8Gi"
+        temp_storage: "50Gi"
+        throughput_target: "50GB/hour"
+        streaming_threshold: "1GB"
+        
+      # Schema Inference Configuration
+      schema_inference:
+        enabled: true
+        sample_size: 10000
+        confidence_threshold: 0.95
+        type_detection:
+          integer: true
+          float: true
+          boolean: true
+          date: true
+          datetime: true
+          email: true
+          phone: true
+          url: true
+        null_detection:
+          values: ["", "NULL", "null", "N/A", "NA", "None", "nil"]
+          
+      # Data Type Mapping
+      type_mappings:
+        string_patterns:
+          email: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+          phone: "^\\+?[1-9]\\d{1,14}$"
+          ssn: "^\\d{3}-\\d{2}-\\d{4}$"
+          credit_card: "^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$"
+          ipv4: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+          url: "^https?://[^\\s/$.?#].[^\\s]*$"
+          
+        numeric_types:
+          integer: "^-?\\d+$"
+          decimal: "^-?\\d+\\.\\d+$"
+          currency: "^\\$?-?\\d+(,\\d{3})*(\\.\\d{2})?$"
+          percentage: "^-?\\d+(\\.\\d+)?%$"
+          
+        temporal_types:
+          date_formats:
+            - "yyyy-MM-dd"
+            - "MM/dd/yyyy"
+            - "dd-MM-yyyy"
+            - "yyyy/MM/dd"
+          datetime_formats:
+            - "yyyy-MM-dd HH:mm:ss"
+            - "yyyy-MM-dd'T'HH:mm:ss'Z'"
+            - "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            - "MM/dd/yyyy HH:mm:ss"
+          timestamp_formats:
+            - "epoch_seconds"
+            - "epoch_milliseconds"
+            - "epoch_microseconds"
+            
+      # Format-Specific Configuration
+      format_configs:
+        csv:
+          delimiter: ","
+          quote_char: "\""
+          escape_char: "\\"
+          header_row: true
+          encoding: "utf-8"
+          skip_blank_lines: true
+          
+        json:
+          encoding: "utf-8"
+          array_handling: "flatten"
+          nested_object_handling: "flatten"
+          date_format: "iso8601"
+          pretty_print: false
+          
+        xml:
+          encoding: "utf-8"
+          namespace_aware: true
+          schema_validation: false
+          preserve_whitespace: false
+          attribute_handling: "merge"
+          
+        parquet:
+          compression: "snappy"
+          row_group_size: 134217728
+          page_size: 1048576
+          dictionary_encoding: true
+          use_legacy_format: false
+          
+        avro:
+          compression: "snappy"
+          schema_registry_url: "${SCHEMA_REGISTRY_URL}"
+          schema_evolution: "backward_compatible"
+          use_logical_types: true
+          
+        excel:
+          sheet_selection: "first"
+          header_row: 1
+          skip_rows: 0
+          date_format: "auto"
+          number_format: "auto"
+          
+      # Quality Validation
+      quality_validation:
+        enabled: true
+        checks:
+          schema_validation: true
+          data_completeness: true
+          format_compliance: true
+          type_consistency: true
+          range_validation: true
+        thresholds:
+          min_completeness: 0.90
+          max_error_rate: 0.05
+          type_consistency: 0.95
+          
+      # Error Handling
+      error_handling:
+        strategy: "continue_on_error" # fail_fast, continue_on_error, collect_errors
+        max_errors_per_file: 1000
+        error_sampling_rate: 0.1
+        dead_letter_queue: true
+        retry_failed_chunks: true
+        
+      # Caching Configuration
+      caching:
+        schema_cache:
+          enabled: true
+          ttl: 3600s
+          max_size: "1GB"
+        conversion_cache:
+          enabled: false
+          ttl: 1800s
+          max_size: "5GB"
+          
+      # Integration Points
+      integration:
+        collector_service:
+          endpoint: "http://base-data-collector-service:8080"
+          timeout: 60s
+        quality_service:
+          endpoint: "http://base-data-quality-service:8080"
+          validation_required: true
+        schema_registry:
+          endpoint: "${SCHEMA_REGISTRY_URL}"
+          authentication: true
+        event_service:
+          endpoint: "http://base-event-coordinator-service:8080"
+          events:
+            - "conversion_started"
+            - "conversion_completed"
+            - "conversion_failed"
+            - "schema_inferred"
+            - "validation_completed"
+            
+      # Security Configuration
+      security:
+        encryption_at_rest: true
+        encryption_in_transit: true
+        pii_detection: true
+        data_masking:
+          enabled: true
+          fields: ["ssn", "credit_card", "phone", "email"]
+        audit_logging: true
+        
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      include_payload: false # Don't log actual data for security
+      
+    # Monitoring Configuration
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      custom_metrics:
+        - name: "conversion_rate"
+          type: "counter"
+          description: "Rate of data conversion operations"
+        - name: "format_detection_accuracy"
+          type: "gauge"
+          description: "Accuracy of format detection"
+        - name: "schema_inference_time"
+          type: "histogram"
+          description: "Time taken for schema inference"
+        - name: "conversion_duration"
+          type: "histogram"
+          description: "Time taken for data conversion operations"
+        - name: "data_quality_score"
+          type: "gauge"
+          description: "Quality score of converted data"
+        - name: "memory_usage"
+          type: "gauge"
+          description: "Memory usage during conversion"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-converter-rules
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+    app.kubernetes.io/component: ingestion
+data:
+  financial_rules.yaml: |
+    # Financial Data Conversion Rules
+    financial_data:
+      currency_fields:
+        - "price"
+        - "amount"
+        - "cost"
+        - "value"
+        - "fee"
+        - "balance"
+      date_fields:
+        - "trade_date"
+        - "settlement_date"
+        - "maturity_date"
+        - "created_at"
+        - "updated_at"
+      categorical_fields:
+        - "asset_type"
+        - "currency_code"
+        - "market"
+        - "sector"
+        - "industry"
+        
+  validation_rules.yaml: |
+    # Data Validation Rules
+    validation:
+      required_fields:
+        - "id"
+        - "timestamp"
+      field_constraints:
+        price:
+          type: "decimal"
+          min: 0
+          precision: 4
+        volume:
+          type: "integer"
+          min: 0
+        currency_code:
+          type: "string"
+          length: 3
+          pattern: "^[A-Z]{3}$"
+      business_rules:
+        - name: "price_volume_consistency"
+          description: "Price and volume must both be present or both be null"
+          condition: "(price IS NULL AND volume IS NULL) OR (price IS NOT NULL AND volume IS NOT NULL)"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-data-converter-hpa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-ingestion-agent-data-converter
+  minReplicas: 2
+  maxReplicas: 15
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: conversion_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "50"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-data-converter-netpol
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-converter
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-converter
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9000
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-events
+  - {} # Allow external schema registry access

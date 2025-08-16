@@ -1,0 +1,56 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-ingestion-workflow-secure-api
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: secure-api-workflow
+    base.io/category: data_ingestion
+    base.io/type: workflow
+    base.io/function: secure-processing
+spec:
+  steps:
+    - name: "security_validation"
+      agent: "data-security"
+      action: "validate_security_requirements"
+      timeout: "3m"
+      
+    - name: "authentication_verification"
+      agent: "data-connector"
+      action: "verify_mfa_authentication"
+      timeout: "5m"
+      dependencies: ["security_validation"]
+      
+    - name: "encrypted_connection"
+      agent: "data-connector"
+      action: "establish_encrypted_connection"
+      timeout: "3m"
+      dependencies: ["authentication_verification"]
+      
+    - name: "secure_data_collection"
+      agent: "data-collector"
+      action: "collect_with_encryption"
+      timeout: "45m"
+      dependencies: ["encrypted_connection"]
+      
+    - name: "data_classification"
+      agent: "data-security"
+      action: "classify_sensitive_data"
+      timeout: "10m"
+      dependencies: ["secure_data_collection"]
+      
+    - name: "encrypted_storage"
+      agent: "data-security"
+      action: "store_with_encryption"
+      timeout: "15m"
+      dependencies: ["data_classification"]
+      
+  triggers:
+    event:
+      - "high_security_source_update"
+      - "compliance_audit_request"
+      
+  dependencies:
+    security_services:
+      - "vault_service"
+      - "encryption_service"

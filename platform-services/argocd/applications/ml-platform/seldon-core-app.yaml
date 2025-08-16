@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: seldon-core
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://storage.googleapis.com/seldon-charts
+    chart: seldon-core-operator
+    targetRevision: 1.18.0
+    helm:
+      parameters:
+      - name: usageMetrics.enabled
+        value: "true"
+      - name: istio.enabled
+        value: "false"
+      - name: ambassador.enabled
+        value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: seldon-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

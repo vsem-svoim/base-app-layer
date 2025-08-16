@@ -1,0 +1,54 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-ingestion-workflow-bulk-file
+  namespace: base-ingestion
+  labels:
+    base.io/category: data_ingestion
+    base.io/type: workflow
+    base.io/function: bulk-processing
+spec:
+  steps:
+    - name: "file_discovery"
+      agent: "file-manager"
+      action: "discover_files_in_directory"
+      timeout: "10m"
+      
+    - name: "parallel_file_processing"
+      agent: "data-collector"
+      action: "process_files_in_parallel"
+      timeout: "120m"
+      parallel_workers: 10
+      chunk_size: "100MB"
+      dependencies: ["file_discovery"]
+      
+    - name: "format_standardization"
+      agent: "data-converter"
+      action: "standardize_file_formats"
+      timeout: "60m"
+      parallelizable: true
+      dependencies: ["parallel_file_processing"]
+      
+    - name: "data_consolidation"
+      agent: "data-merger"
+      action: "merge_processed_files"
+      timeout: "30m"
+      dependencies: ["format_standardization"]
+      
+    - name: "batch_validation"
+      agent: "external"
+      service: "base-data-quality"
+      action: "validate_bulk_data"
+      timeout: "45m"
+      dependencies: ["data_consolidation"]
+      
+  triggers:
+    schedule:
+      cron: "0 2 * * *"  # Daily at 2 AM
+    event:
+      - "bulk_files_available"
+      
+  dependencies:
+    storage_services:
+      - "distributed_file_system"
+      - "object_storage"

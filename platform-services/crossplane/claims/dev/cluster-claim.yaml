@@ -1,0 +1,13 @@
+apiVersion: platform.finportiq.io/v1alpha1
+kind: XCluster
+metadata:
+  name: dev-cluster
+  namespace: crossplane-system
+spec:
+  parameters:
+    region: us-east-1
+    nodeCount: 3
+    nodeSize: medium
+  compositionRef:
+    name: xcluster
+  writeConnectionSecretsToNamespace: crossplane-system

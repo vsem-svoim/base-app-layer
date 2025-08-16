@@ -1,0 +1,65 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-ingestion-scheduling-intelligence-model
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: scheduling-intelligence-model
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: model
+    base.io/function: scheduling-intelligence
+spec:
+  type: "time_series_forecasting"
+  algorithm: "lstm_ensemble"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 3
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/optimize-schedule"
+      batch_prediction: true
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      model_type: "lstm"
+      lstm_units: [128, 64, 32]
+      dropout_rate: 0.2
+      recurrent_dropout: 0.2
+      sequence_length: 168  # 1 week in hours
+      batch_size: 32
+      epochs: 200
+      early_stopping_patience: 20
+    feature_engineering:
+      feature_types:
+        - name: "temporal_features"
+          features: ["hour_of_day", "day_of_week", "day_of_month", "month", "quarter"]
+        - name: "business_calendar"
+          features: ["is_business_day", "is_holiday", "market_hours", "earnings_season"]
+        - name: "source_patterns"
+          features: ["historical_volume", "update_frequency", "error_patterns", "load_distribution"]
+        - name: "system_capacity"
+          features: ["available_resources", "concurrent_jobs", "queue_depth", "performance_metrics"]
+  inference:
+    optimization_objectives:
+      - "minimize_resource_contention"
+      - "maximize_data_freshness"
+      - "respect_business_priorities"
+      - "balance_system_load"
+    scheduling_parameters:
+      time_horizon: "7d"
+      scheduling_granularity: "15min"
+      resource_constraints: true
+      dependency_awareness: true
+    prediction_config:
+      forecast_confidence_intervals: true
+      scenario_analysis: true
+      what_if_analysis: true

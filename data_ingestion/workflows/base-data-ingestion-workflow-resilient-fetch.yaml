@@ -1,0 +1,50 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-ingestion-workflow-resilient-fetch
+  namespace: base-ingestion
+  labels:
+    base.io/category: data_ingestion
+    base.io/type: workflow
+    base.io/function: resilient-processing
+spec:
+  steps:
+    - name: "failure_analysis"
+      agent: "data-fetch-retry"
+      action: "analyze_failure_patterns"
+      timeout: "5m"
+      
+    - name: "recovery_strategy_selection"
+      agent: "data-fetch-retry"
+      action: "select_optimal_retry_strategy"
+      timeout: "2m"
+      dependencies: ["failure_analysis"]
+      
+    - name: "alternative_source_discovery"
+      agent: "data-scheduler"
+      action: "discover_fallback_sources"
+      timeout: "10m"
+      dependencies: ["recovery_strategy_selection"]
+      
+    - name: "data_reconstruction"
+      agent: "data-collector"
+      action: "reconstruct_from_multiple_sources"
+      timeout: "60m"
+      dependencies: ["alternative_source_discovery"]
+      
+    - name: "validation_and_storage"
+      agent: "data-merger"
+      action: "validate_and_store_recovered_data"
+      timeout: "20m"
+      dependencies: ["data_reconstruction"]
+      
+  triggers:
+    event:
+      - "data_source_failure"
+      - "collection_timeout"
+      - "quality_threshold_breach"
+      
+  dependencies:
+    recovery_services:
+      - "alternative_data_sources"
+      - "data_reconstruction_service"

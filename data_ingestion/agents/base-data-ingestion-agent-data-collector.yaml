@@ -1,0 +1,460 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-data-collector-sa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-ingestion-agent-data-collector
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: agent
+    base.io/function: data-collector
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-data-collector
+        app.kubernetes.io/component: ingestion
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_ingestion
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-data-collector-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: data-collector
+        image: base/data-collector:v2.5.0-fixed
+        imagePullPolicy: Always
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: MAX_CONCURRENT_CONNECTIONS
+          value: "1000"
+        - name: THROUGHPUT_TARGET
+          value: "100GB/hour"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-data-collector-config
+      - name: secrets-volume
+        secret:
+          secretName: base-data-collector-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-data-collector-service
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+    app.kubernetes.io/component: ingestion
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-data-collector
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-collector-config
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+    app.kubernetes.io/component: ingestion
+data:
+  collector.yaml: |
+    # Data Collector Agent Configuration
+    collector:
+      # Agent Identity and Responsibility
+      name: "base-data-collector"
+      version: "v2.5.0"
+      responsibility: "Primary data acquisition across heterogeneous sources"
+      
+      # Supported Protocols and Capabilities
+      capabilities:
+        protocols:
+          - "HTTP"
+          - "HTTPS"  
+          - "JDBC"
+          - "SFTP"
+          - "S3"
+          - "Azure Blob"
+          - "GCS"
+          - "Kafka"
+          - "RabbitMQ"
+          - "WebSocket"
+        authentication:
+          - "OAuth2"
+          - "JWT"
+          - "API Key"
+          - "Certificate"
+          - "Basic Auth"
+          - "SAML"
+        data_formats:
+          - "JSON"
+          - "CSV"
+          - "XML"
+          - "Parquet"
+          - "Avro"
+          - "ORC"
+          - "Excel"
+          - "TSV"
+        max_concurrent_connections: 1000
+        throughput_target: "100GB/hour"
+        
+      # Data Source Configuration Templates
+      source_templates:
+        api_rest:
+          connection:
+            timeout: 30s
+            retry_attempts: 3
+            rate_limit: 1000/minute
+          authentication:
+            type: oauth2
+            token_refresh: auto
+          format: json
+          
+        database:
+          connection:
+            pool_size: 10
+            max_idle: 5
+            timeout: 60s
+          query:
+            batch_size: 1000
+            parallel_reads: true
+          format: tabular
+          
+        file_system:
+          connection:
+            concurrent_downloads: 5
+            chunk_size: "10MB"
+          formats:
+            - csv
+            - json
+            - parquet
+            - excel
+          compression:
+            - gzip
+            - bzip2
+            - lz4
+            
+        stream:
+          connection:
+            consumer_group: "base-collectors"
+            auto_commit: false
+            batch_size: 100
+          processing:
+            buffer_size: "64MB"
+            flush_interval: 5s
+            
+      # Performance and Resource Management  
+      performance:
+        worker_threads: 10
+        memory_limit: "8Gi"
+        temp_storage: "20Gi"
+        monitoring:
+          metrics_interval: 30s
+          health_check_interval: 10s
+          
+      # Integration Points
+      integration:
+        next_stage:
+          service: "base-data-quality"
+          endpoint: "/validate"
+          format: "structured"
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "collection_started"
+            - "collection_completed" 
+            - "collection_failed"
+            - "quality_check_required"
+        security:
+          service: "base-data-security"
+          encryption: "AES-256"
+          classification: "auto"
+          
+      # Error Handling and Resilience
+      error_handling:
+        retry_policy:
+          max_attempts: 3
+          backoff: exponential
+          base_delay: 1s
+          max_delay: 30s
+        circuit_breaker:
+          failure_threshold: 5
+          timeout: 30s
+          half_open_requests: 3
+        dead_letter_queue:
+          enabled: true
+          max_size: 10000
+          retention: "7d"
+          
+      # Quality and Compliance  
+      quality_controls:
+        data_validation:
+          schema_check: true
+          format_validation: true
+          size_limits:
+            min: "1KB"
+            max: "10GB"
+        compliance:
+          pii_detection: true
+          gdpr_compliance: true
+          audit_logging: true
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "data_collection_rate"
+          type: "counter"
+          description: "Rate of data collection operations"
+        - name: "collection_duration"  
+          type: "histogram"
+          description: "Time taken for data collection operations"
+        - name: "source_health_score"
+          type: "gauge"
+          description: "Health score of data sources"
+        - name: "error_rate"
+          type: "counter" 
+          description: "Rate of collection errors"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-data-collector-hpa
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-ingestion-agent-data-collector
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: queue_depth
+      target:
+        type: AverageValue
+        averageValue: "100"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-data-collector-netpol
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-data-collector
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-ingestion
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - {} # Allow all egress for external data sources
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-data-collector-secrets
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: base-data-collector
+type: Opaque
+stringData:
+  # API Keys and Tokens (to be populated by external secret management)
+  api_keys.yaml: |
+    # External API credentials
+    sources:
+      bloomberg_api:
+        key: "${BLOOMBERG_API_KEY}"
+        secret: "${BLOOMBERG_API_SECRET}"
+      nyse_api:
+        token: "${NYSE_API_TOKEN}"
+      aws_s3:
+        access_key: "${AWS_ACCESS_KEY}"
+        secret_key: "${AWS_SECRET_KEY}"
+      azure_storage:
+        connection_string: "${AZURE_STORAGE_CONNECTION}"
+      gcp_storage:
+        service_account: "${GCP_SERVICE_ACCOUNT_JSON}"
+        
+  # Database Connection Strings
+  db_connections.yaml: |
+    databases:
+      postgres_main:
+        host: "${POSTGRES_HOST}"
+        port: "${POSTGRES_PORT}"
+        database: "${POSTGRES_DB}"
+        username: "${POSTGRES_USER}"
+        password: "${POSTGRES_PASSWORD}"
+        ssl_mode: "require"
+      mongodb_documents:
+        uri: "${MONGODB_URI}"
+      redis_cache:
+        host: "${REDIS_HOST}"
+        port: "${REDIS_PORT}"
+        password: "${REDIS_PASSWORD}"
+        
+  # SSL/TLS Certificates
+  certificates.pem: |
+    # Client certificates for secure connections
+    # (Certificate content would be injected here)

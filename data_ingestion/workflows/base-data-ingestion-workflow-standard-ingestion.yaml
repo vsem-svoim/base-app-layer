@@ -1,0 +1,75 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-ingestion-workflow-standard-ingestion
+  namespace: base-ingestion
+  labels:
+    app.kubernetes.io/name: standard-ingestion-workflow
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: workflow
+    base.io/function: standard-processing
+spec:
+  steps:
+    - name: "source_validation"
+      agent: "data-scheduler"
+      action: "validate_source_availability"
+      timeout: "5m"
+      retry_attempts: 3
+      dependencies: []
+      
+    - name: "connection_establishment"
+      agent: "data-connector"
+      action: "establish_secure_connection"
+      timeout: "2m"
+      retry_attempts: 5
+      dependencies: ["source_validation"]
+      
+    - name: "data_collection"
+      agent: "data-collector"
+      action: "collect_data_from_source"
+      timeout: "30m"
+      retry_attempts: 3
+      parallelizable: true
+      dependencies: ["connection_establishment"]
+      
+    - name: "format_conversion"
+      agent: "data-converter"
+      action: "convert_to_standard_format"
+      timeout: "15m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["data_collection"]
+      
+    - name: "quality_validation"
+      agent: "external"
+      service: "base-data-quality"
+      action: "validate_data_quality"
+      timeout: "10m"
+      retry_attempts: 2
+      dependencies: ["format_conversion"]
+      
+    - name: "data_storage"
+      agent: "external"
+      service: "base-data-storage"
+      action: "store_validated_data"
+      timeout: "20m"
+      retry_attempts: 3
+      dependencies: ["quality_validation"]
+      
+  triggers:
+    schedule:
+      cron: "0 */6 * * *"  # Every 6 hours
+      timezone: "UTC"
+    event:
+      - "source_data_updated"
+      - "manual_trigger"
+      
+  dependencies:
+    external_services:
+      - "base-data-quality"
+      - "base-data-storage"
+    infrastructure:
+      - "kafka_cluster"
+      - "postgresql_cluster"
