@@ -1,0 +1,125 @@
+name: Setup ArgoCD GitHub Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: 'EKS cluster name'
+        required: true
+        default: 'dev-cluster'
+        type: string
+      aws_region:
+        description: 'AWS region'
+        required: true
+        default: 'us-east-1'
+        type: string
+  push:
+    branches: [main]
+    paths: 
+      - 'platform-services/argocd/**'
+      - '.github/workflows/setup-argocd-github-integration.yml'
+
+env:
+  GITHUB_REPO_URL: https://github.com/vsem-svoim/base-app-layer.git
+
+jobs:
+  setup-github-integration:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ inputs.aws_region || 'us-east-1' }}
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name ${{ inputs.cluster_name || 'dev-cluster' }} --region ${{ inputs.aws_region || 'us-east-1' }}
+
+    - name: Verify cluster connection
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+
+    - name: Create ArgoCD namespace if not exists
+      run: |
+        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Create GitHub repository credentials secret
+      run: |
+        # Delete existing secret if it exists
+        kubectl delete secret github-repo-creds -n argocd --ignore-not-found=true
+        
+        # Create new secret with GitHub token
+        kubectl create secret generic github-repo-creds \
+          --namespace=argocd \
+          --from-literal=type=git \
+          --from-literal=url=${{ env.GITHUB_REPO_URL }} \
+          --from-literal=username=token \
+          --from-literal=password=${{ secrets.ARGOCD_GITHUB_TOKEN }}
+        
+        # Label the secret for ArgoCD repository discovery
+        kubectl label secret github-repo-creds \
+          --namespace=argocd \
+          argocd.argoproj.io/secret-type=repository \
+          --overwrite
+
+    - name: Verify secret creation
+      run: |
+        kubectl get secret github-repo-creds -n argocd -o yaml
+        echo "Secret created successfully with labels:"
+        kubectl get secret github-repo-creds -n argocd --show-labels
+
+    - name: Create additional repository secret for base-app-layer
+      run: |
+        # Create a more specific secret for this repository
+        kubectl delete secret base-app-layer-repo -n argocd --ignore-not-found=true
+        
+        kubectl create secret generic base-app-layer-repo \
+          --namespace=argocd \
+          --from-literal=type=git \
+          --from-literal=url=${{ env.GITHUB_REPO_URL }} \
+          --from-literal=username=token \
+          --from-literal=password=${{ secrets.ARGOCD_GITHUB_TOKEN }} \
+          --from-literal=name=base-app-layer
+        
+        kubectl label secret base-app-layer-repo \
+          --namespace=argocd \
+          argocd.argoproj.io/secret-type=repository \
+          --overwrite
+
+    - name: Update ArgoCD applications to use GitHub repository
+      run: |
+        echo "GitHub repository credentials configured successfully"
+        echo "ArgoCD can now access: ${{ env.GITHUB_REPO_URL }}"
+        echo "Applications can reference this repository in their source.repoURL field"
+
+    - name: Summary
+      run: |
+        echo "✅ ArgoCD GitHub Integration Setup Complete"
+        echo ""
+        echo "Created secrets:"
+        echo "- github-repo-creds (generic GitHub access)"
+        echo "- base-app-layer-repo (specific to this repository)"
+        echo ""
+        echo "Repository URL: ${{ env.GITHUB_REPO_URL }}"
+        echo "Namespace: argocd"
+        echo ""
+        echo "ArgoCD applications can now reference GitHub repositories using:"
+        echo "  source:"
+        echo "    repoURL: ${{ env.GITHUB_REPO_URL }}"
+        echo "    path: platform-services/..."
+        echo "    targetRevision: main"
