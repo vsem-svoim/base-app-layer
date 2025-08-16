@@ -58,7 +58,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/storageClassName
-        value: gp2
+        value: gp3
 
   - target:
       kind: Service
@@ -70,10 +70,12 @@ patches:
           service.beta.kubernetes.io/aws-load-balancer-type: nlb
 
 # AWS-специфичные метки
-commonLabels:
-  cloud.provider: aws
-  cloud.region: us-east-1
-  base.io/provider: aws
+labels:
+  - includeSelectors: false
+    pairs:
+      cloud.provider: aws
+      cloud.region: us-east-1
+      base.io/provider: aws
 
 # AWS-специфичная конфигурация приложения с интеграцией Bedrock/SageMaker
 configMapGenerator:
@@ -81,5 +83,5 @@ configMapGenerator:
     literals:
       - CLOUD_PROVIDER=aws
       - AWS_REGION=us-east-1
-      - STORAGE_CLASS=gp2
+      - STORAGE_CLASS=gp3
       - LOAD_BALANCER_TYPE=nlb
