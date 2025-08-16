@@ -1,0 +1,5 @@
+export AWS_PROFILE="akovalenko-084129280818-AdministratorAccess"
+export AWS_DEFAULT_REGION="us-east-1"
+export AWS_ACCOUNT_ID="084129280818"
+export AWS_USER_ARN="arn:aws:sts::084129280818:assumed-role/AWSReservedSSO_AdministratorAccess_4d2d9a7a497f6f71/akovalenko1312@gmail.com"
+export AWS_USER_ID="AROARHFT66MZHUDY4IZ6E:akovalenko1312@gmail.com"

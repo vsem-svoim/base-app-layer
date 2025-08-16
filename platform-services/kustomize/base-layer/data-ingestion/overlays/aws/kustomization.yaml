@@ -1,29 +1,29 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Только AWS-специфичные ресурсы (базовые ресурсы развертываются через data-ingestion-app)
+# AWS-специфичные ресурсы только (базовые ресурсы развертываются через data-ingestion-app)
 resources: []
 
 # AWS-специфичные образы контейнеров
 images:
   - name: base/data-collector:v2.5.0-fixed
     newName: python
-    newTag: "3.12-slim"
+    newTag: "latest"
   - name: base/data-connector:v2.5.0-fixed
     newName: python
-    newTag: "3.12-slim"
+    newTag: "latest"
   - name: base/data-converter:v2.5.0-fixed
     newName: python
-    newTag: "3.13-slim"
+    newTag: "latest"
   - name: base/data-fetch-retry:v2.5.0-fixed
     newName: python
-    newTag: "3.12-slim"
+    newTag: "latest"
   - name: base/data-merger:v2.5.0-analytics-fixed
     newName: python
-    newTag: "3.13-slim"
+    newTag: "latest"
   - name: base/data-scheduler:v2.5.0-analytics-fixed
     newName: python
-    newTag: "3.12-slim"
+    newTag: "latest"
 
 # AWS-специфичные патчи для базовых развертываний
 patches:
@@ -41,6 +41,16 @@ patches:
           name: AWS_REGION
           value: us-east-1
       - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AWS_BEDROCK_REGION
+          value: us-east-1
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AWS_SAGEMAKER_ENDPOINT_PREFIX
+          value: data-ingestion
+      - op: add
         path: /spec/template/spec/nodeSelector
         value:
           kubernetes.io/os: linux
@@ -51,7 +61,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/storageClassName
-        value: gp3
+        value: gp2
 
   - target:
       kind: Service
@@ -68,11 +78,14 @@ commonLabels:
   cloud.region: us-east-1
   base.io/provider: aws
 
-# AWS-специфичная конфигурация приложения
+# AWS-специфичная конфигурация приложения с интеграцией Bedrock/SageMaker
 configMapGenerator:
   - name: data-ingestion-aws-config
     literals:
       - CLOUD_PROVIDER=aws
       - AWS_REGION=us-east-1
-      - STORAGE_CLASS=gp3
+      - STORAGE_CLASS=gp2
       - LOAD_BALANCER_TYPE=nlb
+      - AWS_BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+      - AWS_SAGEMAKER_EXECUTION_ROLE_ARN=arn:aws:iam::ACCOUNT:role/SageMakerExecutionRole
+      - AWS_BEDROCK_INFERENCE_ENDPOINT=bedrock-runtime.us-east-1.amazonaws.com
