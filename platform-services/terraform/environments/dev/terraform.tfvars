@@ -155,12 +155,12 @@ platform_cluster_config = {
       }
     }
     airflow = {
-      instance_types = ["c8g.large", "c8g.xlarge"]  # Compute-optimized for workflow orchestration
+      instance_types = ["c8g.2xlarge", "c8g.4xlarge"]  # Larger instances to run all airflow services together
       capacity_type  = "ON_DEMAND"
       min_size      = 2
-      max_size      = 10
-      desired_size  = 3
-      disk_size     = 100  # Larger disk for persistent volumes (PostgreSQL, Redis)
+      max_size      = 6
+      desired_size  = 2
+      disk_size     = 200  # Larger disk for all airflow components
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_ARM_64"
       labels = {
@@ -168,13 +168,7 @@ platform_cluster_config = {
         Environment = "dev"
         WorkloadType = "airflow"
       }
-      taints = {
-        airflow = {
-          key    = "airflow"
-          value  = "true"
-          effect = "NO_SCHEDULE"
-        }
-      }
+      taints = {}  # Remove taints so all airflow services can schedule easily
     }
     base_apps = {
       instance_types = ["m7g.large", "m7g.xlarge"]  # General purpose for base layer apps
