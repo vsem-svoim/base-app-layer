@@ -11,7 +11,13 @@ resources:
 configMapGenerator:
   - name: data-ingestion-prompts
     files:
-      - ../../../../../data_ingestion/prompts/
+      - ../../../../../data_ingestion/prompts/base-data-ingestion-prompt-collector.md
+      - ../../../../../data_ingestion/prompts/base-ingest-prompt-collector.md
+      - ../../../../../data_ingestion/prompts/base-ingest-prompt-connector.md
+      - ../../../../../data_ingestion/prompts/base-ingest-prompt-converter.md
+      - ../../../../../data_ingestion/prompts/base-ingest-prompt-merger.md
+      - ../../../../../data_ingestion/prompts/base-ingest-prompt-retry.md
+      - ../../../../../data_ingestion/prompts/base-ingest-prompt-scheduler.md
 
 commonLabels:
   app.kubernetes.io/part-of: base-system
