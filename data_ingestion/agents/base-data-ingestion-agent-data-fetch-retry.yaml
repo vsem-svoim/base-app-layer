@@ -170,7 +170,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: hostpath
+  storageClassName: gp3
 ---
 apiVersion: v1
 kind: ConfigMap

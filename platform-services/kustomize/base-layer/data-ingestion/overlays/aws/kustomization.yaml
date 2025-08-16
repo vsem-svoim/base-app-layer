@@ -4,6 +4,7 @@ kind: Kustomization
 # AWS-специфичные ресурсы + базовые ресурсы с AWS патчами
 resources:
   - ../../base                      # Включаем базовые ресурсы для применения патчей
+  - aws-gp3-storage.yaml            # AWS gp3 StorageClass
   - aws-bedrock-integration.yaml    # Опционально: AI обработка
   - aws-sagemaker-integration.yaml  # Опционально: ML модели  
   - aws-hyperpod-integration.yaml   # Опционально: distributed training
