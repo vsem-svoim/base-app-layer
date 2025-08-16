@@ -115,12 +115,14 @@ patches:
         value:
           service.beta.kubernetes.io/aws-load-balancer-type: nlb
 
-# AWS-specific labels
-commonLabels:
-  cloud.provider: aws
-  cloud.region: us-east-1
-  base.io/provider: aws
-  deployment-fix: automated-v1
+# AWS-specific labels  
+labels:
+- includeSelectors: true
+  pairs:
+    cloud.provider: aws
+    cloud.region: us-east-1
+    base.io/provider: aws
+    deployment-fix: automated-v1
 
 # AWS-specific configuration
 configMapGenerator:
