@@ -7,3 +7,19 @@ resources:
   - base-data-ingestion-model-retry-strategy.yaml
   - base-data-ingestion-model-scheduling-intelligence.yaml
   - base-data-ingestion-model-source-detection.yaml
+
+# Patch all models to use correct namespace and add Fargate labeling
+patches:
+  - target:
+      kind: Model
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: base-data-ingestion
+      - op: add
+        path: /metadata/labels/fargate-enabled
+        value: "true"
+      - op: add
+        path: /spec/deployment/labels
+        value:
+          fargate-enabled: "true"

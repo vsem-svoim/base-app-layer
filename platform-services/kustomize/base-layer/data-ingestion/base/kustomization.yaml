@@ -8,18 +8,10 @@ resources:
   - ../../../../../data_ingestion/orchestrators/
   - ../../../../../data_ingestion/workflows/
 
-configMapGenerator:
-  - name: data-ingestion-prompts
-    files:
-      - ../../../../../data_ingestion/prompts/base-data-ingestion-prompt-collector.md
-      - ../../../../../data_ingestion/prompts/base-ingest-prompt-collector.md
-      - ../../../../../data_ingestion/prompts/base-ingest-prompt-connector.md
-      - ../../../../../data_ingestion/prompts/base-ingest-prompt-converter.md
-      - ../../../../../data_ingestion/prompts/base-ingest-prompt-merger.md
-      - ../../../../../data_ingestion/prompts/base-ingest-prompt-retry.md
-      - ../../../../../data_ingestion/prompts/base-ingest-prompt-scheduler.md
+# ConfigMap generator temporarily disabled due to path security restrictions
+# Will be re-enabled when prompts are properly organized within the platform-services directory
 
-commonLabels:
+labels:
   app.kubernetes.io/part-of: base-system
   base.io/category: data_ingestion
 

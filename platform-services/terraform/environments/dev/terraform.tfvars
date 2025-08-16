@@ -107,7 +107,7 @@ platform_cluster_config = {
       }
     }
     ml_platform = {
-      namespace_selectors = ["ml-*"]        # All ml-* namespaces for auto-scaling ML workloads
+      namespace_selectors = ["ml-*", "mlflow", "kubeflow", "seldon-system"]  # ML platform namespaces for auto-scaling ML workloads
       label_selectors    = {
         "fargate-enabled" = "true"           # Only pods explicitly labeled for Fargate
       }
