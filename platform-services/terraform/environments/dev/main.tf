@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "platform-services-terraform-state-us-east-1"
+    bucket         = "base-app-layer-terraform-state-us-east-1"
     key            = "dev/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "platform-services-terraform-locks"
+    dynamodb_table = "base-app-layer-terraform-locks"
   }
 }
 
@@ -23,7 +23,7 @@ provider "aws" {
   default_tags {
     tags = {
       Environment   = "dev"
-      Project       = "plat-svc"
+      Project       = "base-app-layer"
       ManagedBy     = "terraform"
       Owner         = "platform-engineering"
       CloudProvider = "aws"

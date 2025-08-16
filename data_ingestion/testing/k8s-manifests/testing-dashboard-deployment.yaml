@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-ingestion-testing-dashboard
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: testing-dashboard
+    app.kubernetes.io/component: testing
+    app.kubernetes.io/part-of: data-ingestion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: testing-dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: testing-dashboard
+        app.kubernetes.io/component: testing
+    spec:
+      containers:
+      - name: testing-dashboard
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8502
+          name: dashboard
+        command: ["streamlit", "run"]
+        args: ["web-ui/app.py", "--server.port=8502", "--server.address=0.0.0.0"]
+        env:
+        - name: TESTING_MODE
+          value: "kubernetes"
+        - name: TEST_NAMESPACE
+          value: "base-data-ingestion"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        volumeMounts:
+        - name: testing-source
+          mountPath: /app
+        - name: testing-config
+          mountPath: /app/config
+        - name: test-results
+          mountPath: /app/results
+        workingDir: /app
+      volumes:
+      - name: testing-config
+        configMap:
+          name: testing-config
+      - name: test-results
+        persistentVolumeClaim:
+          claimName: test-results-pvc
+      initContainers:
+      - name: install-dependencies
+        image: python:3.11-slim
+        command: ["pip", "install", "-r", "/app/requirements.txt"]
+        workingDir: /app
+        volumeMounts:
+        - name: testing-source
+          mountPath: /app
+        - name: testing-config
+          mountPath: /app/config
+        - name: test-results
+          mountPath: /app/results
+      volumes:
+      - name: testing-source
+        configMap:
+          name: testing-source-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: testing-dashboard-service
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: testing-dashboard
+spec:
+  selector:
+    app.kubernetes.io/name: testing-dashboard
+  ports:
+  - port: 80
+    targetPort: 8502
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-results-pvc
+  namespace: base-data-ingestion
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp2

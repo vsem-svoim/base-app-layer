@@ -1,4 +1,4 @@
-# PostgreSQL values for AWS Node Groups
+# PostgreSQL values for AWS
 global:
   cloudProvider: aws
   region: us-east-1
@@ -8,9 +8,9 @@ postgresql:
   architecture: replication
   auth:
     postgresPassword: changeme-in-production
-    username: platform-services
+    username: base-app-layer
     password: changeme-in-production
-    database: platform-services
+    database: base-app-layer
 
   primary:
     persistence:
@@ -25,11 +25,10 @@ postgresql:
         cpu: 2
         memory: 4Gi
     nodeSelector:
-      node-type: platform-services
       kubernetes.io/os: linux
 
   readReplicas:
-    replicaCount: 1
+    replicaCount: 2
     persistence:
       enabled: true
       storageClass: gp3
@@ -42,7 +41,6 @@ postgresql:
         cpu: 1
         memory: 2Gi
     nodeSelector:
-      node-type: platform-services
       kubernetes.io/os: linux
 
   metrics:

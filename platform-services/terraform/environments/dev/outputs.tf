@@ -64,7 +64,9 @@ output "irsa_role_arns" {
 output "kubectl_commands" {
   description = "Commands to configure kubectl access"
   value = {
-    base_cluster = module.multi_cluster_eks.base_cluster_enabled ? "aws eks update-kubeconfig --region ${var.region} --name ${module.multi_cluster_eks.base_cluster_name} --alias base-layer" : null
-    platform_cluster = module.multi_cluster_eks.platform_cluster_enabled ? "aws eks update-kubeconfig --region ${var.region} --name ${module.multi_cluster_eks.platform_cluster_name} --alias platform-services" : null
+    base_cluster = module.multi_cluster_eks.base_cluster_enabled ?
+      "aws eks update-kubeconfig --region ${var.region} --name ${module.multi_cluster_eks.base_cluster_name} --alias base-layer" : null
+    platform_cluster = module.multi_cluster_eks.platform_cluster_enabled ?
+      "aws eks update-kubeconfig --region ${var.region} --name ${module.multi_cluster_eks.platform_cluster_name} --alias platform-services" : null
   }
 }

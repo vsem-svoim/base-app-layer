@@ -1,0 +1,215 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wave-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/name: wave-controller
+    app.kubernetes.io/component: deployment-orchestration
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/argocd/applicationsets
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  operation:
+    sync:
+      syncOptions:
+        - CreateNamespace=true
+        - ApplyOutOfSyncOnly=true
+      syncStrategy:
+        hook:
+          force: false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: deployment-wave-template
+  namespace: argocd
+spec:
+  entrypoint: deployment-orchestration
+  serviceAccountName: argo-workflows
+  templates:
+    - name: deployment-orchestration
+      dag:
+        tasks:
+          # Wave 1: Infrastructure - Must complete before proceeding
+          - name: wave-1-infrastructure
+            template: deploy-and-verify-wave
+            arguments:
+              parameters:
+                - name: wave-name
+                  value: "infrastructure-components"
+                - name: wave-number
+                  value: "1"
+                - name: timeout
+                  value: "600"
+          
+          # Wave 2: Data Core - Depends on Wave 1
+          - name: wave-2-data-core
+            template: deploy-and-verify-wave
+            dependencies: [wave-1-infrastructure]
+            arguments:
+              parameters:
+                - name: wave-name
+                  value: "data-core-components"
+                - name: wave-number
+                  value: "2"
+                - name: timeout
+                  value: "900"
+          
+          # Wave 3: Processing - Depends on Wave 2
+          - name: wave-3-processing
+            template: deploy-and-verify-wave
+            dependencies: [wave-2-data-core]
+            arguments:
+              parameters:
+                - name: wave-name
+                  value: "processing-components"
+                - name: wave-number
+                  value: "3"
+                - name: timeout
+                  value: "1200"
+          
+          # Wave 4: ML Platform - Depends on Wave 3
+          - name: wave-4-ml-platform
+            template: deploy-and-verify-wave
+            dependencies: [wave-3-processing]
+            arguments:
+              parameters:
+                - name: wave-name
+                  value: "ml-platform-components"
+                - name: wave-number
+                  value: "4"
+                - name: timeout
+                  value: "1500"
+    
+    - name: deploy-and-verify-wave
+      inputs:
+        parameters:
+          - name: wave-name
+          - name: wave-number
+          - name: timeout
+      script:
+        image: argoproj/argocd:v2.8.4
+        command: [sh]
+        source: |
+          set -e
+          
+          WAVE_NAME="{{inputs.parameters.wave-name}}"
+          WAVE_NUMBER="{{inputs.parameters.wave-number}}"
+          TIMEOUT="{{inputs.parameters.timeout}}"
+          
+          echo "=== Starting Deployment Wave ${WAVE_NUMBER}: ${WAVE_NAME} ==="
+          
+          # Get all applications in this ApplicationSet
+          APPS=$(kubectl get applications -n argocd -l argocd.argoproj.io/applicationset=${WAVE_NAME} -o jsonpath='{.items[*].metadata.name}')
+          
+          if [ -z "$APPS" ]; then
+            echo "No applications found for ApplicationSet: ${WAVE_NAME}"
+            exit 1
+          fi
+          
+          echo "Applications to deploy: $APPS"
+          
+          # Function to check if all apps are healthy
+          check_wave_health() {
+            for app in $APPS; do
+              echo "Checking health of application: $app"
+              
+              HEALTH=$(kubectl get application $app -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+              SYNC=$(kubectl get application $app -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+              
+              echo "  App: $app, Health: $HEALTH, Sync: $SYNC"
+              
+              if [ "$HEALTH" != "Healthy" ] || [ "$SYNC" != "Synced" ]; then
+                return 1
+              fi
+            done
+            return 0
+          }
+          
+          # Function to rollback wave on failure
+          rollback_wave() {
+            echo "=== ROLLING BACK Wave ${WAVE_NUMBER} ==="
+            for app in $APPS; do
+              echo "Rolling back application: $app"
+              argocd app rollback $app --server argocd-server.argocd.svc.cluster.local:443 || true
+            done
+          }
+          
+          # Deploy all applications in wave
+          echo "Triggering sync for all applications in wave..."
+          for app in $APPS; do
+            echo "Syncing application: $app"
+            argocd app sync $app --server argocd-server.argocd.svc.cluster.local:443 --prune || {
+              echo "Failed to sync $app"
+              rollback_wave
+              exit 1
+            }
+          done
+          
+          # Wait for all applications to be healthy
+          echo "Waiting for all applications to become healthy..."
+          START_TIME=$(date +%s)
+          while true; do
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            
+            if [ $ELAPSED -gt $TIMEOUT ]; then
+              echo "Timeout reached waiting for wave to become healthy"
+              rollback_wave
+              exit 1
+            fi
+            
+            if check_wave_health; then
+              echo "All applications in wave ${WAVE_NUMBER} are healthy!"
+              break
+            fi
+            
+            echo "Waiting for applications to become healthy... (${ELAPSED}s elapsed)"
+            sleep 30
+          done
+          
+          # Verify wave deployment with additional checks
+          echo "=== Verifying Wave ${WAVE_NUMBER} Deployment ==="
+          for app in $APPS; do
+            # Check application resources
+            RESOURCES=$(kubectl get application $app -n argocd -o jsonpath='{.status.resources}' 2>/dev/null || echo "[]")
+            echo "Application $app resources: $RESOURCES"
+            
+            # Check for any unhealthy resources
+            UNHEALTHY=$(kubectl get application $app -n argocd -o jsonpath='{.status.conditions[?(@.type=="ResourceHealthy")].status}' 2>/dev/null || echo "Unknown")
+            if [ "$UNHEALTHY" = "False" ]; then
+              echo "Application $app has unhealthy resources"
+              rollback_wave
+              exit 1
+            fi
+          done
+          
+          echo "=== Wave ${WAVE_NUMBER}: ${WAVE_NAME} Deployed Successfully ==="
+        env:
+          - name: ARGOCD_SERVER
+            value: "argocd-server.argocd.svc.cluster.local:443"
+          - name: ARGOCD_AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: argocd-token
+                key: token

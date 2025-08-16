@@ -1,4 +1,4 @@
-# Airflow values for AWS Node Groups
+# Airflow values for AWS
 global:
   cloudProvider: aws
   region: us-east-1
@@ -22,7 +22,7 @@ airflow:
     database: airflow
     user: airflow
 
-  # Enable persistence for node groups
+  # Storage configuration
   persistence:
     enabled: true
     storageClass: gp3
@@ -67,10 +67,9 @@ airflow:
       service.beta.kubernetes.io/aws-load-balancer-type: nlb
       service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
 
-  # Node selector for node groups
+  # Node selector for AWS
   nodeSelector:
-    node-type: platform-services
     kubernetes.io/os: linux
 
-  # No Fargate tolerations needed
+  # Tolerations for Fargate if needed
   tolerations: []

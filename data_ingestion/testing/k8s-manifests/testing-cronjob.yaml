@@ -1,0 +1,110 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: data-ingestion-capability-tests
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: capability-tester
+    app.kubernetes.io/component: testing
+    app.kubernetes.io/part-of: data-ingestion
+spec:
+  # Run every 4 hours
+  schedule: "0 */4 * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: capability-tester
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: capability-tester
+            image: python:3.11-slim
+            command: ["python"]
+            args: ["scripts/capability-tester.py", "--suite", "all", "--report-format", "json"]
+            env:
+            - name: TESTING_MODE
+              value: "kubernetes"
+            - name: TEST_NAMESPACE
+              value: "base-data-ingestion"
+            - name: KUBERNETES_SERVICE_HOST
+              value: "kubernetes.default.svc"
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+            volumeMounts:
+            - name: testing-config
+              mountPath: /app/config
+            - name: test-results
+              mountPath: /app/results
+            workingDir: /app
+          volumes:
+          - name: testing-config
+            configMap:
+              name: testing-config
+          - name: test-results
+            persistentVolumeClaim:
+              claimName: test-results-pvc
+          initContainers:
+          - name: install-dependencies
+            image: python:3.11-slim
+            command: ["pip", "install", "-r", "requirements.txt"]
+            workingDir: /app
+            volumeMounts:
+            - name: app-source
+              mountPath: /app
+          volumes:
+          - name: app-source
+            configMap:
+              name: testing-source-code
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-ingestion-performance-test
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: performance-tester
+    app.kubernetes.io/component: testing
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: performance-tester
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: performance-tester
+        image: python:3.11-slim
+        command: ["python"]
+        args: ["scripts/capability-tester.py", "--suite", "performance_tests", "--duration", "30m"]
+        env:
+        - name: TESTING_MODE
+          value: "performance"
+        - name: TEST_DURATION
+          value: "1800"  # 30 minutes
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 4Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        volumeMounts:
+        - name: testing-config
+          mountPath: /app/config
+        - name: test-results
+          mountPath: /app/results
+        workingDir: /app
+      volumes:
+      - name: testing-config
+        configMap:
+          name: testing-config
+      - name: test-results
+        persistentVolumeClaim:
+          claimName: test-results-pvc

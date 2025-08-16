@@ -1,0 +1,218 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airflow-automated
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/name: airflow
+    app.kubernetes.io/component: orchestration
+    automation: "true"
+spec:
+  project: default
+  source:
+    repoURL: https://airflow.apache.org/charts
+    targetRevision: 1.11.0
+    chart: airflow
+    helm:
+      values: |
+        # Airflow Configuration for GitOps Platform
+        executor: "KubernetesExecutor"
+        
+        # Web server configuration
+        webserver:
+          service:
+            type: ClusterIP
+            ports:
+              - name: airflow-ui
+                port: 8080
+          replicas: 2
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+        
+        # Scheduler configuration
+        scheduler:
+          replicas: 2
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          
+        # Worker configuration for Kubernetes Executor
+        workers:
+          replicas: 3
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          persistence:
+            enabled: true
+            size: 10Gi
+            storageClassName: gp2
+        
+        # Database configuration
+        postgresql:
+          enabled: true
+          persistence:
+            enabled: true
+            size: 20Gi
+            storageClassName: gp2
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+        
+        # Redis configuration  
+        redis:
+          enabled: true
+          persistence:
+            enabled: true
+            size: 5Gi
+            storageClassName: gp2
+        
+        # DAGs configuration
+        dags:
+          persistence:
+            enabled: true
+            size: 10Gi
+            storageClassName: gp2
+          gitSync:
+            enabled: true
+            repo: https://github.com/vsem-svoim/base-app-layer.git
+            branch: main
+            subPath: platform-services/airflow/dags
+            wait: 60
+            maxFailures: 3
+        
+        # Logs configuration
+        logs:
+          persistence:
+            enabled: true
+            size: 20Gi
+            storageClassName: gp2
+        
+        # RBAC and Service Account
+        serviceAccount:
+          create: true
+          name: airflow-automation
+        
+        rbac:
+          create: true
+          createSCCRoleBinding: false
+        
+        # Environment variables for GitOps integration
+        env:
+          - name: AIRFLOW__KUBERNETES__NAMESPACE
+            value: "airflow"
+          - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY
+            value: "apache/airflow"
+          - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG
+            value: "2.7.1-python3.9"
+          - name: AIRFLOW__KUBERNETES__DELETE_WORKER_PODS
+            value: "True"
+          - name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG
+            value: "True"
+          - name: AIRFLOW__CORE__LOAD_EXAMPLES
+            value: "False"
+          - name: AIRFLOW__API__AUTH_BACKEND
+            value: "airflow.api.auth.backend.basic_auth"
+        
+        # Configuration for GitOps workflows
+        config:
+          core:
+            dags_are_paused_at_creation: "False"
+            load_examples: "False"
+            max_active_runs_per_dag: 1
+            dagbag_import_timeout: 30
+          webserver:
+            expose_config: "True"
+            rbac: "True"
+          kubernetes:
+            namespace: "airflow"
+            worker_pods_creation_batch_size: 3
+            delete_worker_pods: "True"
+            worker_container_repository: "apache/airflow"
+            worker_container_tag: "2.7.1-python3.9"
+          api:
+            auth_backend: "airflow.api.auth.backend.basic_auth"
+        
+        # Monitoring integration
+        serviceMonitor:
+          enabled: true
+          namespace: monitoring
+          labels:
+            app: airflow
+            component: monitoring
+        
+        # Security context
+        securityContext:
+          runAsUser: 50000
+          runAsGroup: 50000
+          fsGroup: 50000
+        
+        # Node selector for Fargate
+        nodeSelector:
+          kubernetes.io/arch: amd64
+        
+        # Tolerations
+        tolerations:
+          - key: "kubernetes.io/arch"
+            operator: "Equal"
+            value: "amd64"
+            effect: "NoSchedule"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: airflow
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Health checks
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+---
+# Service Monitor for Prometheus monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: airflow-monitoring
+  namespace: monitoring
+  labels:
+    app: airflow
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: airflow
+      component: webserver
+  endpoints:
+    - port: airflow-ui
+      interval: 30s
+      path: /health

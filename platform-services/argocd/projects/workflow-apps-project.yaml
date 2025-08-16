@@ -7,7 +7,7 @@ spec:
   description: "Workflow orchestration and data pipeline applications"
   sourceRepos:
   - 'https://github.com/vsem-svoim/base-app-layer.git'
-  - 'https://airflow.apache.org'
+  - 'https://airflow.apache.org/charts'
   - 'https://charts.bitnami.com/bitnami'
   - 'https://prefecthq.github.io/prefect-helm'
   - 'https://github.com/argoproj/argo-workflows'

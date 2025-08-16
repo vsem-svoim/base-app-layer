@@ -126,7 +126,7 @@ variable "base_cluster_config" {
         desired_size  = 3
         disk_size     = 50
         disk_type     = "gp3"
-        ami_type      = "BOTTLEROCKET_x86_64"
+        ami_type      = "AL2_x86_64"
         labels = {
           NodeGroup   = "base-layer"
           Environment = "dev"
@@ -206,7 +206,7 @@ variable "platform_cluster_config" {
         desired_size  = 3
         disk_size     = 100
         disk_type     = "gp3"
-        ami_type      = "BOTTLEROCKET_x86_64"
+        ami_type      = "AL2_x86_64"
         labels = {
           NodeGroup   = "platform-services"
           Environment = "dev"
@@ -221,7 +221,7 @@ variable "platform_cluster_config" {
         desired_size  = 2
         disk_size     = 100
         disk_type     = "gp3"
-        ami_type      = "BOTTLEROCKET_x86_64"
+        ami_type      = "AL2_x86_64"
         labels = {
           NodeGroup   = "ml-workloads"
           Environment = "dev"
@@ -260,7 +260,12 @@ variable "cluster_addons" {
     vpc-cni = {
       most_recent    = true
       addon_version = ""
-      configuration_values = ""
+      configuration_values = jsonencode({
+        env = {
+          ENABLE_PREFIX_DELEGATION = "true"
+          WARM_PREFIX_TARGET       = "1"
+        }
+      })
     }
     aws-ebs-csi-driver = {
       most_recent           = true

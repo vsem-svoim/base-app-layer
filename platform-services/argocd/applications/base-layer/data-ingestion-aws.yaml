@@ -12,85 +12,9 @@ spec:
   project: base-layer
   source:
     repoURL: https://github.com/vsem-svoim/base-app-layer.git
-    path: data_ingestion/agents
+    path: platform-services/kustomize/base-layer/data-ingestion/overlays/aws
     targetRevision: HEAD
-    kustomize:
-      images:
-      - name: base/data-collector:v2.5.0-fixed
-        newName: python
-        newTag: "3.11-slim"
-      - name: base/data-connector:v2.5.0-fixed
-        newName: python
-        newTag: "3.11-slim"
-      - name: base/data-converter:v2.5.0-fixed
-        newName: python
-        newTag: "3.11-slim"
-      - name: base/data-fetch-retry:v2.5.0-fixed
-        newName: python
-        newTag: "3.11-slim"
-      - name: base/data-merger:v2.5.0-analytics-fixed
-        newName: python
-        newTag: "3.11-slim"
-      - name: base/data-scheduler:v2.5.0-analytics-fixed
-        newName: python
-        newTag: "3.11-slim"
-      replicas:
-      - name: base-data-ingestion-agent-data-collector
-        count: 3  # AWS scaling for data collection
-      - name: base-data-ingestion-agent-data-connector
-        count: 2  # AWS connection management
-      - name: base-data-ingestion-agent-data-converter
-        count: 4  # Higher AWS processing capacity
-      - name: base-data-ingestion-agent-data-fetch-retry
-        count: 2  # AWS retry coordination
-      - name: base-data-ingestion-agent-data-merger
-        count: 3  # AWS merge operations
-      - name: base-data-ingestion-agent-data-scheduler
-        count: 1  # Single AWS scheduler
-      patches:
-      - target:
-          kind: Deployment
-        patch: |-
-          - op: replace
-            path: /spec/template/spec/containers/0/resources/requests/cpu
-            value: 100m
-          - op: replace
-            path: /spec/template/spec/containers/0/resources/requests/memory
-            value: 128Mi
-          - op: replace
-            path: /spec/template/spec/containers/0/resources/limits/cpu
-            value: 500m
-          - op: replace
-            path: /spec/template/spec/containers/0/resources/limits/memory
-            value: 512Mi
-      - target:
-          kind: Deployment
-          name: base-data-ingestion-agent-data-fetch-retry
-        patch: |-
-          - op: replace
-            path: /spec/template/spec/containers/0/command
-            value: ["sh", "-c", "while true; do echo 'Processing retry logic...'; sleep 30; done"]
-          - op: replace
-            path: /spec/template/spec/containers/0/resources/requests/cpu
-            value: 50m
-          - op: replace
-            path: /spec/template/spec/containers/0/resources/requests/memory
-            value: 64Mi
-      - target:
-          kind: CronJob
-          name: base-data-fetch-retry-dlq-processor
-        patch: |-
-          - op: replace
-            path: /spec/jobTemplate/spec/template/spec/containers/0/command
-            value: ["sh", "-c", "echo Processing DLQ items && sleep 30"]
-      commonLabels:
-        ai-agent: "true"
-        runtime: python-3.11
-        agent-framework: data-ingestion
-        deployment-mode: ai-agents-aws
-        cloud.provider: aws
-        base.io/provider: aws
-        scaling-profile: aws-optimized
+  # Note: AWS overlay adds provider-specific configurations to base deployment
   destination:
     server: https://kubernetes.default.svc
     namespace: base-data-ingestion
@@ -109,3 +33,135 @@ spec:
         factor: 2
         maxDuration: 3m
   revisionHistoryLimit: 3
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-configs-aws
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: configs
+    app.kubernetes.io/part-of: base-ingestion-apps
+    base.io/provider: aws
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/kustomize/base-layer/data-ingestion/configs/aws
+    targetRevision: HEAD
+    # Note: AWS-specific configs that add to base configurations
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-workflows-aws
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: workflows
+    app.kubernetes.io/part-of: base-ingestion-apps
+    base.io/provider: aws
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/kustomize/base-layer/data-ingestion/workflows/aws
+    targetRevision: HEAD
+    # Note: AWS-specific workflows that extend base workflows
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-orchestrators-aws
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: orchestrators
+    app.kubernetes.io/part-of: base-ingestion-apps
+    base.io/provider: aws
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/kustomize/base-layer/data-ingestion/orchestrators/aws
+    targetRevision: HEAD
+    # Note: AWS-specific orchestrators with EKS/Fargate optimizations
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-models-aws
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: models
+    app.kubernetes.io/part-of: base-ingestion-apps
+    base.io/provider: aws
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/kustomize/base-layer/data-ingestion/models/aws
+    targetRevision: HEAD
+    # Note: AWS-specific ML models with SageMaker integration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m

@@ -5,7 +5,7 @@
 # Modify values according to your requirements
 
 # Basic Configuration
-project_name = "plat-svc"
+project_name = "base-app-layer"
 environment  = "dev"
 region      = "us-east-1"
 
@@ -18,15 +18,15 @@ private_subnets_count   = 1                # Private subnets per AZ
 public_subnets_count    = 1                # Public subnets per AZ
 
 # NAT Gateway Configuration
-nat_gateway_count       = 1                # Total number of NAT gateways
+nat_gateway_count       = 3                # Total number of NAT gateways
 enable_nat_gateway      = true             # Enable NAT gateways
-single_nat_gateway      = true             # Use single NAT for all private subnets
-one_nat_gateway_per_az  = false            # Use one NAT per AZ (recommended for HA)
+single_nat_gateway      = false            # Use single NAT for all private subnets
+one_nat_gateway_per_az  = true             # Use one NAT per AZ (recommended for HA)
 
 # ===================================================================
 # Cluster Configuration
 # ===================================================================
-base_cluster_enabled     = false           # Disable BASE layer cluster - run on platform cluster
+base_cluster_enabled     = true            # Enable BASE layer cluster
 platform_cluster_enabled = true            # Enable platform services cluster
 
 # ===================================================================
@@ -36,51 +36,57 @@ base_cluster_config = {
   name               = "base-layer"
   version            = "1.33"              # EKS version 1.33
   enable_fargate     = true                # Enable Fargate profiles
-  enable_managed_nodes = true              # Minimal nodes for system components
+  enable_managed_nodes = true              # Enable managed node groups
 
   # Fargate profiles for BASE layer
   fargate_profiles = {
     base_components = {
-      namespace_selectors = ["base-*"]     # All base-* namespaces (excluding kube-system)
+      namespace_selectors = ["base-*"]     # All base-* namespaces
       label_selectors    = {}              # No specific label selectors
     }
   }
 
   # Managed node groups for BASE layer
   managed_node_groups = {
-    system = {
-      instance_types = ["t4g.small"]
-      capacity_type  = "ON_DEMAND"
-      min_size      = 1
-      max_size      = 2
-      desired_size  = 1
-      disk_size     = 20
-      disk_type     = "gp3"
-      ami_type      = "BOTTLEROCKET_ARM_64"
+    base_compute = {
+      instance_types = ["t3.medium", "t3.large"]  # Instance types for BASE workloads
+      capacity_type  = "ON_DEMAND"                # ON_DEMAND or SPOT
+      min_size      = 1                           # Minimum nodes
+      max_size      = 10                          # Maximum nodes
+      desired_size  = 3                           # Desired nodes
+      disk_size     = 50                          # EBS disk size (GB)
+      disk_type     = "gp3"                       # EBS disk type
+      ami_type      = "AL2_x86_64"                # AMI type
       labels = {
-        NodeGroup   = "system"
+        NodeGroup   = "base-layer"
         Environment = "dev"
-        WorkloadType = "system-components"
+        WorkloadType = "base-components"
       }
-      taints = {}  # No taints for system components
+      taints = {
+        base_layer = {
+          key    = "base-layer"
+          value  = "true"
+          effect = "NO_SCHEDULE"                   # Dedicated to BASE layer
+        }
+      }
     }
-    data = {
-      instance_types = ["r8g.large", "r8g.xlarge"]  # Latest memory-optimized for data processing
-      capacity_type  = "SPOT"
-      min_size      = 0
-      max_size      = 10
-      desired_size  = 1
-      disk_size     = 100
+    base_memory_optimized = {
+      instance_types = ["r5.large", "r5.xlarge"]  # Memory-optimized for data processing
+      capacity_type  = "SPOT"                     # Use SPOT instances for cost savings
+      min_size      = 0                           # Can scale to zero
+      max_size      = 20                          # Allow high scale for data processing
+      desired_size  = 2                           # Start with 2 nodes
+      disk_size     = 100                         # Larger disk for data processing
       disk_type     = "gp3"
-      ami_type      = "BOTTLEROCKET_ARM_64"
+      ami_type      = "AL2_x86_64"
       labels = {
-        NodeGroup   = "data"
+        NodeGroup   = "base-memory-optimized"
         Environment = "dev"
         WorkloadType = "data-processing"
       }
       taints = {
-        data_processing = {
-          key    = "data-processing"
+        memory_optimized = {
+          key    = "memory-optimized"
           value  = "true"
           effect = "NO_SCHEDULE"
         }
@@ -93,100 +99,84 @@ base_cluster_config = {
 # Platform Services Cluster Configuration
 # ===================================================================
 platform_cluster_config = {
-  name               = "svc"
+  name               = "platform-services"
   version            = "1.33"              # EKS version 1.33
   enable_fargate     = true                # Enable Fargate profiles
-  enable_managed_nodes = true              # Minimal nodes for system components
+  enable_managed_nodes = true              # Enable managed node groups
 
-  # Fargate profiles for platform services - only for stateless, auto-scaling workloads
+  # Fargate profiles for platform services
   fargate_profiles = {
-    monitoring = {
-      namespace_selectors = ["monitoring"]   # Prometheus, Grafana for auto-scaling
-      label_selectors    = {
-        "fargate-enabled" = "true"           # Only pods explicitly labeled for Fargate
-      }
+    platform_default = {
+      namespace_selectors = ["default", "kube-system"]
+      label_selectors    = {}
+    }
+    platform_services = {
+      namespace_selectors = ["argocd", "crossplane-system", "monitoring"]
+      label_selectors    = {}
     }
     ml_platform = {
-      namespace_selectors = ["ml-*", "mlflow", "kubeflow", "seldon-system"]  # ML platform namespaces for auto-scaling ML workloads
-      label_selectors    = {
-        "fargate-enabled" = "true"           # Only pods explicitly labeled for Fargate
-      }
+      namespace_selectors = ["ml-*"]       # All ml-* namespaces
+      label_selectors    = {}
     }
   }
 
-  # Managed node groups for platform services - dedicated groups for each workload type
+  # Managed node groups for platform services
   managed_node_groups = {
-    system = {
-      instance_types = ["r8g.large"]  # Memory-optimized instances for system components
-      capacity_type  = "ON_DEMAND"
+    platform_general = {
+      instance_types = ["t3.large", "t3.xlarge"]  # General purpose instances
+      capacity_type  = "ON_DEMAND"                # Reliable for platform services
       min_size      = 1
-      max_size      = 3
-      desired_size  = 2
-      disk_size     = 20
+      max_size      = 10
+      desired_size  = 3
+      disk_size     = 100                          # Larger disk for platform services
       disk_type     = "gp3"
-      ami_type      = "BOTTLEROCKET_ARM_64"
+      ami_type      = "AL2_x86_64"
       labels = {
-        NodeGroup   = "system"
+        NodeGroup   = "platform-services"
         Environment = "dev"
-        WorkloadType = "system"
+        WorkloadType = "platform-services"
       }
-      taints = {}  # No taints - accepts system components like crossplane, kube-system
+      taints = {}                                  # No taints - general purpose
     }
-    argocd = {
-      instance_types = ["m7g.large"]  # General purpose for GitOps controllers
-      capacity_type  = "ON_DEMAND"
-      min_size      = 1
-      max_size      = 3
-      desired_size  = 1
-      disk_size     = 30
+    ml_workloads = {
+      instance_types = ["m5.large", "m5.xlarge", "m5.2xlarge"]  # Compute optimized for ML
+      capacity_type  = "SPOT"                     # Cost-effective for ML training
+      min_size      = 0                           # Can scale to zero when not needed
+      max_size      = 50                          # Allow high scale for ML workloads
+      desired_size  = 2
+      disk_size     = 200                         # Large disk for ML datasets
       disk_type     = "gp3"
-      ami_type      = "BOTTLEROCKET_ARM_64"
+      ami_type      = "AL2_x86_64"
       labels = {
-        NodeGroup   = "argocd"
+        NodeGroup   = "ml-workloads"
         Environment = "dev"
-        WorkloadType = "argocd"
+        WorkloadType = "machine-learning"
       }
       taints = {
-        argocd = {
-          key    = "argocd"
+        ml_workload = {
+          key    = "ml-workload"
           value  = "true"
-          effect = "NO_SCHEDULE"
+          effect = "NO_SCHEDULE"                   # Dedicated to ML workloads
         }
       }
     }
-    airflow = {
-      instance_types = ["c8g.2xlarge", "c8g.4xlarge"]  # Larger instances to run all airflow services together
-      capacity_type  = "ON_DEMAND"
-      min_size      = 2
-      max_size      = 6
-      desired_size  = 2
-      disk_size     = 200  # Larger disk for all airflow components
-      disk_type     = "gp3"
-      ami_type      = "BOTTLEROCKET_ARM_64"
-      labels = {
-        NodeGroup   = "airflow"
-        Environment = "dev"
-        WorkloadType = "airflow"
-      }
-      taints = {}  # Remove taints so all airflow services can schedule easily
-    }
-    base_apps = {
-      instance_types = ["r8g.4xlarge"]  # Memory-optimized instances for AI agents and base layer apps
-      capacity_type  = "ON_DEMAND"
+    airflow_workers = {
+      instance_types = ["c5.large", "c5.xlarge"]  # Compute optimized for Airflow
+      capacity_type  = "ON_DEMAND"                # Reliable for workflow orchestration
       min_size      = 1
-      max_size      = 8
+      max_size      = 20                          # Allow scaling for high workloads
       desired_size  = 2
-      disk_size     = 100
+      disk_size     = 50
       disk_type     = "gp3"
-      ami_type      = "BOTTLEROCKET_ARM_64"
+      ami_type      = "AL2_x86_64"
       labels = {
-        NodeGroup   = "base-apps"
+        NodeGroup   = "airflow-workers"
         Environment = "dev"
-        WorkloadType = "base-apps"
+        WorkloadType = "workflow-orchestration"
       }
       taints = {
-        base_apps = {
-          key    = "base-apps"
+        airflow = {
+          key    = "airflow"
           value  = "true"
           effect = "NO_SCHEDULE"
         }
@@ -212,12 +202,22 @@ cluster_addons = {
   vpc-cni = {
     most_recent    = true
     addon_version = ""
-    configuration_values = "{\"env\":{\"ENABLE_PREFIX_DELEGATION\":\"true\",\"WARM_PREFIX_TARGET\":\"1\",\"ENABLE_POD_ENI\":\"true\"}}"
+    configuration_values = jsonencode({
+      env = {
+        ENABLE_PREFIX_DELEGATION = "true"
+        WARM_PREFIX_TARGET       = "1"
+        ENABLE_POD_ENI          = "true"    # Enable pod ENI for better networking
+      }
+    })
   }
   aws-ebs-csi-driver = {
     most_recent           = true
     addon_version        = ""
-    configuration_values = "{\"defaultStorageClass\":{\"enabled\":true}}"
+    configuration_values = jsonencode({
+      defaultStorageClass = {
+        enabled = true
+      }
+    })
   }
 }
 
@@ -253,13 +253,6 @@ irsa_roles = {
     namespaces       = ["monitoring"]
     service_accounts = ["prometheus", "grafana"]
   }
-  ebs_csi_driver = {
-    policy_arns = [
-      "arn:aws:iam::aws:policy/AmazonEC2FullAccess"  # Temporary full EC2 access for EBS CSI
-    ]
-    namespaces       = ["kube-system"]
-    service_accounts = ["ebs-csi-controller-sa"]
-  }
 }
 
 # ===================================================================
@@ -267,7 +260,7 @@ irsa_roles = {
 # ===================================================================
 common_tags = {
   Environment   = "dev"
-  Project       = "plat-svc"
+  Project       = "base-app-layer"
   ManagedBy     = "terraform"
   Owner         = "platform-engineering"
   CloudProvider = "aws"

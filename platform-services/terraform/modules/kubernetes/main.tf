@@ -79,7 +79,7 @@ module "base_layer_eks" {
   count = var.base_cluster_enabled ? 1 : 0
 
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  version = "~> 19.0"
 
   cluster_name    = local.base_cluster_name
   cluster_version = var.base_cluster_config.version
@@ -137,11 +137,9 @@ module "base_layer_eks" {
   # Cluster add-ons
   cluster_addons = {
     for addon_name, addon_config in var.cluster_addons : addon_name => {
-      most_recent                 = addon_config.most_recent
-      addon_version              = addon_config.addon_version != "" ? addon_config.addon_version : null
-      configuration_values       = addon_config.configuration_values != "" ? addon_config.configuration_values : null
-      resolve_conflicts_on_create = "OVERWRITE"
-      resolve_conflicts_on_update = "PRESERVE"
+      most_recent           = addon_config.most_recent
+      addon_version        = addon_config.addon_version != "" ? addon_config.addon_version : null
+      configuration_values = addon_config.configuration_values != "" ? addon_config.configuration_values : null
     }
   }
 
@@ -155,7 +153,7 @@ module "platform_services_eks" {
   count = var.platform_cluster_enabled ? 1 : 0
 
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  version = "~> 19.0"
 
   cluster_name    = local.platform_cluster_name
   cluster_version = var.platform_cluster_config.version
@@ -213,11 +211,9 @@ module "platform_services_eks" {
   # Cluster add-ons
   cluster_addons = {
     for addon_name, addon_config in var.cluster_addons : addon_name => {
-      most_recent                 = addon_config.most_recent
-      addon_version              = addon_config.addon_version != "" ? addon_config.addon_version : null
-      configuration_values       = addon_config.configuration_values != "" ? addon_config.configuration_values : null
-      resolve_conflicts_on_create = "OVERWRITE"
-      resolve_conflicts_on_update = "PRESERVE"
+      most_recent           = addon_config.most_recent
+      addon_version        = addon_config.addon_version != "" ? addon_config.addon_version : null
+      configuration_values = addon_config.configuration_values != "" ? addon_config.configuration_values : null
     }
   }
 

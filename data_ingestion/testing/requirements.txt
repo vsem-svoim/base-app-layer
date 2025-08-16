@@ -1,0 +1,32 @@
+# Data Ingestion Testing Dependencies
+# Core dependencies with compatible versions
+
+# Data processing and analysis
+numpy>=1.24.0,<1.27.0
+pandas>=2.0.0,<2.2.0
+
+# Web framework
+streamlit>=1.28.0,<1.35.0
+
+# Machine learning
+scikit-learn>=1.3.0,<1.5.0
+
+# HTTP requests
+requests>=2.31.0,<3.0.0
+
+# Configuration
+PyYAML>=6.0,<7.0
+
+# Async support
+aiohttp>=3.8.0,<4.0.0
+
+# Plotting (optional for dashboards)
+plotly>=5.15.0,<6.0.0
+matplotlib>=3.7.0,<4.0.0
+
+# Kubernetes integration
+kubernetes>=30.0.0,<34.0.0
+
+# Development dependencies
+pytest>=7.4.0,<8.0.0
+pytest-asyncio>=0.21.0,<1.0.0

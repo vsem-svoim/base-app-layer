@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-testing
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: testing
+    app.kubernetes.io/part-of: base-ingestion-apps
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: data_ingestion/testing
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-testing-aws
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: testing
+    app.kubernetes.io/part-of: base-ingestion-apps
+    base.io/provider: aws
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: platform-services/kustomize/base-layer/data-ingestion/testing/aws
+    targetRevision: HEAD
+    # Note: AWS-specific testing configurations with cloud optimizations
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m

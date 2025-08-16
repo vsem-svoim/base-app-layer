@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-ingestion-testing-simple
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: testing-simple
+    app.kubernetes.io/component: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: testing-simple
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: testing-simple
+    spec:
+      containers:
+      - name: testing-runner
+        image: python:3.11-slim
+        command: ["bash", "-c"]
+        args:
+        - |
+          pip install streamlit pandas numpy plotly matplotlib scikit-learn requests PyYAML aiohttp kubernetes pytest pytest-asyncio &&
+          echo "Testing framework installed successfully" &&
+          echo "Available commands:" &&
+          echo "  - Streamlit: streamlit run web-ui/app.py --server.port=8502 --server.address=0.0.0.0" &&
+          echo "  - Capability Tests: python scripts/capability_tester.py" &&
+          echo "  - K8s Tests: python scripts/kubernetes-integration-tester.py" &&
+          tail -f /dev/null
+        ports:
+        - containerPort: 8502
+          name: streamlit
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        env:
+        - name: TESTING_MODE
+          value: "kubernetes"
+        - name: TEST_NAMESPACE
+          value: "base-data-ingestion"
+        volumeMounts:
+        - name: testing-config
+          mountPath: /app/config
+        - name: test-results
+          mountPath: /app/results
+        workingDir: /app
+      volumes:
+      - name: testing-config
+        configMap:
+          name: testing-config
+      - name: test-results
+        persistentVolumeClaim:
+          claimName: test-results-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: testing-simple-service
+  namespace: base-data-ingestion
+spec:
+  selector:
+    app.kubernetes.io/name: testing-simple
+  ports:
+  - port: 8502
+    targetPort: 8502
+    protocol: TCP
+    name: streamlit
+  type: ClusterIP

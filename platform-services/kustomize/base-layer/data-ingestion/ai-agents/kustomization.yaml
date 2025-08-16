@@ -1,0 +1,67 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ai-agents-deployment
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+resources:
+  - ai-agent-deployments.yaml
+  - ai-agent-services.yaml
+  - ai-agent-configmaps.yaml
+
+# Use Python 3.11 for AI agents
+images:
+  - name: base/data-collector:v2.5.0-fixed
+    newName: python
+    newTag: "3.11-slim"
+  - name: base/data-connector:v2.5.0-fixed
+    newName: python
+    newTag: "3.11-slim"
+  - name: base/data-converter:v2.5.0-fixed
+    newName: python
+    newTag: "3.11-slim"
+  - name: base/data-fetch-retry:v2.5.0-fixed
+    newName: python
+    newTag: "3.11-slim"
+  - name: base/data-merger:v2.5.0-analytics-fixed
+    newName: python
+    newTag: "3.11-slim"
+  - name: base/data-scheduler:v2.5.0-analytics-fixed
+    newName: python
+    newTag: "3.11-slim"
+
+# Parameterized resource configurations
+replicas:
+  - name: base-data-ingestion-agent-data-collector
+    count: 2  # Higher replicas for critical data collection
+  - name: base-data-ingestion-agent-data-connector
+    count: 2  # Higher replicas for connections
+  - name: base-data-ingestion-agent-data-converter
+    count: 3  # More replicas for data processing
+  - name: base-data-ingestion-agent-data-fetch-retry
+    count: 1  # Single instance for retry logic
+  - name: base-data-ingestion-agent-data-merger
+    count: 2  # Higher replicas for merging
+  - name: base-data-ingestion-agent-data-scheduler
+    count: 1  # Single scheduler instance
+
+# AI agent labels
+labels:
+- includeSelectors: true
+  pairs:
+    ai-agent: "true"
+    runtime: python-3.11
+    agent-type: data-ingestion
+    deployment-mode: ai-agents
+
+# Environment-specific configurations
+configMapGenerator:
+- name: ai-agent-config
+  literals:
+  - PYTHON_VERSION=3.11
+  - AGENT_MODE=production
+  - LOG_LEVEL=INFO
+  - METRICS_PORT=8080
+  - HEALTH_CHECK_PORT=8081

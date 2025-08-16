@@ -117,9 +117,99 @@
 │  └─────────────────────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
-Where is the explaantion about workflows, models, prompts, configs and others parts of data_ingestion?
+## Детальная структура модуля DATA_INGESTION
 
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                       ПОЛНАЯ СТРУКТУРА DATA_INGESTION                              │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                  АГЕНТЫ                                           │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │  Сборщик     │ │ Соединитель  │ │ Конвертер    │ │ Планировщик  │             │
+│  │   данных     │ │   данных     │ │   форматов   │ │   задач      │             │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘             │
+│  • Извлечение    • Подключение   • Преобразование • Управление                    │
+│    из источников   к API/БД       форматов данных   расписанием                   │
+│  • Мониторинг    • Аутентификация • JSON↔CSV↔XML   • Приоритезация               │
+│    изменений      • Retry логика   • Валидация     • Распределение                │
+│  • Фильтрация    • Пулинг         • Нормализация  • Балансировка                 │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                               КОНФИГУРАЦИИ                                         │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │   Правила    │ │   Политики   │ │   Параметры  │ │ Настройки    │             │
+│  │  валидации   │ │ безопасности │ │  подключений │ │ мониторинга  │             │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘             │
+│  • Схемы данных  • Шифрование    • URL эндпоинтов • Метрики SLA                  │
+│  • Обязательные  • Права доступа • Таймауты       • Алерты                       │
+│    поля           • Аудит логи    • Ретрай лимиты  • Дашборды                    │
+│  • Типы данных   • Маскирование  • Пулы соединений • Логирование                 │
+│  • Ограничения   • Compliance    • Буферизация    • Производительность           │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                 МОДЕЛИ                                            │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │ Детекторы    │ │ Классификат. │ │ Предикторы   │ │ Оптимизаторы │             │
+│  │  аномалий    │ │   данных     │ │  качества    │ │ производит.  │             │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘             │
+│  • ML алгоритмы  • Определение   • Оценка качества • Настройка                   │
+│    для выбросов   типов данных    входящих данных   производительности            │
+│  • Статистический• Автотегирование• Прогноз ошибок • Автомасштабирование         │
+│    анализ         • Сегментация   • Скоринг данных • Оптимизация                 │
+│  • Паттерн       • Кластеризация • Метрики качества • Управление                  │
+│    распознавание  • Классы данных • Тренды качества  ресурсами                   │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                               ОРКЕСТРАТОРЫ                                         │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │ Главный      │ │ Координатор  │ │ Балансировщик│ │ Контроллер   │             │
+│  │ диспетчер    │ │   потоков    │ │  нагрузки    │ │   ошибок     │             │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘             │
+│  • Управление    • Синхронизация • Распределение  • Обработка                    │
+│    всеми агентами  параллельных    нагрузки между   исключений                    │
+│  • Планирование  • Координация    • Мониторинг     • Retry стратегии             │
+│    задач          зависимостей      производительн. • Логирование                │
+│  • Приоритизация • Управление     • Автоскейлинг  • Уведомления                 │
+│  • Мониторинг    • Checkpoints    • Throttling     • Recovery                    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                ПОДСКАЗКИ                                          │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │ Инструкции   │ │   Шаблоны    │ │ Руководства  │ │ Сообщения    │             │
+│  │    для ИИ    │ │  обработки   │ │ пользователя │ │  об ошибках  │             │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘             │
+│  • Промпты для   • Стандартные   • Документация   • Текстовые                    │
+│    LLM моделей    алгоритмы        по API           сообщения                     │
+│  • Context       • Бизнес логика • Примеры        • Коды ошибок                  │
+│    формирование   • Правила       • Использования • Рекомендации                 │
+│  • Few-shot      • Валидации     • Troubleshooting• Интернационализация          │
+│    примеры        • Трансформации • FAQ            • Локализация                 │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                            РАБОЧИЕ ПРОЦЕССЫ                                       │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │ Полные       │ │ Бизнес-      │ │ Процедуры    │ │ Автоматизац. │             │
+│  │ процессы     │ │ логика       │ │ восстановл.  │ │   задач      │             │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘             │
+│  • End-to-end    • Условная      • Rollback       • Cron планировщик             │
+│    процессы       логика          операций          • Триггеры событий            │
+│  • DAG           • Бизнес правила • Compensation   • Автопочинка                  │
+│    определения    • Валидации      • Circuit breaker• Мониторинг                 │
+│  • Шаги          • Условные       • Резервное      • Эскалация                   │
+│    выполнения     переходы         копирование      • Уведомления                │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 
                                           │
                                           ▼
@@ -502,6 +592,8 @@ Where is the explaantion about workflows, models, prompts, configs and others pa
 ## Развертывание AWS GitOps
 
 ### Архитектура развертывания
+- **Terraform** - Infrastructure as Code для multicloud
+- **Crossplane** - Kubernetes-native Infrastructure as Code
 - **Argo Workflows** - замена custom workflow engine
 - **Argo Events** - автоматизация на основе событий  
 - **Seldon Core** - serving ML моделей
@@ -509,8 +601,16 @@ Where is the explaantion about workflows, models, prompts, configs and others pa
 - **Kustomize** - конфигурации для окружений
 - **ArgoCD ApplicationSets** - автоматизированные волны развертывания
 - **Prometheus + Grafana** - мониторинг
-- **Crossplane** - Infrastructure as Code
 - **Airflow** - оркестрация бизнес-процессов
+
+### Multicloud Infrastructure as Code
+```
+Terraform модули:
+├── AWS → EKS, VPC, IAM, RDS, S3
+├── Azure → AKS, VNET, AAD, CosmosDB, Storage
+├── GCP → GKE, VPC, IAM, CloudSQL, GCS
+└── Multicloud → DNS, CDN, Monitoring
+```
 
 ### Структура проектов ArgoCD
 ```
@@ -522,71 +622,121 @@ orchestration-apps → Crossplane + AWS Provider
 ```
 
 ### Быстрое развертывание
+
+**Infrastructure as Code + GitOps:**
 ```bash
+# AWS развертывание с Terraform + ArgoCD
 ./stage2-aws-provider.sh --region us-east-1
+
+# Multicloud развертывание
+terraform -chdir=platform-services/terraform/environments/dev plan
+terraform -chdir=platform-services/terraform/environments/dev apply
+
+# Crossplane Infrastructure as Code
+kubectl apply -f platform-services/crossplane/compositions/
 ```
 
 ---
 
 ## Поэтапное тестирование
 
-### Этап 1: Валидация инфраструктуры (5-10 мин)
+### Этап 1: Валидация инфраструктуры
 ```bash
-# Проверка AWS
-aws sts get-caller-identity --profile akovalenko-084129280818-AdministratorAccess
+# Проверка подключения
+aws sts get-caller-identity
 kubectl cluster-info
 
-# Проверка конфигураций
-ls platform-services/kustomize/base-layer/data-ingestion/overlays/aws/
-cat platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml
+# Проверка Terraform конфигураций
+ls platform-services/terraform/environments/dev/
+cat platform-services/terraform/environments/dev/terraform.tfvars
+
+# Проверка существующих конфигураций
+ls data_ingestion/
+ls platform-services/argocd/applications/base-layer/
+ls platform-services/crossplane/
 ```
 
-### Этап 2: Wave 1 - Инфраструктура (10-15 мин)  
+### Этап 2: Применение ApplicationSets
 ```bash
-kubectl apply -f platform-services/argocd/applications/infrastructure/
-kubectl get pods -n crossplane-system -w
-kubectl get providers.pkg.crossplane.io
-```
-
-### Этап 3: Wave 2 - Платформенные сервисы (15-20 мин)
-```bash
-kubectl apply -f platform-services/argocd/applications/platform-services/
-kubectl apply -f platform-services/argocd/applications/workflow-apps/
-kubectl get applications -n argocd
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-```
-
-### Этап 4: Wave 3 - Data Ingestion с AWS overlays (20-25 мин)
-```bash
-kubectl apply -f platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml
-kubectl get configmap -n base-data-ingestion data-ingestion-aws-config
-kubectl get pods -n base-data-ingestion -l cloud.provider=aws
-```
-
-### Этап 5: Wave 4 - ML платформа (25-30 мин)
-```bash
-kubectl apply -f platform-services/argocd/applications/ml-platform/
-kubectl get applications -n argocd | grep -E "(mlflow|seldon|kubeflow)"
-kubectl port-forward svc/mlflow -n mlflow 5000:5000
-```
-
-### Этап 6: Автоматизированные ApplicationSets (30-35 мин)
-```bash
+# Развертывание автоматизированных ApplicationSets
 kubectl apply -f platform-services/argocd/applicationsets/automated-platform-deployment.yaml
+
+# Проверка статуса
 kubectl get applicationsets -n argocd
-kubectl get applications -n argocd -l automation=true
+kubectl get applications -n argocd | grep automated
 ```
 
-### Этап 7: Валидация E2E (35-40 мин)
+### Этап 3: Мониторинг развертывания
 ```bash
-kubectl get namespaces | grep -E "(base-data-ingestion|mlflow|seldon|airflow|monitoring|crossplane)"
+# Проверка всех приложений по проектам
 kubectl get applications -n argocd -o custom-columns=NAME:.metadata.name,PROJECT:.spec.project,SYNC:.status.sync.status,HEALTH:.status.health.status
+
+# Проверка namespace
+kubectl get namespaces | grep -E "(base-data-ingestion|mlflow|seldon|airflow|monitoring|crossplane)"
+```
+
+### Этап 4: Проверка data_ingestion ссылок
+```bash
+# Валидация AWS overlays
+kubectl get configmap -n base-data-ingestion data-ingestion-aws-config -o yaml
+
+# Проверка AWS labels на pods
+kubectl get pods -n base-data-ingestion -l cloud.provider=aws --show-labels
+```
+
+### Этап 5: Доступ к сервисам
+```bash
+# ArgoCD
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# MLflow
+kubectl port-forward svc/mlflow -n mlflow 5000:5000
+
+# Airflow  
+kubectl port-forward svc/airflow-webserver -n airflow 8081:8080
+```
+
+### Этап 6: Проверка работы ApplicationSets
+```bash
+# Принудительная синхронизация если нужно
+kubectl patch application crossplane-core-aws-automated -n argocd -p '{"operation":{"sync":{}}}' --type merge
+
+# Проверка автоматизации
+kubectl describe applicationset automated-platform-deployment -n argocd
 ```
 
 ### Критерии успеха
-- Crossplane + AWS provider работают
-- Платформенные сервисы развернуты
-- Data ingestion ссылается на data_ingestion/ с AWS overlays
-- ML платформа в ml-apps проекте
-- ApplicationSets управляют развертыванием волнами
-- Корректное назначение ArgoCD проектов
+- **Infrastructure as Code**: Terraform создал EKS кластер и инфраструктуру
+- **Crossplane**: AWS провайдеры установлены и работают
+- **ApplicationSets**: создают приложения автоматически
+- **GitOps**: все automated приложения в статусе Synced/Healthy
+- **Data Ingestion**: data_ingestion/ папки корректно подключены
+- **Multicloud**: AWS overlays применены (labels cloud.provider=aws)
+- **ArgoCD**: проекты правильно назначены
+- **Services**: доступ к ArgoCD, MLflow, Airflow работает
+
+### Устранение проблем
+```bash
+# Terraform инфраструктура
+terraform -chdir=platform-services/terraform/environments/dev refresh
+terraform -chdir=platform-services/terraform/environments/dev plan
+
+# Crossplane провайдеры
+kubectl get providers.pkg.crossplane.io
+kubectl logs -n crossplane-system deployment/crossplane-aws-provider
+
+# Если приложения в статусе Unknown
+kubectl get applications -n argocd | grep Unknown
+kubectl patch application <app-name> -n argocd -p '{"operation":{"sync":{}}}' --type merge
+
+# Проверка ошибок GitOps
+kubectl describe application <app-name> -n argocd
+
+# Multicloud проверка
+kubectl get configmap -A | grep -E "(aws|azure|gcp)"
+kubectl get pods -A -l cloud.provider
+
+# Пересоздание ApplicationSet при необходимости
+kubectl delete applicationset automated-platform-deployment -n argocd
+kubectl apply -f platform-services/argocd/applicationsets/automated-platform-deployment.yaml
+```

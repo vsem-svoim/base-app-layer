@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: webhook-source
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: webhook-source
+    app.kubernetes.io/component: event-source
+spec:
+  webhook:
+    deployment-trigger:
+      port: "12000"
+      endpoint: /deployment
+      method: POST
+    workflow-trigger:
+      port: "12000"
+      endpoint: /workflow
+      method: POST
+    health-check:
+      port: "12000"
+      endpoint: /health
+      method: GET
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github-source
+  namespace: argocd
+spec:
+  github:
+    base-app-layer:
+      repositories:
+        - owner: vsem-svoim
+          names:
+            - base-app-layer
+      webhook:
+        endpoint: /push
+        port: "12000"
+        method: POST
+      events:
+        - push
+        - pull_request
+      apiToken:
+        name: github-token
+        key: token
+      webhookSecret:
+        name: github-secret
+        key: secret
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: prometheus-source
+  namespace: argocd
+spec:
+  webhook:
+    alert-webhook:
+      port: "12000"
+      endpoint: /prometheus
+      method: POST

@@ -1,0 +1,131 @@
+{
+  "test_timestamp": "2025-08-16T14:32:35.319419",
+  "namespace": "base-data-ingestion",
+  "kubernetes_available": true,
+  "tests": {
+    "agent_deployments": {
+      "status": "degraded",
+      "agents": {
+        "base-data-ingestion-agent-data-collector": {
+          "desired_replicas": 5,
+          "ready_replicas": 3,
+          "status": "degraded",
+          "creation_timestamp": "2025-08-16T16:17:34+00:00",
+          "image": "python:3.11-slim",
+          "resources": {
+            "requests": {
+              "cpu": "200m",
+              "memory": "512Mi"
+            },
+            "limits": {
+              "cpu": "1",
+              "memory": "2Gi"
+            }
+          }
+        },
+        "base-data-ingestion-agent-data-connector": {
+          "desired_replicas": 1,
+          "ready_replicas": 1,
+          "status": "healthy",
+          "creation_timestamp": "2025-08-16T16:17:34+00:00",
+          "image": "python:3.11-slim",
+          "resources": {
+            "requests": {
+              "cpu": "150m",
+              "memory": "256Mi"
+            },
+            "limits": {
+              "cpu": "500m",
+              "memory": "1Gi"
+            }
+          }
+        },
+        "base-data-ingestion-agent-data-converter": {
+          "desired_replicas": 1,
+          "ready_replicas": 1,
+          "status": "healthy",
+          "creation_timestamp": "2025-08-16T16:17:34+00:00",
+          "image": "python:3.11-slim",
+          "resources": {
+            "requests": {
+              "cpu": "300m",
+              "memory": "1Gi"
+            },
+            "limits": {
+              "cpu": "1500m",
+              "memory": "4Gi"
+            }
+          }
+        },
+        "base-data-ingestion-agent-data-fetch-retry": {
+          "desired_replicas": 1,
+          "ready_replicas": 1,
+          "status": "healthy",
+          "creation_timestamp": "2025-08-16T16:17:34+00:00",
+          "image": "python:3.11-slim",
+          "resources": {
+            "requests": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            },
+            "limits": {
+              "cpu": "300m",
+              "memory": "512Mi"
+            }
+          }
+        },
+        "base-data-ingestion-agent-data-merger": {
+          "desired_replicas": 1,
+          "ready_replicas": 1,
+          "status": "healthy",
+          "creation_timestamp": "2025-08-16T16:17:34+00:00",
+          "image": "python:3.11-slim",
+          "resources": {
+            "requests": {
+              "cpu": "250m",
+              "memory": "512Mi"
+            },
+            "limits": {
+              "cpu": "1",
+              "memory": "2Gi"
+            }
+          }
+        },
+        "base-data-ingestion-agent-data-scheduler": {
+          "desired_replicas": 1,
+          "ready_replicas": 1,
+          "status": "healthy",
+          "creation_timestamp": "2025-08-16T16:17:34+00:00",
+          "image": "python:3.11-slim",
+          "resources": {
+            "requests": {
+              "cpu": "150m",
+              "memory": "256Mi"
+            },
+            "limits": {
+              "cpu": "500m",
+              "memory": "1Gi"
+            }
+          }
+        }
+      },
+      "total_agents": 6,
+      "healthy_agents": 5
+    },
+    "pod_scaling": {
+      "status": "error",
+      "error": "Scaling to 7 did not complete within 60s"
+    },
+    "service_connectivity": {
+      "status": "success",
+      "services": {},
+      "total_services": 0
+    }
+  },
+  "overall_status": "partial",
+  "summary": {
+    "total_tests": 3,
+    "successful_tests": 1,
+    "kubernetes_integration": true
+  }
+}
