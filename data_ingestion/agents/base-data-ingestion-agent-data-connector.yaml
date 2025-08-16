@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: base-data-connector-sa
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
     app.kubernetes.io/component: ingestion
@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: base-data-ingestion-agent-data-connector
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
     app.kubernetes.io/component: ingestion
@@ -129,7 +129,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: base-data-connector-service
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
     app.kubernetes.io/component: ingestion
@@ -151,7 +151,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: base-data-connector-config
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
     app.kubernetes.io/component: ingestion
@@ -373,7 +373,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: base-data-connector-netpol
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
 spec:
@@ -403,7 +403,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: base-data-connector-secrets
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
 type: Opaque
@@ -489,7 +489,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: base-data-connector-certs
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-connector
 type: kubernetes.io/tls

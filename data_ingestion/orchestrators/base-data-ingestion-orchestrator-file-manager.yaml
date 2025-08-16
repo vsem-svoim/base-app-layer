@@ -2,7 +2,7 @@ apiVersion: base.io/v1
 kind: Orchestrator
 metadata:
   name: base-data-ingestion-orchestrator-file-manager
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: file-manager
     app.kubernetes.io/component: ingestion

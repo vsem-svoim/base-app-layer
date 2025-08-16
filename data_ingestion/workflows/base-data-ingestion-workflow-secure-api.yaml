@@ -2,7 +2,7 @@ apiVersion: base.io/v1
 kind: Workflow
 metadata:
   name: base-data-ingestion-workflow-secure-api
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: secure-api-workflow
     base.io/category: data_ingestion

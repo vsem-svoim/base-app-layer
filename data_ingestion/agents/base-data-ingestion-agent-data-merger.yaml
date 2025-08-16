@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: base-data-merger-sa
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
     app.kubernetes.io/component: ingestion
@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: base-data-ingestion-agent-data-merger
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
     app.kubernetes.io/component: ingestion
@@ -140,7 +140,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: base-data-merger-service
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
     app.kubernetes.io/component: ingestion
@@ -166,7 +166,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: base-data-merger-config
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
     app.kubernetes.io/component: ingestion
@@ -400,7 +400,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: base-data-merger-rules
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
     app.kubernetes.io/component: ingestion
@@ -487,7 +487,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: base-data-merger-netpol
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
 spec:
@@ -534,7 +534,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: base-data-merger-pdb
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-merger
 spec:

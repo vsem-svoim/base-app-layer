@@ -2,7 +2,7 @@ apiVersion: base.io/v1
 kind: Config
 metadata:
   name: base-data-ingestion-format-specifications
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: format-specifications
     app.kubernetes.io/component: ingestion

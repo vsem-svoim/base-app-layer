@@ -2,7 +2,7 @@ apiVersion: base.io/v1
 kind: Config
 metadata:
   name: base-data-ingestion-source-mappings
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: source-mappings
     app.kubernetes.io/component: ingestion

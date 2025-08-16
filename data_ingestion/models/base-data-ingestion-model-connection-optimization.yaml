@@ -2,7 +2,7 @@ apiVersion: base.io/v1
 kind: Model
 metadata:
   name: base-data-ingestion-connection-optimization-model
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: connection-optimization-model
     app.kubernetes.io/component: ingestion

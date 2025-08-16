@@ -2,7 +2,7 @@ apiVersion: base.io/v1
 kind: Workflow
 metadata:
   name: base-data-ingestion-workflow-realtime-stream
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     base.io/category: data_ingestion
     base.io/type: workflow

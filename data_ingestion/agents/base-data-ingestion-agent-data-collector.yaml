@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: base-data-collector-sa
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
     app.kubernetes.io/component: ingestion
@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: base-data-ingestion-agent-data-collector
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
     app.kubernetes.io/component: ingestion
@@ -132,7 +132,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: base-data-collector-service
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
     app.kubernetes.io/component: ingestion
@@ -154,7 +154,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: base-data-collector-config
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
     app.kubernetes.io/component: ingestion
@@ -334,7 +334,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: base-data-collector-hpa
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
 spec:
@@ -385,7 +385,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: base-data-collector-netpol
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
 spec:
@@ -415,7 +415,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: base-data-collector-secrets
-  namespace: base-ingestion
+  namespace: base-data-ingestion
   labels:
     app.kubernetes.io/name: base-data-collector
 type: Opaque
