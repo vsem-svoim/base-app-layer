@@ -37,7 +37,7 @@ spec:
       annotations:
         argocd.argoproj.io/sync-wave: '{{wave}}'
     spec:
-      project: default
+      project: aws-infrastructure
       source:
         repoURL: https://github.com/vsem-svoim/base-app-layer.git
         targetRevision: HEAD

@@ -94,13 +94,15 @@ spec:
             namespace: base-schema-contracts
             wave: "4"
           - name: seldon-core
-            path: platform-services/ml-platform/seldon
+            path: platform-services/kustomize/base-layer/seldon-core/overlays/dev
             namespace: seldon-system
             wave: "4"
+            project: ml-apps
           - name: mlflow
-            path: platform-services/ml-platform/mlflow
+            path: platform-services/kustomize/base-layer/mlflow/overlays/dev
             namespace: mlflow
             wave: "4"
+            project: ml-apps
   template:
     metadata:
       name: '{{name}}'
@@ -110,7 +112,7 @@ spec:
       annotations:
         argocd.argoproj.io/sync-wave: '{{wave}}'
     spec:
-      project: ml-apps
+      project: '{{project | default "base-layer"}}'
       source:
         repoURL: https://github.com/vsem-svoim/base-app-layer.git
         targetRevision: HEAD

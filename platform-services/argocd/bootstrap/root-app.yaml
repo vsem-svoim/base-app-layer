@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/vsem-svoim/base-app-layer.git
     targetRevision: HEAD
-    path: platform-services/argocd/applications
+    path: platform-services/argocd/applicationsets
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

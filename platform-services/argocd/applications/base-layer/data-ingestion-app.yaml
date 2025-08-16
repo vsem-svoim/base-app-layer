@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: data-ingestion-agent-base
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: data-ingestion
     app.kubernetes.io/component: base-ingestion-agents
@@ -37,6 +39,8 @@ kind: Application
 metadata:
   name: data-ingestion-configs-base
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: data-ingestion
     app.kubernetes.io/component: base-ingestion-configs
@@ -69,6 +73,8 @@ kind: Application
 metadata:
   name: data-ingestion-workflows-base
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: data-ingestion
     app.kubernetes.io/component: base-ingestion-workflows
@@ -100,6 +106,8 @@ kind: Application
 metadata:
   name: data-ingestion-orchestrators-base
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: data-ingestion
     app.kubernetes.io/component: base-ingestion-orchestrators
@@ -131,6 +139,8 @@ kind: Application
 metadata:
   name: data-ingestion-models-base
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: data-ingestion
     app.kubernetes.io/component: base-ingestion-models

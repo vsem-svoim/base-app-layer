@@ -10,70 +10,85 @@ metadata:
     deployment-type: "automated"
 spec:
   generators:
-    # Wave 1: Infrastructure
     - list:
         elements:
+          # Wave 1: Infrastructure
           - name: crossplane-core-aws
-            path: platform-services/argocd/applications/infrastructure/crossplane-core-aws.yaml
-            project: orchestration-apps
+            path: platform-services/argocd/applications/infrastructure
+            project: aws-infrastructure
             namespace: crossplane-system
             wave: "1"
             priority: "critical"
+            applicationFile: "crossplane-core-aws.yaml"
           - name: crossplane-aws-providers
-            path: platform-services/argocd/applications/infrastructure/crossplane-aws-providers.yaml
-            project: orchestration-apps
+            path: platform-services/argocd/applications/infrastructure
+            project: aws-infrastructure
             namespace: crossplane-system
             wave: "1"
             priority: "critical"
-    
-    # Wave 2: Platform Services
-    - list:
-        elements:
+            applicationFile: "crossplane-aws-providers.yaml"
+          - name: istio-service-mesh
+            path: platform-services/argocd/applications/infrastructure
+            project: aws-infrastructure
+            namespace: istio-system
+            wave: "1"
+            priority: "high"
+            applicationFile: "istio-app.yaml"
+          
+          # Wave 2: Platform Services
           - name: monitoring-stack
-            path: platform-services/argocd/applications/platform-services/monitoring-stack-app.yaml
+            path: platform-services/argocd/applications/platform-services
             project: monitoring-apps
             namespace: monitoring
             wave: "2"
             priority: "high"
+            applicationFile: "monitoring-stack-app.yaml"
           - name: airflow
-            path: platform-services/argocd/applications/platform-services/airflow-app.yaml
+            path: platform-services/argocd/applications/platform-services
             project: workflow-apps
             namespace: airflow
             wave: "2"
             priority: "high"
-    
-    # Wave 3: Data Ingestion Layer
-    - list:
-        elements:
-          - name: data-ingestion-agents
-            path: platform-services/argocd/applications/base-layer/data-ingestion-app.yaml
+            applicationFile: "airflow-app.yaml"
+          
+          # Wave 3: Data Processing Layer
+          - name: data-ingestion
+            path: platform-services/argocd/applications/base-layer
             project: base-layer
             namespace: base-data-ingestion
             wave: "3"
             priority: "high"
-            component: "agents"
-    
-    # Wave 4: ML Platform
-    - list:
-        elements:
+            applicationFile: "data-ingestion-app.yaml"
+          - name: data-quality
+            path: platform-services/argocd/applications/base-layer
+            project: base-layer
+            namespace: base-data-quality
+            wave: "3"
+            priority: "high"
+            applicationFile: "data-quality-app.yaml"
+          - name: data-storage
+            path: platform-services/argocd/applications/base-layer
+            project: base-layer
+            namespace: base-data-storage
+            wave: "3"
+            priority: "high"
+            applicationFile: "data-storage-app.yaml"
+          
+          # Wave 4: ML Platform
           - name: mlflow
-            path: platform-services/argocd/applications/ml-platform/mlflow-app.yaml
+            path: platform-services/argocd/applications/ml-platform
             project: ml-apps
             namespace: mlflow
             wave: "4"
             priority: "medium"
+            applicationFile: "mlflow-app.yaml"
           - name: seldon-core
-            path: platform-services/argocd/applications/ml-platform/seldon-core-app.yaml
+            path: platform-services/argocd/applications/ml-platform
             project: ml-apps
             namespace: seldon-system
             wave: "4"
             priority: "medium"
-          - name: kubeflow
-            path: platform-services/argocd/applications/ml-platform/kubeflow-app.yaml
-            project: ml-apps
-            namespace: kubeflow
-            wave: "4"
-            priority: "low"
+            applicationFile: "seldon-core-app.yaml"
   
   template:
     metadata:
@@ -92,7 +107,7 @@ spec:
       source:
         repoURL: https://github.com/vsem-svoim/base-app-layer.git
         targetRevision: HEAD
-        path: '{{path}}'
+        path: '{{path}}/{{applicationFile}}'
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{namespace}}'
