@@ -11,7 +11,7 @@ resources:
 # ConfigMap generator temporarily disabled due to path security restrictions
 # Will be re-enabled when prompts are properly organized within the platform-services directory
 
-labels:
+commonLabels:
   app.kubernetes.io/part-of: base-system
   base.io/category: data_ingestion
 

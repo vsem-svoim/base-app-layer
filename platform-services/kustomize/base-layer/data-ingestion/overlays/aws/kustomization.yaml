@@ -42,7 +42,7 @@ patches:
           service.beta.kubernetes.io/aws-load-balancer-type: nlb
 
 # AWS-specific labels
-labels:
+commonLabels:
   cloud.provider: aws
   cloud.region: us-east-1
   base.io/provider: aws
