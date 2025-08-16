@@ -33,7 +33,22 @@ patches:
         path: /spec/template/spec/nodeSelector
         value:
           kubernetes.io/os: linux
-          node.kubernetes.io/instance-type: t3.medium
+      - op: add
+        path: /spec/template/spec/tolerations
+        value:
+          - key: "base-apps"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
 
   - target:
       kind: PersistentVolumeClaim
