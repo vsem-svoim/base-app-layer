@@ -8,22 +8,22 @@ resources:
 images:
   - name: base/data-collector:v2.5.0-fixed
     newName: nginx
-    newTag: 1.25-alpine
+    newTag: "1.25-alpine"
   - name: base/data-connector:v2.5.0-fixed
     newName: nginx
-    newTag: 1.25-alpine
+    newTag: "1.25-alpine"
   - name: base/data-converter:v2.5.0-fixed
     newName: nginx
-    newTag: 1.25-alpine
+    newTag: "1.25-alpine"
   - name: base/data-fetch-retry:v2.5.0-fixed
     newName: busybox
-    newTag: 1.36
+    newTag: "1.36"
   - name: base/data-merger:v2.5.0-analytics-fixed
     newName: nginx
-    newTag: 1.25-alpine
+    newTag: "1.25-alpine"
   - name: base/data-scheduler:v2.5.0-analytics-fixed
     newName: nginx
-    newTag: 1.25-alpine
+    newTag: "1.25-alpine"
 
 # Scale down to working replicas
 replicas:
