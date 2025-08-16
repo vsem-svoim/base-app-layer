@@ -1,13 +1,121 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-${ENVIRONMENT}
+  name: data-ingestion-agents
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: agents
+    app.kubernetes.io/part-of: base-ingestion-apps
 spec:
-  project: default
+  project: base-layer
   source:
     repoURL: https://github.com/vsem-svoim/base-app-layer.git
-    path: data_ingestion
+    path: data_ingestion/agents
+    targetRevision: HEAD
+    kustomize:
+      images:
+      - name: base/data-collector:v2.5.0-fixed
+        newName: nginx
+        newTag: 1.25-alpine
+      - name: base/data-connector:v2.5.0-fixed
+        newName: nginx
+        newTag: 1.25-alpine
+      - name: base/data-converter:v2.5.0-fixed
+        newName: nginx
+        newTag: 1.25-alpine
+      - name: base/data-fetch-retry:v2.5.0-fixed
+        newName: busybox
+        newTag: "1.36"
+      - name: base/data-merger:v2.5.0-analytics-fixed
+        newName: nginx
+        newTag: 1.25-alpine
+      - name: base/data-scheduler:v2.5.0-analytics-fixed
+        newName: nginx
+        newTag: 1.25-alpine
+      replicas:
+      - name: base-data-ingestion-agent-data-collector
+        count: 1
+      - name: base-data-ingestion-agent-data-connector
+        count: 1
+      - name: base-data-ingestion-agent-data-converter
+        count: 1
+      - name: base-data-ingestion-agent-data-fetch-retry
+        count: 1
+      - name: base-data-ingestion-agent-data-merger
+        count: 1
+      - name: base-data-ingestion-agent-data-scheduler
+        count: 1
+      patches:
+      - target:
+          kind: Deployment
+        patch: |-
+          - op: replace
+            path: /spec/template/spec/containers/0/resources/requests/cpu
+            value: 100m
+          - op: replace
+            path: /spec/template/spec/containers/0/resources/requests/memory
+            value: 128Mi
+          - op: replace
+            path: /spec/template/spec/containers/0/resources/limits/cpu
+            value: 500m
+          - op: replace
+            path: /spec/template/spec/containers/0/resources/limits/memory
+            value: 512Mi
+      - target:
+          kind: Deployment
+          name: base-data-ingestion-agent-data-fetch-retry
+        patch: |-
+          - op: replace
+            path: /spec/template/spec/containers/0/command
+            value: ["sh", "-c", "while true; do echo 'Processing retry logic...'; sleep 30; done"]
+          - op: replace
+            path: /spec/template/spec/containers/0/resources/requests/cpu
+            value: 50m
+          - op: replace
+            path: /spec/template/spec/containers/0/resources/requests/memory
+            value: 64Mi
+      - target:
+          kind: CronJob
+          name: base-data-fetch-retry-dlq-processor
+        patch: |-
+          - op: replace
+            path: /spec/jobTemplate/spec/template/spec/containers/0/command
+            value: ["sh", "-c", "echo Processing DLQ items && sleep 30"]
+      commonLabels:
+        deployment-fix: automated-v1
+        cloud.provider: aws
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-configs
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: configs
+    app.kubernetes.io/part-of: base-ingestion-apps
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: data_ingestion/configs
     targetRevision: HEAD
   destination:
     server: https://kubernetes.default.svc
@@ -18,3 +126,102 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-workflows
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: workflows
+    app.kubernetes.io/part-of: base-ingestion-apps
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: data_ingestion/workflows
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-orchestrators
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: orchestrators
+    app.kubernetes.io/part-of: base-ingestion-apps
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: data_ingestion/orchestrators
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingestion-models
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: models
+    app.kubernetes.io/part-of: base-ingestion-apps
+spec:
+  project: base-layer
+  source:
+    repoURL: https://github.com/vsem-svoim/base-app-layer.git
+    path: data_ingestion/models
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-data-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
