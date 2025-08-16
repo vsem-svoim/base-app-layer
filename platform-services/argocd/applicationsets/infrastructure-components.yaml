@@ -1,0 +1,142 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infrastructure-components
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    deployment-wave: "1"
+    component-type: "infrastructure"
+spec:
+  generators:
+    - list:
+        elements:
+          - name: crossplane-aws
+            path: platform-services/crossplane
+            namespace: crossplane-system
+            wave: "1"
+          - name: monitoring-stack
+            path: platform-services/monitoring
+            namespace: monitoring
+            wave: "1"
+          - name: argo-workflows
+            path: platform-services/argocd/workflows
+            namespace: argocd
+            wave: "1"
+          - name: argo-events
+            path: platform-services/argo-events
+            namespace: argocd
+            wave: "1"
+  template:
+    metadata:
+      name: '{{name}}'
+      labels:
+        argocd.argoproj.io/applicationset: infrastructure-components
+        deployment-wave: '{{wave}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: data-core-components
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    deployment-wave: "2"
+    component-type: "data-core"
+spec:
+  generators:
+    - list:
+        elements:
+          - name: data-ingestion
+            path: platform-services/kustomize/base-layer/data-ingestion/overlays/dev
+            namespace: base-data-ingestion
+            wave: "2"
+          - name: data-storage
+            path: platform-services/kustomize/base-layer/data-storage/overlays/dev
+            namespace: base-data-storage
+            wave: "2"
+          - name: data-quality
+            path: platform-services/kustomize/base-layer/data-quality/overlays/dev
+            namespace: base-data-quality
+            wave: "2"
+          - name: data-security
+            path: platform-services/kustomize/base-layer/data-security/overlays/dev
+            namespace: base-data-security
+            wave: "2"
+  template:
+    metadata:
+      name: '{{name}}'
+      labels:
+        argocd.argoproj.io/applicationset: data-core-components
+        deployment-wave: '{{wave}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+        argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    spec:
+      project: base-layer
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      health:
+        - group: apps
+          kind: Deployment
+          check: |
+            hs = {}
+            if obj.status ~= nil then
+              if obj.status.readyReplicas ~= nil and obj.status.readyReplicas > 0 then
+                hs.status = "Healthy"
+                hs.message = "Deployment is healthy"
+                return hs
+              end
+            end
+            hs.status = "Progressing"
+            hs.message = "Waiting for deployment"
+            return hs

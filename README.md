@@ -85,14 +85,11 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                       БАЗОВАЯ ЛОГИЧЕСКАЯ ПЛАТФОРМА                                 │
-│                      Корпоративный движок обработки данных                         │
+│                       БАЗОВАЯ ЛОГИЧЕСКАЯ ПЛАТФОРМА - Обработка данных               │
 └─────────────────────────────────────────────────────────────────────────────────────┘
-
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                                УРОВЕНЬ 1: ВВОД                                     │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│  Источники данных                                                                   │
+│                        Источники данных: Откуда приходит информация                │
+├────────────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                │
 │  │     API     │  │ Базы данных │  │    Файлы    │  │   Потоки    │                │
 │  │    REST     │  │  SQL/NoSQL  │  │  CSV/JSON   │  │   Kafka     │                │
@@ -119,6 +116,11 @@
 │  │  └─────────────────────────────────────────────────────────────────────────┘ │ │
 │  └─────────────────────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────────────┘
+
+Where is the explaantion about workflows, models, prompts, configs and others parts of data_ingestion?
+
+
+
                                           │
                                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
@@ -494,3 +496,97 @@
 ```
 
 Архитектура поддерживает полный жизненный цикл данных от приема до распространения с корпоративными возможностями безопасности, соответствия требованиям и мониторинга качества.
+
+---
+
+## Развертывание AWS GitOps
+
+### Архитектура развертывания
+- **Argo Workflows** - замена custom workflow engine
+- **Argo Events** - автоматизация на основе событий  
+- **Seldon Core** - serving ML моделей
+- **MLflow** - управление жизненным циклом ML
+- **Kustomize** - конфигурации для окружений
+- **ArgoCD ApplicationSets** - автоматизированные волны развертывания
+- **Prometheus + Grafana** - мониторинг
+- **Crossplane** - Infrastructure as Code
+- **Airflow** - оркестрация бизнес-процессов
+
+### Структура проектов ArgoCD
+```
+base-layer → ссылки на data_ingestion/ папки
+ml-apps → MLflow, Seldon Core, Kubeflow  
+workflow-apps → Airflow, Argo Workflows
+monitoring-apps → Prometheus + Grafana
+orchestration-apps → Crossplane + AWS Provider
+```
+
+### Быстрое развертывание
+```bash
+./stage2-aws-provider.sh --region us-east-1
+```
+
+---
+
+## Поэтапное тестирование
+
+### Этап 1: Валидация инфраструктуры (5-10 мин)
+```bash
+# Проверка AWS
+aws sts get-caller-identity --profile akovalenko-084129280818-AdministratorAccess
+kubectl cluster-info
+
+# Проверка конфигураций
+ls platform-services/kustomize/base-layer/data-ingestion/overlays/aws/
+cat platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml
+```
+
+### Этап 2: Wave 1 - Инфраструктура (10-15 мин)  
+```bash
+kubectl apply -f platform-services/argocd/applications/infrastructure/
+kubectl get pods -n crossplane-system -w
+kubectl get providers.pkg.crossplane.io
+```
+
+### Этап 3: Wave 2 - Платформенные сервисы (15-20 мин)
+```bash
+kubectl apply -f platform-services/argocd/applications/platform-services/
+kubectl apply -f platform-services/argocd/applications/workflow-apps/
+kubectl get applications -n argocd
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+### Этап 4: Wave 3 - Data Ingestion с AWS overlays (20-25 мин)
+```bash
+kubectl apply -f platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml
+kubectl get configmap -n base-data-ingestion data-ingestion-aws-config
+kubectl get pods -n base-data-ingestion -l cloud.provider=aws
+```
+
+### Этап 5: Wave 4 - ML платформа (25-30 мин)
+```bash
+kubectl apply -f platform-services/argocd/applications/ml-platform/
+kubectl get applications -n argocd | grep -E "(mlflow|seldon|kubeflow)"
+kubectl port-forward svc/mlflow -n mlflow 5000:5000
+```
+
+### Этап 6: Автоматизированные ApplicationSets (30-35 мин)
+```bash
+kubectl apply -f platform-services/argocd/applicationsets/automated-platform-deployment.yaml
+kubectl get applicationsets -n argocd
+kubectl get applications -n argocd -l automation=true
+```
+
+### Этап 7: Валидация E2E (35-40 мин)
+```bash
+kubectl get namespaces | grep -E "(base-data-ingestion|mlflow|seldon|airflow|monitoring|crossplane)"
+kubectl get applications -n argocd -o custom-columns=NAME:.metadata.name,PROJECT:.spec.project,SYNC:.status.sync.status,HEALTH:.status.health.status
+```
+
+### Критерии успеха
+- Crossplane + AWS provider работают
+- Платформенные сервисы развернуты
+- Data ingestion ссылается на data_ingestion/ с AWS overlays
+- ML платформа в ml-apps проекте
+- ApplicationSets управляют развертыванием волнами
+- Корректное назначение ArgoCD проектов

@@ -8,6 +8,9 @@ CURRENT_DIR="$(pwd)"
 
 # Get parameters from environment (set by main script) or command line
 REGION="${REGION:-}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(basename "$SCRIPT_DIR")}"
+ENVIRONMENT="${ENVIRONMENT:-dev}"
+CLUSTER_NAME="${CLUSTER_NAME:-${PROJECT_ROOT}-${ENVIRONMENT}-cluster}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -2569,6 +2572,197 @@ EOF
     log "✅ AWS-specific ArgoCD applications created"
 }
 
+# ============================================================================
+# GITOPS PLATFORM DEPLOYMENT FUNCTIONS
+# Integrated from deploy-aws-platform.sh
+# ============================================================================
+
+check_k8s_prerequisites() {
+    log_info "Checking Kubernetes prerequisites..."
+    
+    if ! command -v kubectl &> /dev/null; then
+        log_error "kubectl is not installed"
+        exit 1
+    fi
+    
+    if ! kubectl cluster-info &> /dev/null; then
+        log_error "Cannot connect to Kubernetes cluster"
+        exit 1
+    fi
+    
+    log "Prerequisites check passed"
+}
+
+deploy_wave_1_infrastructure() {
+    log_info "🌊 Wave 1: Infrastructure (Crossplane + AWS Provider)"
+    
+    # Deploy Crossplane infrastructure applications
+    kubectl apply -f platform-services/argocd/applications/infrastructure/ || log_warning "Some infrastructure apps may not exist yet"
+    
+    # Wait for Crossplane to be ready
+    log_info "Waiting for Crossplane to be ready..."
+    kubectl wait --for=condition=available --timeout=300s deployment/crossplane -n crossplane-system || true
+    
+    log "Wave 1 completed"
+}
+
+deploy_wave_2_platform_services() {
+    log_info "🌊 Wave 2: Platform Services (Airflow + Monitoring)"
+    
+    # Deploy platform services using correct projects
+    kubectl apply -f platform-services/argocd/applications/platform-services/airflow-app.yaml || log_warning "Airflow app may not exist yet"
+    kubectl apply -f platform-services/argocd/applications/platform-services/monitoring-stack-app.yaml || log_warning "Monitoring app may not exist yet"
+    
+    # Deploy Argo Workflows and Events
+    kubectl apply -f platform-services/argocd/applications/workflow-apps/ || log_warning "Some workflow apps may not exist yet"
+    
+    log "Wave 2 completed"
+}
+
+deploy_wave_3_data_ingestion() {
+    log_info "🌊 Wave 3: Data Ingestion Layer (AWS Provider)"
+    
+    # Deploy data ingestion with AWS configurations
+    # This references your data_ingestion/ folder configs with AWS overlays
+    kubectl apply -f platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml || log_warning "Data ingestion AWS app may not exist yet"
+    
+    # Also deploy individual components that reference data_ingestion/ folders
+    kubectl apply -f platform-services/argocd/applications/base-layer/data-ingestion-app.yaml || log_warning "Data ingestion app may not exist yet"
+    
+    log "Wave 3 completed"
+}
+
+deploy_wave_4_ml_platform() {
+    log_info "🌊 Wave 4: ML Platform (ml-apps project)"
+    
+    # Deploy ML applications using correct project
+    kubectl apply -f platform-services/argocd/applications/ml-platform/ || log_warning "Some ML apps may not exist yet"
+    
+    log "Wave 4 completed"
+}
+
+deploy_automated_applicationsets() {
+    log_info "🤖 Deploying Automated ApplicationSets"
+    
+    # Deploy the automated ApplicationSets for wave management
+    kubectl apply -f platform-services/argocd/applicationsets/automated-platform-deployment.yaml || log_warning "ApplicationSets may not exist yet"
+    
+    log "ApplicationSets deployed"
+}
+
+monitor_deployments() {
+    log_info "📊 Monitoring deployment progress..."
+    
+    # Monitor for 5 minutes
+    for i in {1..10}; do
+        echo ""
+        echo "=== Monitoring Iteration $i ==="
+        
+        # Check applications by project
+        echo "📋 Data Ingestion (base-layer project):"
+        kubectl get applications -n argocd -l app.kubernetes.io/name=data-ingestion -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status 2>/dev/null || echo "No data ingestion apps found"
+        
+        echo ""
+        echo "🤖 ML Platform (ml-apps project):"
+        kubectl get applications -n argocd | grep -E "(mlflow|seldon|kubeflow)" || echo "No ML apps found"
+        
+        echo ""
+        echo "🔧 Platform Services (workflow-apps, monitoring-apps projects):"
+        kubectl get applications -n argocd | grep -E "(airflow|monitoring|argo)" || echo "No platform services found"
+        
+        echo ""
+        echo "☁️  Infrastructure (orchestration-apps project):"
+        kubectl get applications -n argocd | grep -E "(crossplane)" || echo "No infrastructure apps found"
+        
+        sleep 30
+    done
+}
+
+validate_aws_deployment() {
+    log_info "🔍 Validating AWS deployment..."
+    
+    # Check namespaces
+    echo "📦 Checking namespaces:"
+    kubectl get namespaces | grep -E "(base-data-ingestion|mlflow|seldon|airflow|monitoring|crossplane)" || true
+    
+    # Check AWS-specific resources
+    echo ""
+    echo "☁️  Checking AWS-specific configurations:"
+    kubectl get configmap -n base-data-ingestion data-ingestion-aws-config -o yaml 2>/dev/null || echo "AWS config not found"
+    
+    # Check if pods are running with AWS configurations
+    echo ""
+    echo "🏃 Checking running pods with AWS provider:"
+    kubectl get pods -A -l cloud.provider=aws 2>/dev/null || echo "No AWS pods found yet"
+    
+    log "Validation completed"
+}
+
+display_access_info() {
+    log_info "🎯 Platform Access Information"
+    
+    echo ""
+    log "🎉 AWS Platform Deployment Complete!"
+    echo "====================================="
+    echo ""
+    
+    echo "📊 Project Structure:"
+    echo "├── base-layer project"
+    echo "│   └── data_ingestion/ folder configs with AWS overlays"
+    echo "├── ml-apps project"  
+    echo "│   ├── MLflow"
+    echo "│   ├── Seldon Core"
+    echo "│   └── Kubeflow"
+    echo "├── workflow-apps project"
+    echo "│   ├── Airflow"
+    echo "│   └── Argo Workflows"
+    echo "├── monitoring-apps project"
+    echo "│   └── Prometheus + Grafana"
+    echo "└── orchestration-apps project"
+    echo "    └── Crossplane + AWS Provider"
+    echo ""
+    
+    echo "🔐 Access URLs:"
+    echo "ArgoCD: kubectl port-forward svc/argocd-server -n argocd 8080:443"
+    echo "Airflow: kubectl port-forward svc/airflow-webserver -n airflow 8080:8080"  
+    echo "MLflow: kubectl port-forward svc/mlflow -n mlflow 5000:5000"
+    echo "Grafana: kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80"
+    echo ""
+    
+    echo "✅ Features Deployed:"
+    echo "🔄 GitOps with ArgoCD ApplicationSets"
+    echo "🌪️  Airflow orchestration for automation"
+    echo "☁️  AWS provider configurations"
+    echo "📊 Data ingestion referencing data_ingestion/ configs"
+    echo "🤖 ML platform with AWS integrations"
+    echo "📈 Monitoring and observability"
+    echo ""
+    
+    log "Platform ready for AWS operations!"
+}
+
+deploy_gitops_platform() {
+    log ""
+    log "🏗️  GitOps Platform Deployment with Automated Waves"
+    log "=================================================="
+    
+    check_k8s_prerequisites
+    deploy_wave_1_infrastructure
+    deploy_wave_2_platform_services
+    deploy_wave_3_data_ingestion
+    deploy_wave_4_ml_platform
+    deploy_automated_applicationsets
+    monitor_deployments
+    validate_aws_deployment
+    display_access_info
+    
+    log "🎉 GitOps Platform deployment completed!"
+}
+
+# ============================================================================
+# END GITOPS PLATFORM DEPLOYMENT FUNCTIONS
+# ============================================================================
+
 main() {
     log "========================================="
     log "AWS Provider Configuration"
@@ -2644,6 +2838,13 @@ main() {
     log "TERRAFORM BACKEND: $(echo "${PROJECT_ROOT}" | tr '[:upper:]' '[:lower:]')-terraform-state-${REGION}"
     log ""
     log "💡 TIP: The terraform.tfvars file is extensively documented with all options!"
+    
+    # Now deploy the GitOps platform using the configurations we just created
+    log ""
+    log "========================================="
+    log "Starting Automated GitOps Deployment"
+    log "========================================="
+    deploy_gitops_platform
 }
 
 # Rename the function to match what main() is calling

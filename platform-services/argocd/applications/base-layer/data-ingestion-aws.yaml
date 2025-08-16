@@ -10,10 +10,15 @@ metadata:
     base.io/provider: aws
 spec:
   project: base-layer
-  source:
-    repoURL: https://github.com/vsem-svoim/base-app-layer.git
-    path: platform-services/kustomize/base-layer/data-ingestion/overlays/aws
-    targetRevision: HEAD
+  sources:
+    # Base data ingestion configs from data_ingestion/ folder
+    - repoURL: https://github.com/vsem-svoim/base-app-layer.git
+      path: data_ingestion
+      targetRevision: HEAD
+    # AWS-specific overlays and configurations
+    - repoURL: https://github.com/vsem-svoim/base-app-layer.git
+      path: platform-services/kustomize/base-layer/data-ingestion/overlays/aws
+      targetRevision: HEAD
   destination:
     server: https://kubernetes.default.svc
     namespace: base-data-ingestion
