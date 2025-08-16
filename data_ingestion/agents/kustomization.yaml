@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-ingestion-agent-data-collector.yaml
+  - base-data-ingestion-agent-data-connector.yaml
+  - base-data-ingestion-agent-data-converter.yaml
+  - base-data-ingestion-agent-data-fetch-retry.yaml
+  - base-data-ingestion-agent-data-merger.yaml
+  - base-data-ingestion-agent-data-scheduler.yaml

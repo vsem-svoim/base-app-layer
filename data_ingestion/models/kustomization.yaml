@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-ingestion-model-connection-optimization.yaml
+  - base-data-ingestion-model-format-recognition.yaml
+  - base-data-ingestion-model-retry-strategy.yaml
+  - base-data-ingestion-model-scheduling-intelligence.yaml
+  - base-data-ingestion-model-source-detection.yaml
