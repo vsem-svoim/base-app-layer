@@ -1,11 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-aws
+  name: data-ingestion-agent-aws
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/part-of: base-system
+    app.kubernetes.io/component: aws-ingestion-agents
+    app.kubernetes.io/part-of: base-ingestion-apps
     base.io/category: data_ingestion
     base.io/provider: aws
 spec:
@@ -41,7 +42,7 @@ metadata:
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: configs
+    app.kubernetes.io/component: aws-ingestion-configs
     app.kubernetes.io/part-of: base-ingestion-apps
     base.io/provider: aws
 spec:
@@ -74,7 +75,7 @@ metadata:
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: workflows
+    app.kubernetes.io/component: aws-ingestion-workflows
     app.kubernetes.io/part-of: base-ingestion-apps
     base.io/provider: aws
 spec:
@@ -107,7 +108,7 @@ metadata:
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: orchestrators
+    app.kubernetes.io/component: aws-ingestion-orchestrators
     app.kubernetes.io/part-of: base-ingestion-apps
     base.io/provider: aws
 spec:
@@ -140,7 +141,7 @@ metadata:
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: models
+    app.kubernetes.io/component: aws-ingestion-models
     app.kubernetes.io/part-of: base-ingestion-apps
     base.io/provider: aws
 spec:

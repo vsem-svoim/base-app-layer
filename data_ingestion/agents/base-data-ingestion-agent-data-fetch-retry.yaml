@@ -46,7 +46,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: data-fetch-retry
-        image: base/data-fetch-retry:v2.5.0-fixed
+        image: python:latest
         imagePullPolicy: Always
         ports:
         - name: http-metrics
@@ -612,7 +612,7 @@ spec:
           serviceAccountName: base-data-fetch-retry-sa
           containers:
           - name: dlq-processor
-            image: base/data-fetch-retry:v2.5.0-fixed
+            image: python:3.13.7-slim
             command: ["python", "/app/dlq_processor.py"]
             env:
             - name: DLQ_PATH

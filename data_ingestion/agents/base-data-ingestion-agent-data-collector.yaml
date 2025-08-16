@@ -46,7 +46,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: data-collector
-        image: base/data-collector:v2.5.0-fixed
+        image: python:3.13.7-slim
         imagePullPolicy: Always
         ports:
         - name: http-metrics

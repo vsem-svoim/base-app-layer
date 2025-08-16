@@ -1,12 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-agents
+  name: data-ingestion-agent-base
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: agents
+    app.kubernetes.io/component: base-ingestion-agents
     app.kubernetes.io/part-of: base-ingestion-apps
+
 spec:
   project: base-layer
   source:
@@ -34,12 +35,13 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-configs
+  name: data-ingestion-configs-base
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: configs
+    app.kubernetes.io/component: base-ingestion-configs
     app.kubernetes.io/part-of: base-ingestion-apps
+
 spec:
   project: base-layer
   source:
@@ -65,11 +67,11 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-workflows
+  name: data-ingestion-workflows-base
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: workflows
+    app.kubernetes.io/component: base-ingestion-workflows
     app.kubernetes.io/part-of: base-ingestion-apps
 spec:
   project: base-layer
@@ -96,11 +98,11 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-orchestrators
+  name: data-ingestion-orchestrators-base
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: orchestrators
+    app.kubernetes.io/component: base-ingestion-orchestrators
     app.kubernetes.io/part-of: base-ingestion-apps
 spec:
   project: base-layer
@@ -127,11 +129,11 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: data-ingestion-models
+  name: data-ingestion-models-base
   namespace: argocd
   labels:
     app.kubernetes.io/name: data-ingestion
-    app.kubernetes.io/component: models
+    app.kubernetes.io/component: base-ingestion-models
     app.kubernetes.io/part-of: base-ingestion-apps
 spec:
   project: base-layer

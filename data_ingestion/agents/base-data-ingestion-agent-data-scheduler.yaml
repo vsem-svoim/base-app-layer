@@ -75,7 +75,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: data-scheduler
-        image: base/data-scheduler:v2.5.0-analytics-fixed
+        image: python:3.13.7-slim
         imagePullPolicy: Always
         ports:
         - name: http-metrics
