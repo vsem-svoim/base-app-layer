@@ -16,7 +16,7 @@ spec:
     # Saga Pattern Implementation
     orchestration_pattern: "saga"
     coordination_model: "centralized"
-    state_management: "persistent"
+    state_coordination: "persistent"
     transaction_boundaries: "per_source"
     
     # Workflow Coordination

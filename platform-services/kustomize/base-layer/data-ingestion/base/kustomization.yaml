@@ -11,9 +11,11 @@ resources:
 # ConfigMap generator temporarily disabled due to path security restrictions
 # Will be re-enabled when prompts are properly organized within the platform-services directory
 
-commonLabels:
-  app.kubernetes.io/part-of: base-system
-  base.io/category: data_ingestion
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: base-system
+      base.io/category: data_ingestion
 
 namespace: base-data-ingestion
 namePrefix: base-data-ingestion-

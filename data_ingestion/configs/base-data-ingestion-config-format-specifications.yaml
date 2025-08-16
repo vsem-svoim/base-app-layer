@@ -446,9 +446,9 @@ spec:
     format_detection:
       magic_numbers:
         pdf: "%PDF"
-        xlsx: "PK\x03\x04"
-        zip: "PK\x03\x04"
-        gzip: "\x1f\x8b"
+        xlsx: "PK"
+        zip: "PK"
+        gzip: "gzip"
         
       content_analysis:
         json:
