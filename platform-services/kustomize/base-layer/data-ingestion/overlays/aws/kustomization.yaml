@@ -7,32 +7,18 @@ resources:
   - aws-sagemaker-integration.yaml  # Опционально: ML модели  
   - aws-hyperpod-integration.yaml   # Опционально: distributed training
 
-# AWS-специфичные образы контейнеров
-images:
-  - name: base/data-collector:v2.5.0-fixed
-    newName: python
-    newTag: "latest"
-  - name: base/data-connector:v2.5.0-fixed
-    newName: python
-    newTag: "latest"
-  - name: base/data-converter:v2.5.0-fixed
-    newName: python
-    newTag: "latest"
-  - name: base/data-fetch-retry:v2.5.0-fixed
-    newName: python
-    newTag: "latest"
-  - name: base/data-merger:v2.5.0-analytics-fixed
-    newName: python
-    newTag: "latest"
-  - name: base/data-scheduler:v2.5.0-analytics-fixed
-    newName: python
-    newTag: "latest"
+# AWS-специфичные образы контейнеров (через патчи для существующих deployments)
+# images: не работает для патчинга существующих ресурсов
 
 # AWS-специфичные патчи для базовых развертываний
 patches:
+  # Замена образов на python:latest для всех deployments
   - target:
       kind: Deployment
     patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: python:latest
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
