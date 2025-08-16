@@ -4,7 +4,7 @@ metadata:
   name: kubeflow-pipelines
   namespace: argocd
 spec:
-  project: default
+  project: ml-apps
   source:
     repoURL: https://kubeflow.github.io/pipelines
     chart: kubeflow-pipelines

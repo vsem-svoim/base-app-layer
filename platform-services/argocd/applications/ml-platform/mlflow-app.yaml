@@ -4,7 +4,7 @@ metadata:
   name: mlflow
   namespace: argocd
 spec:
-  project: default
+  project: ml-apps
   source:
     repoURL: https://community-charts.github.io/helm-charts
     chart: mlflow

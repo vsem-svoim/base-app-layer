@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  project: aws-infrastructure
+  project: orchestration-apps
   source:
     chart: crossplane
     repoURL: https://charts.crossplane.io/stable

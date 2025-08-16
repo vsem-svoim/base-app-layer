@@ -1,0 +1,230 @@
+# Integrated Argo Workflows with ArgoCD
+# This deploys Argo Workflows components into the argocd namespace
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflows
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: service-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-workflows-cluster-role
+  labels:
+    app.kubernetes.io/name: argo-workflows
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/exec"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["create", "delete", "get"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+- apiGroups: ["argoproj.io"]
+  resources: ["workflows", "workflowtemplates", "cronworkflows", "clusterworkflowtemplates"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-workflows-binding
+  labels:
+    app.kubernetes.io/name: argo-workflows
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: argo-workflows
+  namespace: argocd
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-controller-configmap
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: workflow-controller
+data:
+  config: |
+    namespace: argocd
+    instanceID: argocd-workflows
+    parallelism: 20
+    workflowDefaults:
+      spec:
+        serviceAccountName: argo-workflows
+        ttlStrategy:
+          secondsAfterCompletion: 86400
+          secondsAfterSuccess: 86400
+          secondsAfterFailure: 86400
+    # Integration with ArgoCD
+    links:
+    - name: "ArgoCD Applications"
+      scope: "workflow"
+      url: "https://argocd-server.argocd.svc.cluster.local/applications"
+    - name: "Workflow in ArgoCD"
+      scope: "workflow" 
+      url: "https://argocd-server.argocd.svc.cluster.local/applications/{{workflow.labels.argocd-app}}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-workflows-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: workflow-controller
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-workflows
+      app.kubernetes.io/component: workflow-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-workflows
+        app.kubernetes.io/component: workflow-controller
+    spec:
+      serviceAccountName: argo-workflows
+      containers:
+      - name: workflow-controller
+        image: quay.io/argoproj/workflow-controller:v3.5.5
+        command: ["workflow-controller"]
+        args:
+        - "--configmap=workflow-controller-configmap"
+        - "--executor-image=quay.io/argoproj/argoexec:v3.5.5"
+        - "--loglevel=info"
+        - "--gloglevel=0"
+        - "--namespace=argocd"
+        env:
+        - name: LEADER_ELECTION_IDENTITY
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: ARGO_NAMESPACE
+          value: "argocd"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 6060
+          initialDelaySeconds: 90
+          periodSeconds: 60
+          timeoutSeconds: 30
+        ports:
+        - containerPort: 9090
+          name: metrics
+        - containerPort: 6060
+          name: healthz
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-workflows-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: server
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-workflows
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-workflows
+        app.kubernetes.io/component: server
+    spec:
+      serviceAccountName: argo-workflows
+      containers:
+      - name: argo-server
+        image: quay.io/argoproj/argocli:v3.5.5
+        command: ["argo"]
+        args:
+        - "server"
+        - "--auth-mode=server"
+        - "--secure=false"
+        - "--namespace=argocd"
+        - "--namespaced"
+        ports:
+        - containerPort: 2746
+          name: web
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 2746
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 2746
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-workflows-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 2746
+    targetPort: 2746
+    name: web
+  selector:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: server
+---
+# Service Monitor for Prometheus integration (if monitoring is enabled)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argo-workflows-metrics
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-workflows
+      app.kubernetes.io/component: workflow-controller
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

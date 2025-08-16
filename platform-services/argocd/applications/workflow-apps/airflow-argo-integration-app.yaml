@@ -1,0 +1,143 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airflow-argo-integration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: airflow-argo-integration
+    app.kubernetes.io/component: dual-orchestration
+    app.kubernetes.io/part-of: base-system
+spec:
+  project: workflow-apps
+  source:
+    repoURL: https://github.com/your-org/finportiq
+    targetRevision: main
+    path: base-app-layer/data_ingestion/argo-workflows
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: base-ingestion
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airflow-dags-deployment
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: airflow-dags
+    app.kubernetes.io/component: business-orchestration
+spec:
+  project: workflow-apps
+  source:
+    repoURL: https://github.com/your-org/finportiq
+    targetRevision: main
+    path: base-app-layer/data_ingestion/airflow-dags
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: airflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# ApplicationSet for automated deployment waves
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: data-ingestion-dual-orchestration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: dual-orchestration-appset
+    app.kubernetes.io/component: automated-deployment
+spec:
+  generators:
+  # Stage-based deployment generator
+  - list:
+      elements:
+      - stage: "foundation"
+        components: "argo-workflows,rbac-configs"
+        namespace: "argo-workflows"
+        priority: "1"
+        
+      - stage: "workflow-templates"
+        components: "workflow-templates,configmaps"
+        namespace: "base-ingestion"
+        priority: "2"
+        dependencies: "foundation"
+        
+      - stage: "airflow-integration"
+        components: "airflow-dags,integration-configs"
+        namespace: "airflow"
+        priority: "3"
+        dependencies: "workflow-templates"
+        
+      - stage: "business-orchestration"
+        components: "business-workflows,monitoring"
+        namespace: "airflow"
+        priority: "4"
+        dependencies: "airflow-integration"
+        
+      - stage: "validation-testing"
+        components: "end-to-end-tests,validation-workflows"
+        namespace: "base-ingestion"
+        priority: "5"
+        dependencies: "business-orchestration"
+        
+  template:
+    metadata:
+      name: '{{stage}}-deployment'
+      labels:
+        stage: '{{stage}}'
+        priority: '{{priority}}'
+    spec:
+      project: workflow-apps
+      source:
+        repoURL: https://github.com/your-org/finportiq
+        targetRevision: main
+        path: 'base-app-layer/data_ingestion/deployment-stages/{{stage}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      # Add sync waves for proper ordering
+      syncPolicy:
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+        automated:
+          prune: true
+          selfHeal: true
+      info:
+      - name: 'Stage'
+        value: '{{stage}}'
+      - name: 'Components'
+        value: '{{components}}'
+      - name: 'Dependencies'
+        value: '{{dependencies}}'

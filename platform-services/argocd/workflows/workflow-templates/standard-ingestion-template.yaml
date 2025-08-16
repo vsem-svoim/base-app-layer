@@ -1,0 +1,387 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: standard-data-ingestion
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: standard-ingestion-template
+    app.kubernetes.io/component: workflow-template
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_ingestion
+    base.io/type: workflow_template
+spec:
+  entrypoint: standard-ingestion-pipeline
+  
+  # Input parameters from Airflow
+  arguments:
+    parameters:
+    - name: source-url
+      description: "Data source URL to ingest"
+    - name: source-type
+      description: "Type of data source (api, database, file, etc.)"
+    - name: priority
+      value: "medium"
+      description: "Processing priority (critical, high, medium, low)"
+    - name: business-context
+      description: "Business context for this ingestion job"
+    - name: sla-deadline
+      description: "SLA deadline for completion"
+      
+  templates:
+  # Main pipeline orchestration
+  - name: standard-ingestion-pipeline
+    dag:
+      tasks:
+      - name: source-validation
+        template: validate-source
+        arguments:
+          parameters:
+          - name: source-url
+            value: "{{workflow.parameters.source-url}}"
+          - name: source-type
+            value: "{{workflow.parameters.source-type}}"
+            
+      - name: connection-establishment
+        template: establish-connection
+        dependencies: [source-validation]
+        arguments:
+          parameters:
+          - name: source-url
+            value: "{{workflow.parameters.source-url}}"
+          - name: validated-config
+            value: "{{tasks.source-validation.outputs.parameters.config}}"
+            
+      - name: data-collection
+        template: collect-data
+        dependencies: [connection-establishment]
+        arguments:
+          parameters:
+          - name: connection-handle
+            value: "{{tasks.connection-establishment.outputs.parameters.connection-id}}"
+          - name: collection-config
+            value: "{{tasks.connection-establishment.outputs.parameters.collection-config}}"
+            
+      - name: format-conversion
+        template: convert-format
+        dependencies: [data-collection]
+        arguments:
+          parameters:
+          - name: raw-data-location
+            value: "{{tasks.data-collection.outputs.parameters.data-location}}"
+          - name: source-format
+            value: "{{tasks.data-collection.outputs.parameters.detected-format}}"
+            
+      - name: quality-validation
+        template: validate-quality
+        dependencies: [format-conversion]
+        arguments:
+          parameters:
+          - name: converted-data-location
+            value: "{{tasks.format-conversion.outputs.parameters.converted-location}}"
+          - name: quality-rules
+            value: "{{tasks.format-conversion.outputs.parameters.quality-rules}}"
+            
+      - name: data-storage
+        template: store-data
+        dependencies: [quality-validation]
+        arguments:
+          parameters:
+          - name: validated-data-location
+            value: "{{tasks.quality-validation.outputs.parameters.validated-location}}"
+          - name: storage-config
+            value: "{{tasks.quality-validation.outputs.parameters.storage-config}}"
+
+  # Individual step templates calling our sophisticated agents
+  - name: validate-source
+    inputs:
+      parameters:
+      - name: source-url
+      - name: source-type
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call the data-scheduler agent for source validation
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "validate_source_availability",
+            "source_url": "{{inputs.parameters.source-url}}",
+            "source_type": "{{inputs.parameters.source-type}}",
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "business_context": "{{workflow.parameters.business-context}}",
+              "priority": "{{workflow.parameters.priority}}"
+            }
+          }' \
+          http://base-data-scheduler-service.base-ingestion.svc.cluster.local:8080/api/v1/validate_source_availability > /tmp/validation_result.json
+          
+        # Extract validation result and configuration
+        cat /tmp/validation_result.json | jq -r '.config' > /tmp/config.json
+        cat /tmp/config.json
+    outputs:
+      parameters:
+      - name: config
+        valueFrom:
+          path: /tmp/config.json
+          
+  - name: establish-connection
+    inputs:
+      parameters:
+      - name: source-url
+      - name: validated-config
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call the data-connector agent
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "establish_secure_connection",
+            "source_url": "{{inputs.parameters.source-url}}",
+            "config": {{inputs.parameters.validated-config}},
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "step": "connection_establishment"
+            }
+          }' \
+          http://base-data-connector-service.base-ingestion.svc.cluster.local:8080/api/v1/establish_secure_connection > /tmp/connection_result.json
+          
+        # Extract connection details
+        cat /tmp/connection_result.json | jq -r '.connection_id' > /tmp/connection_id.txt
+        cat /tmp/connection_result.json | jq -r '.collection_config' > /tmp/collection_config.json
+        
+        echo "Connection established: $(cat /tmp/connection_id.txt)"
+    outputs:
+      parameters:
+      - name: connection-id
+        valueFrom:
+          path: /tmp/connection_id.txt
+      - name: collection-config
+        valueFrom:
+          path: /tmp/collection_config.json
+          
+  - name: collect-data
+    inputs:
+      parameters:
+      - name: connection-handle
+      - name: collection-config
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call the sophisticated data-collector agent
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "collect_data_from_source",
+            "connection_id": "{{inputs.parameters.connection-handle}}",
+            "config": {{inputs.parameters.collection-config}},
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "step": "data_collection",
+              "sla_deadline": "{{workflow.parameters.sla-deadline}}"
+            }
+          }' \
+          http://base-data-collector-service.base-ingestion.svc.cluster.local:8080/api/v1/collect_data_from_source > /tmp/collection_result.json
+          
+        # Extract collection results
+        cat /tmp/collection_result.json | jq -r '.data_location' > /tmp/data_location.txt
+        cat /tmp/collection_result.json | jq -r '.detected_format' > /tmp/detected_format.txt
+        
+        echo "Data collected at: $(cat /tmp/data_location.txt)"
+        echo "Detected format: $(cat /tmp/detected_format.txt)"
+    outputs:
+      parameters:
+      - name: data-location
+        valueFrom:
+          path: /tmp/data_location.txt
+      - name: detected-format
+        valueFrom:
+          path: /tmp/detected_format.txt
+          
+  - name: convert-format
+    inputs:
+      parameters:
+      - name: raw-data-location
+      - name: source-format
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call the ML-enhanced data-converter agent
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "convert_to_standard_format",
+            "source_location": "{{inputs.parameters.raw-data-location}}",
+            "source_format": "{{inputs.parameters.source-format}}",
+            "target_format": "parquet",
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "step": "format_conversion"
+            }
+          }' \
+          http://base-data-converter-service.base-ingestion.svc.cluster.local:8080/api/v1/convert_to_standard_format > /tmp/conversion_result.json
+          
+        # Extract conversion results
+        cat /tmp/conversion_result.json | jq -r '.converted_location' > /tmp/converted_location.txt
+        cat /tmp/conversion_result.json | jq -r '.quality_rules' > /tmp/quality_rules.json
+        
+        echo "Data converted at: $(cat /tmp/converted_location.txt)"
+    outputs:
+      parameters:
+      - name: converted-location
+        valueFrom:
+          path: /tmp/converted_location.txt
+      - name: quality-rules
+        valueFrom:
+          path: /tmp/quality_rules.json
+          
+  - name: validate-quality
+    inputs:
+      parameters:
+      - name: converted-data-location
+      - name: quality-rules
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call external data quality service (integrates with base-data-quality)
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "validate_data_quality",
+            "data_location": "{{inputs.parameters.converted-data-location}}",
+            "quality_rules": {{inputs.parameters.quality-rules}},
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "step": "quality_validation"
+            }
+          }' \
+          http://base-data-quality-service.base-platform.svc.cluster.local:8080/api/v1/validate > /tmp/quality_result.json
+          
+        # Extract quality validation results
+        cat /tmp/quality_result.json | jq -r '.validated_location' > /tmp/validated_location.txt
+        cat /tmp/quality_result.json | jq -r '.storage_config' > /tmp/storage_config.json
+        
+        echo "Quality validated data at: $(cat /tmp/validated_location.txt)"
+    outputs:
+      parameters:
+      - name: validated-location
+        valueFrom:
+          path: /tmp/validated_location.txt
+      - name: storage-config
+        valueFrom:
+          path: /tmp/storage_config.json
+          
+  - name: store-data
+    inputs:
+      parameters:
+      - name: validated-data-location
+      - name: storage-config
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call external data storage service
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "store_validated_data",
+            "data_location": "{{inputs.parameters.validated-data-location}}",
+            "storage_config": {{inputs.parameters.storage-config}},
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "step": "data_storage",
+              "completion_time": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }
+          }' \
+          http://base-data-storage-service.base-platform.svc.cluster.local:8080/api/v1/store > /tmp/storage_result.json
+          
+        # Extract storage results
+        cat /tmp/storage_result.json | jq -r '.final_location' > /tmp/final_location.txt
+        cat /tmp/storage_result.json | jq -r '.catalog_entry' > /tmp/catalog_entry.json
+        
+        echo "Data stored at: $(cat /tmp/final_location.txt)"
+        echo "Catalog entry: $(cat /tmp/catalog_entry.json)"
+    outputs:
+      parameters:
+      - name: final-location
+        valueFrom:
+          path: /tmp/final_location.txt
+      - name: catalog-entry
+        valueFrom:
+          path: /tmp/catalog_entry.json
+          
+  # Error handling and retry templates
+  - name: handle-failure
+    inputs:
+      parameters:
+      - name: failed-step
+      - name: error-details
+      - name: retry-attempt
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call the sophisticated retry agent for failure analysis
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "analyze_failure_and_retry",
+            "failed_step": "{{inputs.parameters.failed-step}}",
+            "error_details": "{{inputs.parameters.error-details}}",
+            "retry_attempt": {{inputs.parameters.retry-attempt}},
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "business_context": "{{workflow.parameters.business-context}}"
+            }
+          }' \
+          http://base-data-fetch-retry-service.base-ingestion.svc.cluster.local:8080/api/v1/analyze_failure_and_retry > /tmp/retry_result.json
+          
+        echo "Retry analysis completed"
+        cat /tmp/retry_result.json
+
+  # Monitoring and metrics collection
+  - name: collect-metrics
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Collect metrics from all agents
+        echo "Workflow {{workflow.uid}} completed successfully" 
+        
+        # Report completion to Airflow (callback)
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "workflow_id": "{{workflow.uid}}",
+            "status": "completed",
+            "completion_time": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+            "business_context": "{{workflow.parameters.business-context}}",
+            "metrics": {
+              "duration": "{{workflow.duration}}",
+              "priority": "{{workflow.parameters.priority}}"
+            }
+          }' \
+          http://airflow-webserver.airflow.svc.cluster.local:8080/api/experimental/dags/data_ingestion_orchestrator/dag_runs || true
+          
+        echo "Metrics collected and reported to Airflow"

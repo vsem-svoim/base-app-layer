@@ -4,7 +4,7 @@ metadata:
   name: seldon-core
   namespace: argocd
 spec:
-  project: default
+  project: ml-apps
   source:
     repoURL: https://storage.googleapis.com/seldon-charts
     chart: seldon-core-operator

@@ -7,14 +7,8 @@ spec:
   description: "AWS Infrastructure management with Crossplane"
   sourceRepos:
   - 'https://github.com/vsem-svoim/base-app-layer.git'
-  - 'https://charts.crossplane.io/stable'
-  - 'https://charts.jetstack.io'
 
   destinations:
-  - namespace: 'crossplane-system'
-    server: https://kubernetes.default.svc
-  - namespace: 'cert-manager'
-    server: https://kubernetes.default.svc
   - namespace: 'aws-*'
     server: https://kubernetes.default.svc
 

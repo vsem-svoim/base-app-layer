@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-workflows
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: workflow-execution
+    app.kubernetes.io/part-of: base-platform
+spec:
+  project: workflow-apps
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 0.41.0
+    chart: argo-workflows
+    helm:
+      values: |
+        controller:
+          enabled: true
+          namespace: argocd
+          workflowNamespaces:
+            - argocd
+        server:
+          enabled: true
+          serviceType: ClusterIP
+          namespace: argocd
+        executor:
+          image:
+            tag: v3.5.5
+        workflow:
+          namespace: argocd
+          serviceAccount:
+            create: true
+            name: argo-workflow
+        singleNamespace: true
+        createAggregateRoles: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions: []
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-workflows-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows-server
+    app.kubernetes.io/component: workflow-ui
+spec:
+  project: workflow-apps
+  source:
+    repoURL: https://github.com/argoproj/argo-workflows
+    targetRevision: v3.5.5
+    path: manifests/quick-start
+    directory:
+      include: "argo-server*.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

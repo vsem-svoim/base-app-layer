@@ -171,12 +171,12 @@ platform_cluster_config = {
       taints = {}  # Remove taints so all airflow services can schedule easily
     }
     base_apps = {
-      instance_types = ["m7g.large", "m7g.xlarge"]  # General purpose for base layer apps
+      instance_types = ["r8g.4xlarge"]  # Memory-optimized instances for AI agents and base layer apps
       capacity_type  = "ON_DEMAND"
       min_size      = 1
       max_size      = 8
       desired_size  = 2
-      disk_size     = 50
+      disk_size     = 100
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_ARM_64"
       labels = {
