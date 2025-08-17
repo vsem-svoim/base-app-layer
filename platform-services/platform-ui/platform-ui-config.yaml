@@ -28,7 +28,7 @@ spec:
         - containerPort: 80
           name: http
         volumeMounts:
-        - name: platform-ui-config
+        - name: platform-ui-content
           mountPath: /usr/share/nginx/html/index.html
           subPath: index.html
         - name: nginx-config
@@ -42,9 +42,9 @@ spec:
             memory: "128Mi"
             cpu: "100m"
       volumes:
-      - name: platform-ui-config
+      - name: platform-ui-content
         configMap:
-          name: platform-ui-redirect
+          name: platform-ui-content
       - name: nginx-config
         configMap:
           name: platform-ui-nginx-config

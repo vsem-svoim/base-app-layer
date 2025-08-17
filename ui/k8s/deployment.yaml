@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui-dashboard
+  namespace: platform-ui
+  labels:
+    app: platform-ui-dashboard
+    app.kubernetes.io/name: platform-ui-dashboard
+    app.kubernetes.io/part-of: base-platform
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-ui-dashboard
+  template:
+    metadata:
+      labels:
+        app: platform-ui-dashboard
+        app.kubernetes.io/name: platform-ui-dashboard
+        app.kubernetes.io/part-of: base-platform
+        app.kubernetes.io/component: frontend
+    spec:
+      containers:
+      - name: finportiq-app
+        image: finportiq/registration-ui:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: NEXTAUTH_URL
+          value: "http://base-platform-dashboard-44440474.us-east-1.elb.amazonaws.com"
+        - name: NEXTAUTH_SECRET
+          value: "base-platform-secret-key-for-auth"
+        - name: DATABASE_URL
+          value: "postgresql://platform:platform@postgresql.platform-ui.svc.cluster.local:5432/platform"
+        - name: STRIPE_SECRET_KEY
+          value: "sk_test_placeholder"
+        - name: STRIPE_PUBLISHABLE_KEY
+          value: "pk_test_placeholder"
+        - name: STRIPE_WEBHOOK_SECRET
+          value: "whsec_placeholder"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001

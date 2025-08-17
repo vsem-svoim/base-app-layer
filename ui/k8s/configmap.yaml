@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-scripts
+  labels:
+    app: registration-ui
+    app.kubernetes.io/name: registration-ui
+    app.kubernetes.io/part-of: finportiq-platform
+    app.kubernetes.io/component: frontend
+data:
+  deploy-finportiq-automated.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Starting FinPortIQ automated deployment..."
+    
+    # Deployment configuration
+    NAMESPACE=${NAMESPACE:-"finportiq-shared"}
+    ENVIRONMENT=${ENVIRONMENT:-"development"}
+    CLUSTER_NAME=${CLUSTER_NAME:-"finportiq-cluster"}
+    
+    echo "Deployment Configuration:"
+    echo "  Namespace: $NAMESPACE"
+    echo "  Environment: $ENVIRONMENT"
+    echo "  Cluster: $CLUSTER_NAME"
+    
+    # Create namespace if not exists
+    kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Deploy ArgoCD if not exists
+    if ! kubectl get namespace old-f-argocd > /dev/null 2>&1; then
+        echo "Deploying ArgoCD..."
+        helm repo add argo https://argoproj.github.io/argo-helm
+        helm repo update
+        helm install old-f-argocd argo/argo-cd \
+          --namespace old-f-argocd \
+          --create-namespace \
+          --wait --timeout=600s
+    fi
+    
+    # Deploy shared services
+    echo "Deploying shared services..."
+    kubectl apply -f /app/scripts/shared-services-automated.yaml
+    
+    # Wait for services to be ready
+    echo "Waiting for services to be ready..."
+    kubectl wait --for=condition=available --timeout=600s deployment --all -n $NAMESPACE
+    
+    echo "FinPortIQ deployment completed successfully!"
+    
+  check-deployment-status.sh: |
+    #!/bin/bash
+    
+    echo "Checking FinPortIQ deployment status..."
+    
+    # Check ArgoCD applications
+    echo "=== ArgoCD Applications ==="
+    kubectl get applications -n old-f-argocd -o wide
+    
+    # Check pod status
+    echo "=== Pod Status ==="
+    kubectl get pods --all-namespaces | grep old-f
+    
+    # Check service status
+    echo "=== Service Status ==="
+    kubectl get services --all-namespaces | grep old-f
+    
+    # Check ingress status
+    echo "=== Ingress Status ==="
+    kubectl get ingress --all-namespaces | grep old-f
+    
+    echo "Status check completed."

@@ -17,6 +17,84 @@ spec:
         wave: "1"
         cluster: base
         description: "Multi-protocol data acquisition with 100GB/hour throughput"
+      - module: data_quality
+        name: data-quality
+        namespace: base-data-quality
+        wave: "1"
+        cluster: base
+        description: "Validation, cleaning, and quality assurance"
+      - module: data_storage
+        name: data-storage
+        namespace: base-data-storage
+        wave: "1"
+        cluster: base
+        description: "Distributed storage with lifecycle management"
+      - module: data_security
+        name: data-security
+        namespace: base-data-security
+        wave: "1"
+        cluster: base
+        description: "Encryption, classification, and access control"
+      - module: feature_engineering
+        name: feature-engineering
+        namespace: base-feature-engineering
+        wave: "2"
+        cluster: base
+        description: "ML feature extraction and transformation"
+      - module: multimodal_processing
+        name: multimodal-processing
+        namespace: base-multimodal-processing
+        wave: "2"
+        cluster: base
+        description: "Text, image, geospatial, time-series processing"
+      - module: data_streaming
+        name: data-streaming
+        namespace: base-data-streaming
+        wave: "2"
+        cluster: base
+        description: "Real-time stream processing with Kafka"
+      - module: quality_monitoring
+        name: quality-monitoring
+        namespace: base-quality-monitoring
+        wave: "2"
+        cluster: base
+        description: "Continuous monitoring and anomaly detection"
+      - module: pipeline_management
+        name: pipeline-management
+        namespace: base-pipeline-management
+        wave: "3"
+        cluster: base
+        description: "Workflow orchestration and dependency management"
+      - module: event_coordination
+        name: event-coordination
+        namespace: base-event-coordination
+        wave: "3"
+        cluster: base
+        description: "Event-driven architecture and saga patterns"
+      - module: metadata_discovery
+        name: metadata-discovery
+        namespace: base-metadata-discovery
+        wave: "3"
+        cluster: base
+        description: "Data cataloging and lineage tracking"
+      - module: schema_contracts
+        name: schema-contracts
+        namespace: base-schema-contracts
+        wave: "3"
+        cluster: base
+        description: "Schema management and data contracts"
+      - module: data_distribution
+        name: data-distribution
+        namespace: base-data-distribution
+        wave: "4"
+        cluster: base
+        description: "API management and data delivery"
+      - module: data_control
+        name: data-control
+        namespace: base-data-control
+        wave: "4"
+        cluster: base
+        description: "Governance and control plane services"
         
   template:
     metadata:

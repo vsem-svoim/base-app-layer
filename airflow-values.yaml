@@ -1,0 +1,68 @@
+executor: KubernetesExecutor
+
+webserver:
+  replicas: 1
+  service:
+    type: ClusterIP
+    ports:
+      - name: airflow-ui
+        port: 8080
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 500m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 500m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+workers:
+  replicas: 0
+
+postgresql:
+  enabled: true
+  auth:
+    database: airflow
+    username: airflow
+    password: airflow
+
+redis:
+  enabled: false
+
+config:
+  core:
+    dags_folder: /opt/airflow/dags
+    load_examples: false
+  webserver:
+    expose_config: true
+    base_url: http://localhost:8080
+  kubernetes:
+    namespace: airflow
+    worker_container_repository: apache/airflow
+    worker_container_tag: 2.7.2
+
+dags:
+  persistence:
+    enabled: true
+    size: 1Gi
+
+extraEnv: |
+  - name: AIRFLOW__KUBERNETES__NAMESPACE
+    value: "airflow"
+  - name: AIRFLOW__KUBERNETES__KUBE_CLIENT_REQUEST_ARGS
+    value: '{"_request_timeout": [60, 60]}'
+
+serviceAccount:
+  create: true
+  name: airflow
+
+defaultAirflowTag: "2.7.2"
