@@ -131,7 +131,8 @@ data:
                         const response = await fetch('/vault/v1/auth/userpass/login/' + username, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ password })
+                            body: JSON.stringify({ password }),
+                            redirect: 'manual'
                         });
                         
                         if (response.ok) {
@@ -148,6 +149,8 @@ data:
                                 policies: data.auth.policies,
                                 role: data.auth.metadata?.role || 'user'
                             });
+                        } else if (response.status === 307 || response.type === 'opaqueredirect') {
+                            setError('Authentication redirected unexpectedly. Please try again.');
                         } else {
                             setError('Invalid credentials. Try: admin, developer, or data-scientist');
                         }
@@ -358,7 +361,8 @@ data:
                     
                     if (token && savedUserInfo) {
                         fetch('/vault/v1/auth/token/lookup-self', {
-                            headers: { 'X-Vault-Token': token }
+                            headers: { 'X-Vault-Token': token },
+                            redirect: 'manual'
                         })
                         .then(response => {
                             if (response.ok) {
