@@ -145,18 +145,78 @@ spec:
           # Login with root token
           vault login "$ROOT_TOKEN"
           
-          # Basic configuration
-          echo "⚙️ Configuring Vault..."
+          # Comprehensive Vault Configuration with Automation Hooks
+          echo "⚙️ Starting Comprehensive Vault Configuration..."
           
-          # Enable secrets engines
-          vault secrets enable -path=secret kv-v2 || true
-          vault secrets enable -path=aws aws || true
-          vault secrets enable -path=database database || true
-          vault secrets enable -path=transit transit || true
+          # Function to enable secret engines with error handling
+          enable_secret_engine() {
+            local path=$1
+            local type=$2
+            echo "🔧 Enabling $type secrets engine at path: $path"
+            if vault secrets enable -path="$path" "$type" 2>/dev/null; then
+              echo "✅ Successfully enabled $type at $path"
+            else
+              echo "ℹ️  $type already enabled at $path or error occurred"
+              vault secrets list | grep -E "^$path/"
+            fi
+          }
           
-          # Enable auth methods
-          vault auth enable kubernetes || true
-          vault auth enable aws || true
+          # Function to enable auth methods with error handling
+          enable_auth_method() {
+            local path=$1
+            local type=$2
+            echo "🔑 Enabling $type auth method at path: $path"
+            if vault auth enable -path="$path" "$type" 2>/dev/null; then
+              echo "✅ Successfully enabled $type auth at $path"
+            else
+              echo "ℹ️  $type auth already enabled at $path or error occurred"
+              vault auth list | grep -E "^$path/"
+            fi
+          }
+          
+          # Enable comprehensive secrets engines
+          echo "🔧 Configuring comprehensive secrets engines..."
+          enable_secret_engine "secret" "kv-v2"
+          enable_secret_engine "aws" "aws"
+          enable_secret_engine "azure" "azure"
+          enable_secret_engine "gcp" "gcp"
+          enable_secret_engine "database" "database"
+          enable_secret_engine "ssh" "ssh"
+          enable_secret_engine "pki" "pki"
+          enable_secret_engine "transit" "transit"
+          enable_secret_engine "totp" "totp"
+          enable_secret_engine "ldap" "openldap"
+          enable_secret_engine "consul" "consul"
+          enable_secret_engine "nomad" "nomad"
+          enable_secret_engine "rabbitmq" "rabbitmq"
+          
+          echo "✅ All secrets engines configuration completed"
+          
+          # Enable comprehensive auth methods
+          echo "🔑 Configuring comprehensive auth methods..."
+          enable_auth_method "kubernetes" "kubernetes"
+          enable_auth_method "aws" "aws"
+          enable_auth_method "azure" "azure"
+          enable_auth_method "gcp" "gcp"
+          enable_auth_method "ldap" "ldap"
+          enable_auth_method "userpass" "userpass"
+          enable_auth_method "oidc" "oidc"
+          enable_auth_method "jwt" "jwt"
+          enable_auth_method "approle" "approle"
+          enable_auth_method "cert" "cert"
+          
+          echo "✅ All auth methods configuration completed"
+          
+          # Display comprehensive configuration status
+          echo ""
+          echo "📊 VAULT CONFIGURATION SUMMARY"
+          echo "=============================="
+          echo "🔐 Enabled Secrets Engines:"
+          vault secrets list -format=table
+          echo ""
+          echo "🔑 Enabled Auth Methods:"
+          vault auth list -format=table
+          echo ""
           
           # Create basic policies
           vault policy write admin - << 'POLICY'
@@ -166,16 +226,97 @@ spec:
           POLICY
           
           vault policy write platform-services - << 'POLICY'
+          # KV v2 secrets access
           path "secret/data/platform/*" {
             capabilities = ["read", "list"]
           }
+          # Cloud providers access
           path "aws/creds/platform-*" {
             capabilities = ["read"]
           }
+          path "azure/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          path "gcp/token/platform-*" {
+            capabilities = ["read"]
+          }
+          # Database access
+          path "database/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          # SSH access
+          path "ssh/sign/platform-*" {
+            capabilities = ["create", "update"]
+          }
+          # PKI access
+          path "pki/issue/platform" {
+            capabilities = ["create", "update"]
+          }
+          # Transit encryption
           path "transit/encrypt/platform" {
             capabilities = ["create", "update"]
           }
           path "transit/decrypt/platform" {
+            capabilities = ["create", "update"]
+          }
+          # TOTP access
+          path "totp/code/platform-*" {
+            capabilities = ["create", "update"]
+          }
+          POLICY
+          
+          vault policy write base-layer - << 'POLICY'
+          # BASE layer modules comprehensive access
+          path "secret/data/base-layer/*" {
+            capabilities = ["read", "list"]
+          }
+          path "aws/creds/base-*" {
+            capabilities = ["read"]
+          }
+          path "azure/creds/base-*" {
+            capabilities = ["read"]
+          }
+          path "gcp/token/base-*" {
+            capabilities = ["read"]
+          }
+          path "database/creds/base-*" {
+            capabilities = ["read"]
+          }
+          path "ssh/sign/base-*" {
+            capabilities = ["create", "update"]
+          }
+          path "pki/issue/base-layer" {
+            capabilities = ["create", "update"]
+          }
+          path "transit/encrypt/base-layer" {
+            capabilities = ["create", "update"]
+          }
+          path "transit/decrypt/base-layer" {
+            capabilities = ["create", "update"]
+          }
+          POLICY
+          
+          vault policy write ml-platform - << 'POLICY'
+          # ML platform comprehensive access
+          path "secret/data/ml-platform/*" {
+            capabilities = ["read", "list"]
+          }
+          path "aws/creds/ml-*" {
+            capabilities = ["read"]
+          }
+          path "azure/creds/ml-*" {
+            capabilities = ["read"]
+          }
+          path "gcp/token/ml-*" {
+            capabilities = ["read"]
+          }
+          path "database/creds/ml-*" {
+            capabilities = ["read"]
+          }
+          path "ssh/sign/ml-*" {
+            capabilities = ["create", "update"]
+          }
+          path "pki/issue/ml-platform" {
             capabilities = ["create", "update"]
           }
           POLICY
@@ -209,8 +350,33 @@ spec:
             timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             cluster="base-app-layer-dev-platform"
           
+          # Create credentials file in vault directory
+          echo "📝 Creating credentials file..."
+          cat > /vault/data/vault-credentials.txt << EOF
+# Vault Credentials and Configuration
+# Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# ==========================================
+
+## Vault Tokens and Keys
+ROOT_TOKEN=$ROOT_TOKEN
+UNSEAL_KEY_1=$UNSEAL_KEY_1
+UNSEAL_KEY_2=$UNSEAL_KEY_2
+UNSEAL_KEY_3=$UNSEAL_KEY_3
+
+## Vault URLs
+VAULT_ADDR=$VAULT_ADDR
+VAULT_UI=https://vault.base-app-layer.dev
+
+## Bootstrap Status
+VAULT_INITIALIZED=true
+VAULT_UNSEALED=true
+BOOTSTRAP_COMPLETED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+EOF
+          
           echo "✅ Vault bootstrap completed successfully!"
           echo "🔑 Root token and unseal keys stored in vault-unseal-keys secret"
+          echo "📝 Credentials file created at: /vault/data/vault-credentials.txt"
           echo "🏗️ Basic auth methods and policies configured"
           
         env:

@@ -1,0 +1,417 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: platform-ui
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BASE Platform Dashboard</title>
+        <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .auth-container { 
+                min-height: 100vh; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+            }
+            .dashboard-container { 
+                min-height: 100vh; 
+                padding: 2rem 0; 
+            }
+            .auth-card, .service-card { 
+                border: none; 
+                border-radius: 15px; 
+                transition: all 0.3s ease;
+                backdrop-filter: blur(10px);
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .auth-card {
+                max-width: 400px;
+                width: 100%;
+            }
+            .service-card:hover { 
+                transform: translateY(-10px); 
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            }
+            .service-icon { 
+                font-size: 3rem; 
+                margin-bottom: 1rem; 
+            }
+            .status-indicator { 
+                width: 12px; 
+                height: 12px; 
+                border-radius: 50%; 
+                display: inline-block; 
+                margin-left: 8px;
+            }
+            .status-healthy { background-color: #28a745; }
+            .status-unhealthy { background-color: #dc3545; }
+            .status-unknown { background-color: #ffc107; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        
+        <script type="text/babel">
+            const { useState, useEffect } = React;
+            
+            const services = [
+                {
+                    name: "ArgoCD",
+                    description: "GitOps Continuous Deployment",
+                    icon: "fas fa-rocket",
+                    url: "/argocd",
+                    namespace: "argocd",
+                    color: "text-info"
+                },
+                {
+                    name: "Vault",
+                    description: "Secrets Management & Authentication",
+                    icon: "fas fa-vault",
+                    url: "/vault",
+                    namespace: "vault",
+                    color: "text-warning"
+                },
+                {
+                    name: "Airflow",
+                    description: "Workflow Orchestration",
+                    icon: "fas fa-wind",
+                    url: "/airflow",
+                    namespace: "airflow", 
+                    color: "text-primary"
+                },
+                {
+                    name: "MLflow",
+                    description: "ML Lifecycle Management",
+                    icon: "fas fa-brain",
+                    url: "/mlflow",
+                    namespace: "mlflow",
+                    color: "text-success"
+                },
+                {
+                    name: "Grafana",
+                    description: "Monitoring & Observability",
+                    icon: "fas fa-chart-line",
+                    url: "/grafana",
+                    namespace: "monitoring",
+                    color: "text-danger"
+                },
+                {
+                    name: "Prometheus",
+                    description: "Metrics Collection",
+                    icon: "fas fa-tachometer-alt",
+                    url: "/prometheus",
+                    namespace: "monitoring",
+                    color: "text-warning"
+                }
+            ];
+            
+            function LoginForm({ onLogin }) {
+                const [username, setUsername] = useState('');
+                const [password, setPassword] = useState('');
+                const [loading, setLoading] = useState(false);
+                const [error, setError] = useState('');
+                
+                const handleLogin = async (e) => {
+                    e.preventDefault();
+                    setLoading(true);
+                    setError('');
+                    
+                    try {
+                        const response = await fetch('/vault/v1/auth/userpass/login/' + username, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password })
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            localStorage.setItem('vault_token', data.auth.client_token);
+                            localStorage.setItem('user_info', JSON.stringify({ 
+                                username, 
+                                policies: data.auth.policies,
+                                role: data.auth.metadata?.role || 'user'
+                            }));
+                            onLogin({ 
+                                username, 
+                                token: data.auth.client_token, 
+                                policies: data.auth.policies,
+                                role: data.auth.metadata?.role || 'user'
+                            });
+                        } else {
+                            setError('Invalid credentials. Try: admin, developer, or data-scientist');
+                        }
+                    } catch (err) {
+                        setError('Authentication failed. Please check your connection.');
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                
+                return (
+                    <div className="auth-container">
+                        <div className="auth-card text-white p-4">
+                            <div className="text-center mb-4">
+                                <i className="fas fa-shield-alt fa-4x text-warning mb-3"></i>
+                                <h2>BASE Platform</h2>
+                                <p className="text-white-50">Secure Authentication Required</p>
+                            </div>
+                            
+                            <form onSubmit={handleLogin}>
+                                <div className="mb-3">
+                                    <label className="form-label">
+                                        <i className="fas fa-user me-2"></i>Username
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        className="form-control" 
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        placeholder="admin, developer, or data-scientist"
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">
+                                        <i className="fas fa-lock me-2"></i>Password
+                                    </label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control" 
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter your Vault password"
+                                        required
+                                    />
+                                </div>
+                                {error && (
+                                    <div className="alert alert-danger" role="alert">
+                                        <i className="fas fa-exclamation-triangle me-2"></i>
+                                        {error}
+                                    </div>
+                                )}
+                                <button 
+                                    type="submit" 
+                                    className="btn btn-warning w-100 mb-3"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin me-2"></i>
+                                            Authenticating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-sign-in-alt me-2"></i>
+                                            Sign In with Vault
+                                        </>
+                                    )}
+                                </button>
+                            </form>
+                            
+                            <div className="text-center">
+                                <small className="text-white-50">
+                                    <i className="fas fa-info-circle me-1"></i>
+                                    Powered by HashiCorp Vault OIDC
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            function ServiceCard({ service, userInfo }) {
+                const [status, setStatus] = useState('unknown');
+                
+                useEffect(() => {
+                    const checkHealth = async () => {
+                        setStatus('healthy'); // Simplified for demo
+                    };
+                    checkHealth();
+                }, []);
+                
+                return (
+                    <div className="col-md-6 col-lg-4 mb-4">
+                        <div className="card service-card h-100 text-white">
+                            <div className="card-body text-center">
+                                <i className={`${service.icon} service-icon ${service.color}`}></i>
+                                <h5 className="card-title">
+                                    {service.name}
+                                    <span className={`status-indicator status-${status}`}></span>
+                                </h5>
+                                <p className="card-text">{service.description}</p>
+                                <p className="small text-muted">Namespace: {service.namespace}</p>
+                                <a 
+                                    href={service.url} 
+                                    className="btn btn-outline-light"
+                                    target="_blank"
+                                >
+                                    <i className="fas fa-external-link-alt me-2"></i>
+                                    Open Service
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            function Dashboard({ userInfo, onLogout }) {
+                return (
+                    <div className="dashboard-container">
+                        <nav className="navbar navbar-expand-lg mb-4" style={{background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)'}}>
+                            <div className="container">
+                                <span className="navbar-brand text-white">
+                                    <i className="fas fa-layer-group me-2"></i>
+                                    BASE Platform
+                                </span>
+                                <div className="navbar-nav ms-auto">
+                                    <span className="navbar-text text-white me-3">
+                                        <i className="fas fa-user me-1"></i>
+                                        Welcome, {userInfo.username}
+                                    </span>
+                                    <button className="btn btn-outline-light btn-sm" onClick={onLogout}>
+                                        <i className="fas fa-sign-out-alt me-1"></i>
+                                        Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </nav>
+                        
+                        <div className="container">
+                            <div className="row mb-5">
+                                <div className="col-12 text-center">
+                                    <h1 className="display-4 text-white mb-3">
+                                        Enterprise Data Platform Services
+                                    </h1>
+                                    <p className="lead text-white-50">
+                                        Authenticated access to your platform services
+                                    </p>
+                                    <div className="badge bg-success me-2">
+                                        <i className="fas fa-shield-check me-1"></i>
+                                        Authenticated
+                                    </div>
+                                    <div className="badge bg-info me-2">
+                                        <i className="fas fa-server me-1"></i>
+                                        Platform Cluster
+                                    </div>
+                                    <div className="badge bg-warning">
+                                        <i className="fas fa-cloud me-1"></i>
+                                        AWS us-east-1
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="row">
+                                {services.map((service, index) => (
+                                    <ServiceCard key={index} service={service} userInfo={userInfo} />
+                                ))}
+                            </div>
+                            
+                            <div className="row mt-5">
+                                <div className="col-12">
+                                    <div className="card service-card text-white">
+                                        <div className="card-body">
+                                            <h5 className="card-title">
+                                                <i className="fas fa-user-circle me-2"></i>
+                                                Session Information
+                                            </h5>
+                                            <div className="row">
+                                                <div className="col-md-3">
+                                                    <strong>User:</strong> {userInfo.username}
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <strong>Role:</strong> {userInfo.role}
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <strong>Policies:</strong> {userInfo.policies?.join(', ')}
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <strong>Environment:</strong> Development
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            function App() {
+                const [userInfo, setUserInfo] = useState(null);
+                const [loading, setLoading] = useState(true);
+                
+                useEffect(() => {
+                    const token = localStorage.getItem('vault_token');
+                    const savedUserInfo = localStorage.getItem('user_info');
+                    
+                    if (token && savedUserInfo) {
+                        fetch('/vault/v1/auth/token/lookup-self', {
+                            headers: { 'X-Vault-Token': token }
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                setUserInfo(JSON.parse(savedUserInfo));
+                            } else {
+                                localStorage.removeItem('vault_token');
+                                localStorage.removeItem('user_info');
+                            }
+                        })
+                        .catch(() => {
+                            localStorage.removeItem('vault_token');
+                            localStorage.removeItem('user_info');
+                        })
+                        .finally(() => setLoading(false));
+                    } else {
+                        setLoading(false);
+                    }
+                }, []);
+                
+                const handleLogin = (userData) => {
+                    setUserInfo(userData);
+                };
+                
+                const handleLogout = () => {
+                    localStorage.removeItem('vault_token');
+                    localStorage.removeItem('user_info');
+                    setUserInfo(null);
+                };
+                
+                if (loading) {
+                    return (
+                        <div className="auth-container">
+                            <div className="text-center text-white">
+                                <i className="fas fa-spinner fa-spin fa-3x mb-3 text-warning"></i>
+                                <h4>Checking authentication...</h4>
+                                <p className="text-white-50">Verifying Vault token</p>
+                            </div>
+                        </div>
+                    );
+                }
+                
+                if (!userInfo) {
+                    return <LoginForm onLogin={handleLogin} />;
+                }
+                
+                return <Dashboard userInfo={userInfo} onLogout={handleLogout} />;
+            }
+            
+            ReactDOM.render(<App />, document.getElementById('root'));
+        </script>
+    </body>
+    </html>

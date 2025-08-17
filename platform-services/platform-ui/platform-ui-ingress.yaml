@@ -1,0 +1,61 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-ui-ingress
+  namespace: platform-ui
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/load-balancer-name: base-platform-dashboard
+    alb.ingress.kubernetes.io/inbound-cidrs: 72.79.77.223/32
+spec:
+  rules:
+  - host: platform.base-app-layer.dev
+    http:
+      paths:
+      - path: /vault
+        pathType: Prefix
+        backend:
+          service:
+            name: vault
+            port:
+              number: 8200
+      - path: /argocd
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui-service
+            port:
+              number: 80
+  - http:
+      paths:
+      - path: /vault
+        pathType: Prefix
+        backend:
+          service:
+            name: vault
+            port:
+              number: 8200
+      - path: /argocd
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui-service
+            port:
+              number: 80

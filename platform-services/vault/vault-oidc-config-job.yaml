@@ -59,9 +59,18 @@ spec:
             group_ids="" \
             entity_ids=""
           
-          # Create OIDC application for platform dashboard
+          # Get Platform UI Load Balancer DNS dynamically
+          echo "🌐 Discovering Platform UI Load Balancer..."
+          PLATFORM_LB_DNS=$(kubectl get ingress platform-ui-ingress -n platform-ui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          if [ -z "$PLATFORM_LB_DNS" ]; then
+            PLATFORM_LB_DNS=$(kubectl get ingress platform-ui-ingress -n platform-ui -o jsonpath='{.spec.rules[0].host}' 2>/dev/null || echo "platform.base-app-layer.dev")
+          fi
+          
+          echo "📍 Platform UI Load Balancer: $PLATFORM_LB_DNS"
+          
+          # Create OIDC application for platform dashboard with dynamic URLs
           vault write identity/oidc/client/platform-dashboard \
-            redirect_uris="https://platform-ui.base-app-layer.dev/auth/callback,https://argocd.base-app-layer.dev/auth/callback" \
+            redirect_uris="http://${PLATFORM_LB_DNS}/auth/callback,https://${PLATFORM_LB_DNS}/auth/callback,https://argocd.base-app-layer.dev/auth/callback" \
             assignments="platform-users" \
             key="platform-dashboard-key" \
             id_token_ttl="30m" \
@@ -107,44 +116,91 @@ spec:
           vault auth enable userpass || true
           
           # Create users with passwords
+          ADMIN_PASS=$(openssl rand -base64 16)
+          DEV_PASS=$(openssl rand -base64 16)
+          DS_PASS=$(openssl rand -base64 16)
+          
           vault write auth/userpass/users/admin \
-            password="$(openssl rand -base64 16)" \
+            password="$ADMIN_PASS" \
             policies="admin"
           
           vault write auth/userpass/users/developer \
-            password="$(openssl rand -base64 16)" \
+            password="$DEV_PASS" \
             policies="platform-services,base-layer"
           
           vault write auth/userpass/users/data-scientist \
-            password="$(openssl rand -base64 16)" \
+            password="$DS_PASS" \
             policies="ml-platform,base-layer"
           
           echo "🔐 Storing User Credentials..."
           
           # Store user credentials securely
-          ADMIN_PASSWORD=$(vault read -field=password auth/userpass/users/admin)
-          DEV_PASSWORD=$(vault read -field=password auth/userpass/users/developer)
-          DS_PASSWORD=$(vault read -field=password auth/userpass/users/data-scientist)
-          
           vault kv put secret/platform/users \
             admin-username="admin" \
-            admin-password="$ADMIN_PASSWORD" \
+            admin-password="$ADMIN_PASS" \
             developer-username="developer" \
-            developer-password="$DEV_PASSWORD" \
+            developer-password="$DEV_PASS" \
             data-scientist-username="data-scientist" \
-            data-scientist-password="$DS_PASSWORD"
+            data-scientist-password="$DS_PASS"
+          
+          echo ""
+          echo "🔑 GENERATED USER PASSWORDS - SAVE THESE!"
+          echo "========================================="
+          echo "👤 Admin User:"
+          echo "   Username: admin"
+          echo "   Password: $ADMIN_PASS"
+          echo ""
+          echo "👨‍💻 Developer User:"
+          echo "   Username: developer"
+          echo "   Password: $DEV_PASS"
+          echo ""
+          echo "👩‍🔬 Data Scientist User:"
+          echo "   Username: data-scientist"
+          echo "   Password: $DS_PASS"
+          echo "========================================="
           
           # Get OIDC application details
           CLIENT_ID=$(vault read -field=client_id identity/oidc/client/platform-dashboard)
           CLIENT_SECRET=$(vault read -field=client_secret identity/oidc/client/platform-dashboard)
           
-          # Store OIDC configuration for platform UI
+          # Append user credentials to the vault credentials file
+          echo "📝 Adding user credentials to vault credentials file..."
+          cat >> /vault/data/vault-credentials.txt << EOF
+
+## User Credentials (Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ))
+# ==========================================
+
+## Admin User
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=$ADMIN_PASS
+
+## Developer User
+DEVELOPER_USERNAME=developer
+DEVELOPER_PASSWORD=$DEV_PASS
+
+## Data Scientist User
+DATA_SCIENTIST_USERNAME=data-scientist
+DATA_SCIENTIST_PASSWORD=$DS_PASS
+
+## Platform URLs
+PLATFORM_UI_URL=http://${PLATFORM_LB_DNS}
+VAULT_UI_URL=https://vault.base-app-layer.dev
+ARGOCD_UI_URL=https://argocd.base-app-layer.dev
+
+## OIDC Configuration
+OIDC_CLIENT_ID=$CLIENT_ID
+OIDC_ISSUER=https://vault.base-app-layer.dev
+
+EOF
+          
+          # Store OIDC configuration for platform UI with dynamic URLs
           vault kv put secret/platform/oidc \
             issuer="https://vault.base-app-layer.dev" \
             client-id="$CLIENT_ID" \
             client-secret="$CLIENT_SECRET" \
             discovery-url="https://vault.base-app-layer.dev/v1/identity/oidc/.well-known/openid_configuration" \
-            redirect-uri="https://platform-ui.base-app-layer.dev/auth/callback"
+            redirect-uri="http://${PLATFORM_LB_DNS}/auth/callback" \
+            platform-url="http://${PLATFORM_LB_DNS}"
           
           echo "✅ OIDC Configuration Completed!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -159,10 +215,14 @@ spec:
           echo ""
           echo "🌐 Platform Login URLs:"
           echo "• Vault UI: https://vault.base-app-layer.dev"
-          echo "• Platform Dashboard: https://platform-ui.base-app-layer.dev"
+          echo "• Platform Dashboard: http://${PLATFORM_LB_DNS}"
           echo "• ArgoCD: https://argocd.base-app-layer.dev"
           echo ""
           echo "👤 Test Login Credentials stored in: secret/platform/users"
+          echo "📝 Complete credentials file: /vault/data/vault-credentials.txt"
+          echo ""
+          echo "📋 To access credentials file from outside cluster:"
+          echo "   kubectl exec -n vault vault-0 -- cat /vault/data/vault-credentials.txt"
           
         env:
         - name: VAULT_SKIP_VERIFY
