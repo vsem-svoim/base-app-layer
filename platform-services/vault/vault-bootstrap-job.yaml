@@ -70,6 +70,11 @@ spec:
           # Install prerequisites
           apk add --no-cache curl jq aws-cli
           
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+          
           # Wait for Vault pod to be ready
           echo "⏳ Waiting for Vault pod to be ready..."
           until kubectl get pod vault-0 -n vault >/dev/null 2>&1; do

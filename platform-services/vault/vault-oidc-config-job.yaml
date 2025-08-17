@@ -1,0 +1,176 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-oidc-config
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: vault-oidc-config
+    spec:
+      serviceAccountName: vault-bootstrap
+      restartPolicy: Never
+      containers:
+      - name: vault-oidc-config
+        image: hashicorp/vault:1.20.1
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "🔧 Configuring Vault OIDC for Platform Dashboard..."
+          
+          # Install prerequisites
+          apk add --no-cache curl jq openssl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && mv kubectl /usr/local/bin/
+          
+          # Connect to Vault
+          VAULT_POD_IP=$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.podIP}')
+          export VAULT_ADDR="http://$VAULT_POD_IP:8200"
+          
+          # Login with root token
+          ROOT_TOKEN=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.root-token}' | base64 -d)
+          vault login "$ROOT_TOKEN"
+          
+          echo "🆔 Setting up OIDC Application for Platform Dashboard..."
+          
+          # Enable OIDC auth method
+          vault auth enable -path=oidc oidc || true
+          
+          # Configure OIDC as identity provider (self-hosted)
+          vault write identity/oidc/config \
+            issuer="https://vault.base-app-layer.dev"
+          
+          # Create OIDC key first
+          vault write identity/oidc/key/platform-dashboard-key \
+            algorithm="RS256"
+          
+          # Create assignment for platform users
+          vault write identity/oidc/assignment/platform-users \
+            group_ids="" \
+            entity_ids=""
+          
+          # Create OIDC application for platform dashboard
+          vault write identity/oidc/client/platform-dashboard \
+            redirect_uris="https://platform-ui.base-app-layer.dev/auth/callback,https://argocd.base-app-layer.dev/auth/callback" \
+            assignments="platform-users" \
+            key="platform-dashboard-key" \
+            id_token_ttl="30m" \
+            access_token_ttl="1h"
+          
+          # Create OIDC key for signing tokens
+          vault write identity/oidc/key/platform-dashboard-key \
+            algorithm="RS256" \
+            allowed_client_ids="platform-dashboard"
+          
+          # Create user entities and groups
+          echo "👥 Creating Users and Groups..."
+          
+          # Create admin user
+          vault write identity/entity name="admin" \
+            policies="admin" \
+            metadata="role=admin"
+          
+          # Create developer user  
+          vault write identity/entity name="developer" \
+            policies="platform-services,base-layer" \
+            metadata="role=developer"
+          
+          # Create data scientist user
+          vault write identity/entity name="data-scientist" \
+            policies="ml-platform,base-layer" \
+            metadata="role=data-scientist"
+          
+          # Create groups
+          vault write identity/group name="platform-admins" \
+            policies="admin" \
+            metadata="description=Platform administrators"
+          
+          vault write identity/group name="platform-developers" \
+            policies="platform-services,base-layer" \
+            metadata="description=Platform developers"
+          
+          vault write identity/group name="data-scientists" \
+            policies="ml-platform,base-layer" \
+            metadata="description=Data scientists and ML engineers"
+          
+          # Create userpass auth for simple login
+          vault auth enable userpass || true
+          
+          # Create users with passwords
+          vault write auth/userpass/users/admin \
+            password="$(openssl rand -base64 16)" \
+            policies="admin"
+          
+          vault write auth/userpass/users/developer \
+            password="$(openssl rand -base64 16)" \
+            policies="platform-services,base-layer"
+          
+          vault write auth/userpass/users/data-scientist \
+            password="$(openssl rand -base64 16)" \
+            policies="ml-platform,base-layer"
+          
+          echo "🔐 Storing User Credentials..."
+          
+          # Store user credentials securely
+          ADMIN_PASSWORD=$(vault read -field=password auth/userpass/users/admin)
+          DEV_PASSWORD=$(vault read -field=password auth/userpass/users/developer)
+          DS_PASSWORD=$(vault read -field=password auth/userpass/users/data-scientist)
+          
+          vault kv put secret/platform/users \
+            admin-username="admin" \
+            admin-password="$ADMIN_PASSWORD" \
+            developer-username="developer" \
+            developer-password="$DEV_PASSWORD" \
+            data-scientist-username="data-scientist" \
+            data-scientist-password="$DS_PASSWORD"
+          
+          # Get OIDC application details
+          CLIENT_ID=$(vault read -field=client_id identity/oidc/client/platform-dashboard)
+          CLIENT_SECRET=$(vault read -field=client_secret identity/oidc/client/platform-dashboard)
+          
+          # Store OIDC configuration for platform UI
+          vault kv put secret/platform/oidc \
+            issuer="https://vault.base-app-layer.dev" \
+            client-id="$CLIENT_ID" \
+            client-secret="$CLIENT_SECRET" \
+            discovery-url="https://vault.base-app-layer.dev/v1/identity/oidc/.well-known/openid_configuration" \
+            redirect-uri="https://platform-ui.base-app-layer.dev/auth/callback"
+          
+          echo "✅ OIDC Configuration Completed!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔐 VAULT OIDC AUTHENTICATION READY"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🌐 OIDC Issuer: https://vault.base-app-layer.dev"
+          echo "🎯 Client ID: $CLIENT_ID"
+          echo "👤 Users: admin, developer, data-scientist"
+          echo "🔑 Auth Methods: userpass, oidc, kubernetes"
+          echo "🏗️ Redirect URIs: platform-ui, argocd"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "🌐 Platform Login URLs:"
+          echo "• Vault UI: https://vault.base-app-layer.dev"
+          echo "• Platform Dashboard: https://platform-ui.base-app-layer.dev"
+          echo "• ArgoCD: https://argocd.base-app-layer.dev"
+          echo ""
+          echo "👤 Test Login Credentials stored in: secret/platform/users"
+          
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
