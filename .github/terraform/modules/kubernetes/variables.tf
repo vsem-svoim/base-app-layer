@@ -258,14 +258,9 @@ variable "cluster_addons" {
       configuration_values = ""
     }
     vpc-cni = {
-      most_recent    = true
-      addon_version = ""
-      configuration_values = jsonencode({
-        env = {
-          ENABLE_PREFIX_DELEGATION = "true"
-          WARM_PREFIX_TARGET       = "1"
-        }
-      })
+      most_recent           = true
+      addon_version        = ""
+      configuration_values = ""
     }
     aws-ebs-csi-driver = {
       most_recent           = true

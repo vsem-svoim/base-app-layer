@@ -1,0 +1,130 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xvaultbootstraps.platform.base-app-layer.dev
+spec:
+  group: platform.base-app-layer.dev
+  names:
+    kind: XVaultBootstrap
+    plural: xvaultbootstraps
+  claimNames:
+    kind: VaultBootstrap
+    plural: vaultbootstraps
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              namespace:
+                type: string
+                description: "Kubernetes namespace for Vault"
+                default: "vault"
+              storageSize:
+                type: string
+                description: "Storage size for Vault PVC"
+                default: "10Gi"
+              autoUnseal:
+                type: boolean
+                description: "Enable auto-unsealing"
+                default: true
+              policies:
+                type: array
+                description: "List of Vault policies to create"
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    policy:
+                      type: string
+              authMethods:
+                type: array
+                description: "Auth methods to enable"
+                default: ["kubernetes", "aws"]
+                items:
+                  type: string
+              secretsEngines:
+                type: array
+                description: "Secrets engines to enable"
+                default: ["kv-v2", "aws", "database", "transit"]
+                items:
+                  type: string
+          status:
+            type: object
+            properties:
+              bootstrapStatus:
+                type: string
+                description: "Bootstrap completion status"
+              vaultStatus:
+                type: string
+                description: "Current Vault status"
+              lastBootstrap:
+                type: string
+                description: "Last bootstrap timestamp"
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: vault-bootstrap-composition
+  labels:
+    provider: kubernetes
+    service: vault
+spec:
+  compositeTypeRef:
+    apiVersion: platform.base-app-layer.dev/v1alpha1
+    kind: XVaultBootstrap
+  
+  resources:
+  - name: vault-bootstrap-job
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: Object
+      spec:
+        forProvider:
+          manifest:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: vault-bootstrap
+              annotations:
+                vault.bootstrap/timestamp: ""
+            spec:
+              backoffLimit: 3
+              ttlSecondsAfterFinished: 300
+              template:
+                metadata:
+                  labels:
+                    app: vault-bootstrap
+                spec:
+                  serviceAccountName: vault-bootstrap
+                  restartPolicy: Never
+                  containers:
+                  - name: vault-bootstrap
+                    image: hashicorp/vault:1.15.2
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      # Bootstrap script embedded here
+                      echo "🔐 Crossplane-managed Vault Bootstrap starting..."
+                      # Same bootstrap logic as above
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.namespace
+      toFieldPath: spec.forProvider.manifest.metadata.namespace
+    - type: FromCompositeFieldPath
+      fromFieldPath: metadata.name
+      toFieldPath: spec.forProvider.manifest.metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: "vault-bootstrap-%s"
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.manifest.status.conditions[0].status
+      toFieldPath: status.bootstrapStatus

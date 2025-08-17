@@ -39,15 +39,37 @@ This is the **BASE App Layer** - a comprehensive enterprise data platform with 1
 
 ## Development Commands
 
-### Platform Deployment
+### Automated Platform Deployment (NEW - Recommended)
 ```bash
-# Deploy entire platform (AWS)
+# Full automated deployment (infrastructure + platform + applications)
+cd platform-services/scripts
+./full-deployment.sh
+
+# Deploy specific components only
+./full-deployment.sh infrastructure  # Deploy only Terraform infrastructure
+./full-deployment.sh gitops         # Deploy only ArgoCD, Workflows, Rollouts
+./full-deployment.sh apps           # Deploy only orchestration applications
+./full-deployment.sh base-layer     # Deploy only BASE layer modules
+./full-deployment.sh crossplane     # Enable Crossplane infrastructure platform
+
+# Monitoring and validation
+./full-deployment.sh validate       # Validate deployment and show status
+./full-deployment.sh status         # Show current deployment status
+./full-deployment.sh destroy        # Destroy entire deployment
+
+# Environment variables (optional)
+REGION=us-west-2 ENVIRONMENT=staging ./full-deployment.sh
+```
+
+### Legacy Platform Deployment
+```bash
+# Deploy entire platform (AWS) - Legacy method
 ./stage2-aws-provider.sh --region us-east-1
 
-# Deploy via Makefile
+# Deploy via Makefile - Legacy method
 make deploy ENV=dev PROVIDER=aws REGION=us-east-1
 
-# Deploy specific environment
+# Deploy specific environment - Legacy method
 cd platform-services
 ./scripts/deployment/deploy.sh dev aws us-east-1
 ```

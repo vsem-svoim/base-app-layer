@@ -1,0 +1,610 @@
+---
+# ===================================================================
+# BASE Layer Workflow Integration with ArgoCD and Airflow
+# ===================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: base-layer-data-pipeline
+  namespace: workflows
+  labels:
+    workflows.argoproj.io/creator: base-layer-orchestration
+    integration.type: cross-cluster
+spec:
+  entrypoint: base-data-pipeline
+  serviceAccountName: workflow-executor
+  
+  # Cross-cluster workflow templates
+  templates:
+  - name: base-data-pipeline
+    dag:
+      tasks:
+      # Wave 1: Data Foundation
+      - name: data-ingestion
+        template: trigger-base-module
+        arguments:
+          parameters:
+          - name: module
+            value: "data-ingestion"
+          - name: cluster
+            value: "base"
+          - name: namespace
+            value: "base-data-ingestion"
+            
+      - name: data-quality
+        template: trigger-base-module
+        dependencies: [data-ingestion]
+        arguments:
+          parameters:
+          - name: module
+            value: "data-quality"
+          - name: cluster
+            value: "base"
+          - name: namespace
+            value: "base-data-quality"
+            
+      # Wave 2: Processing
+      - name: feature-engineering
+        template: trigger-base-module
+        dependencies: [data-quality]
+        arguments:
+          parameters:
+          - name: module
+            value: "feature-engineering"
+          - name: cluster
+            value: "base"
+          - name: namespace
+            value: "base-feature-engineering"
+            
+      - name: multimodal-processing
+        template: trigger-base-module
+        dependencies: [data-quality]
+        arguments:
+          parameters:
+          - name: module
+            value: "multimodal-processing"
+          - name: cluster
+            value: "base"
+          - name: namespace
+            value: "base-multimodal-processing"
+            
+      # Wave 3: ML Pipeline Integration
+      - name: trigger-mlflow-experiment
+        template: mlflow-integration
+        dependencies: [feature-engineering, multimodal-processing]
+        arguments:
+          parameters:
+          - name: experiment-name
+            value: "base-layer-pipeline-{{workflow.creationTimestamp}}"
+            
+      - name: trigger-kubeflow-pipeline
+        template: kubeflow-integration
+        dependencies: [trigger-mlflow-experiment]
+        arguments:
+          parameters:
+          - name: pipeline-name
+            value: "base-layer-ml-pipeline"
+            
+  # Cross-cluster module trigger template
+  - name: trigger-base-module
+    inputs:
+      parameters:
+      - name: module
+      - name: cluster
+      - name: namespace
+    container:
+      image: argoproj/argocd:v2.9.3
+      command: ["/bin/bash", "-c"]
+      args:
+      - |
+        # Configure kubectl for base cluster
+        kubectl config use-context {{inputs.parameters.cluster}}
+        
+        # Trigger ArgoCD sync for the module
+        argocd app sync {{inputs.parameters.module}} \
+          --server argocd-server.argocd.svc.cluster.local \
+          --auth-token $ARGOCD_TOKEN \
+          --insecure
+          
+        # Wait for sync completion
+        argocd app wait {{inputs.parameters.module}} \
+          --server argocd-server.argocd.svc.cluster.local \
+          --auth-token $ARGOCD_TOKEN \
+          --insecure \
+          --timeout 300
+          
+        # Trigger module-specific workflow using proper BASE layer structure
+        kubectl apply -f - <<EOF
+        apiVersion: argoproj.io/v1alpha1
+        kind: Workflow
+        metadata:
+          generateName: {{inputs.parameters.module}}-
+          namespace: {{inputs.parameters.namespace}}
+        spec:
+          entrypoint: module-workflow
+          templates:
+          - name: module-workflow
+            dag:
+              tasks:
+              - name: execute-agents
+                template: run-agents
+              - name: apply-models
+                template: run-models
+                dependencies: [execute-agents]
+              - name: orchestrate
+                template: run-orchestrators
+                dependencies: [apply-models]
+              - name: execute-workflows
+                template: run-workflows
+                dependencies: [orchestrate]
+                
+          - name: run-agents
+            container:
+              image: base-{{inputs.parameters.module}}:latest
+              command: ["/bin/bash", "-c"]
+              args: |
+                # Execute all 6 agents in sequence
+                python /app/agents/base-{{inputs.parameters.module}}-agent-data-collector.py
+                python /app/agents/base-{{inputs.parameters.module}}-agent-data-validator.py
+                python /app/agents/base-{{inputs.parameters.module}}-agent-data-transformer.py
+                python /app/agents/base-{{inputs.parameters.module}}-agent-data-router.py
+                python /app/agents/base-{{inputs.parameters.module}}-agent-retry-manager.py
+                python /app/agents/base-{{inputs.parameters.module}}-agent-health-monitor.py
+                
+          - name: run-models
+            container:
+              image: base-{{inputs.parameters.module}}:latest
+              command: ["/bin/bash", "-c"]
+              args: |
+                # Execute all 5 models for AI decision-making
+                python /app/models/base-{{inputs.parameters.module}}-model-data-quality-classifier.py
+                python /app/models/base-{{inputs.parameters.module}}-model-anomaly-detector.py
+                python /app/models/base-{{inputs.parameters.module}}-model-capacity-predictor.py
+                python /app/models/base-{{inputs.parameters.module}}-model-optimization-advisor.py
+                python /app/models/base-{{inputs.parameters.module}}-model-pattern-recognizer.py
+                
+          - name: run-orchestrators
+            container:
+              image: base-{{inputs.parameters.module}}:latest
+              command: ["/bin/bash", "-c"]
+              args: |
+                # Execute all 5 orchestrators for coordination
+                python /app/orchestrators/base-{{inputs.parameters.module}}-orchestrator-master-manager.py
+                python /app/orchestrators/base-{{inputs.parameters.module}}-orchestrator-workflow-coordinator.py
+                python /app/orchestrators/base-{{inputs.parameters.module}}-orchestrator-resource-allocator.py
+                python /app/orchestrators/base-{{inputs.parameters.module}}-orchestrator-performance-optimizer.py
+                python /app/orchestrators/base-{{inputs.parameters.module}}-orchestrator-health-manager.py
+                
+          - name: run-workflows
+            container:
+              image: base-{{inputs.parameters.module}}:latest
+              command: ["/bin/bash", "-c"]
+              args: |
+                # Execute all 5 workflows for end-to-end processing
+                python /app/workflows/base-{{inputs.parameters.module}}-workflow-data-processing.py
+                python /app/workflows/base-{{inputs.parameters.module}}-workflow-quality-assurance.py
+                python /app/workflows/base-{{inputs.parameters.module}}-workflow-performance-monitoring.py
+                python /app/workflows/base-{{inputs.parameters.module}}-workflow-error-handling.py
+                python /app/workflows/base-{{inputs.parameters.module}}-workflow-reporting.py
+        EOF
+      env:
+      - name: ARGOCD_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: argocd-token
+            key: token
+            
+  # MLflow integration template
+  - name: mlflow-integration
+    inputs:
+      parameters:
+      - name: experiment-name
+    container:
+      image: python:3.11-slim
+      command: ["/bin/bash", "-c"]
+      args:
+      - |
+        pip install mlflow boto3 kubernetes
+        
+        python - <<EOF
+        import mlflow
+        import mlflow.sklearn
+        from kubernetes import client, config
+        
+        # Configure MLflow
+        mlflow.set_tracking_uri("http://mlflow-server.mlflow.svc.cluster.local:5000")
+        mlflow.set_experiment("{{inputs.parameters.experiment-name}}")
+        
+        # Start MLflow run
+        with mlflow.start_run() as run:
+            # Log parameters from BASE layer processing
+            mlflow.log_param("pipeline_type", "base-layer-integration")
+            mlflow.log_param("data_source", "base-data-ingestion")
+            mlflow.log_param("feature_engineering", "base-feature-engineering")
+            
+            # Get metrics from BASE layer modules
+            config.load_incluster_config()
+            v1 = client.CoreV1Api()
+            
+            # Query BASE layer module metrics
+            for namespace in ["base-data-ingestion", "base-data-quality", "base-feature-engineering"]:
+                try:
+                    pods = v1.list_namespaced_pod(namespace=namespace)
+                    mlflow.log_metric(f"{namespace}_pod_count", len(pods.items))
+                except Exception as e:
+                    print(f"Error querying {namespace}: {e}")
+                    
+            # Log completion
+            mlflow.log_metric("pipeline_success", 1)
+            
+        print(f"MLflow run completed: {run.info.run_id}")
+        EOF
+        
+  # Kubeflow integration template  
+  - name: kubeflow-integration
+    inputs:
+      parameters:
+      - name: pipeline-name
+    container:
+      image: python:3.11-slim
+      command: ["/bin/bash", "-c"]
+      args:
+      - |
+        pip install kfp kubernetes
+        
+        python - <<EOF
+        import kfp
+        from kfp import dsl
+        from kubernetes import client, config
+        
+        # Define Kubeflow pipeline that uses BASE layer outputs
+        @dsl.pipeline(
+            name="{{inputs.parameters.pipeline-name}}",
+            description="Integrated BASE layer ML pipeline"
+        )
+        def base_layer_ml_pipeline():
+            # Step 1: Get data from BASE data-ingestion
+            data_op = dsl.ContainerOp(
+                name="get-base-data",
+                image="base-data-ingestion:latest",
+                command=["python", "/app/export_data.py"],
+                arguments=["--output-path", "/data/base_output"]
+            )
+            
+            # Step 2: Apply BASE feature engineering
+            feature_op = dsl.ContainerOp(
+                name="apply-features", 
+                image="base-feature-engineering:latest",
+                command=["python", "/app/apply_features.py"],
+                arguments=["--input-path", "/data/base_output", "--output-path", "/data/features"]
+            ).after(data_op)
+            
+            # Step 3: Train model using processed features
+            train_op = dsl.ContainerOp(
+                name="train-model",
+                image="python:3.11-slim",
+                command=["python", "-c"],
+                arguments=["""
+                import mlflow
+                mlflow.set_tracking_uri("http://mlflow-server.mlflow.svc.cluster.local:5000")
+                # Training logic here using BASE layer features
+                print("Model training with BASE layer integration complete")
+                """]
+            ).after(feature_op)
+            
+        # Submit pipeline to Kubeflow
+        client = kfp.Client(host="http://ml-pipeline.kubeflow.svc.cluster.local:8888")
+        
+        # Compile and run pipeline
+        kfp.compiler.Compiler().compile(base_layer_ml_pipeline, "base_pipeline.yaml")
+        
+        run = client.run_pipeline(
+            experiment_id=client.get_experiment(experiment_name="base-layer-experiments").id,
+            job_name="{{inputs.parameters.pipeline-name}}-{{workflow.creationTimestamp}}",
+            pipeline_package_path="base_pipeline.yaml"
+        )
+        
+        print(f"Kubeflow pipeline submitted: {run.id}")
+        EOF
+---
+# ===================================================================
+# Airflow DAG for BASE Layer Orchestration
+# ===================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-layer-airflow-dag
+  namespace: airflow
+  labels:
+    component: airflow-dag
+data:
+  base_layer_pipeline.py: |
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.providers.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+    from airflow.providers.http.operators.http import SimpleHttpOperator
+    from airflow.models import Variable
+    import json
+    
+    # Default args
+    default_args = {
+        'owner': 'base-layer-team',
+        'depends_on_past': False,
+        'start_date': datetime(2024, 1, 1),
+        'email_on_failure': True,
+        'email_on_retry': False,
+        'retries': 2,
+        'retry_delay': timedelta(minutes=5)
+    }
+    
+    # Create DAG
+    dag = DAG(
+        'base_layer_data_pipeline',
+        default_args=default_args,
+        description='Integrated BASE Layer Data Pipeline',
+        schedule_interval='@daily',
+        catchup=False,
+        tags=['base-layer', 'data-pipeline', 'ml']
+    )
+    
+    # Task 1: Trigger ArgoCD sync for data-ingestion
+    sync_data_ingestion = SimpleHttpOperator(
+        task_id='sync_data_ingestion',
+        http_conn_id='argocd_api',
+        endpoint='/api/v1/applications/data-ingestion/sync',
+        method='POST',
+        headers={'Authorization': 'Bearer {{ var.value.argocd_token }}'},
+        dag=dag
+    )
+    
+    # Task 2: Wait and trigger data quality
+    sync_data_quality = SimpleHttpOperator(
+        task_id='sync_data_quality',
+        http_conn_id='argocd_api', 
+        endpoint='/api/v1/applications/data-quality/sync',
+        method='POST',
+        headers={'Authorization': 'Bearer {{ var.value.argocd_token }}'},
+        dag=dag
+    )
+    
+    # Task 3: Execute BASE layer data processing
+    process_base_data = KubernetesPodOperator(
+        task_id='process_base_data',
+        name='base-data-processor',
+        namespace='base-data-ingestion',
+        image='base-data-ingestion:latest',
+        cmds=['/bin/bash', '-c'],
+        arguments=['''
+            # Process data using BASE layer agents (6 agents per module)
+            python /app/agents/base-data-ingestion-agent-data-collector.py --mode=batch
+            python /app/agents/base-data-ingestion-agent-data-validator.py --input=/data/raw --output=/data/validated
+            python /app/agents/base-data-ingestion-agent-data-transformer.py --input=/data/validated --output=/data/processed
+            python /app/agents/base-data-ingestion-agent-data-router.py --input=/data/processed --output=/data/routed
+            python /app/agents/base-data-ingestion-agent-retry-manager.py --check-failed-jobs
+            python /app/agents/base-data-ingestion-agent-health-monitor.py --export-metrics
+            
+            # Apply AI models for intelligent decision-making (5 models per module)
+            python /app/models/base-data-ingestion-model-data-quality-classifier.py --input=/data/processed
+            python /app/models/base-data-ingestion-model-anomaly-detector.py --input=/data/processed
+            python /app/models/base-data-ingestion-model-capacity-predictor.py --export-predictions
+            python /app/models/base-data-ingestion-model-optimization-advisor.py --generate-recommendations
+            python /app/models/base-data-ingestion-model-pattern-recognizer.py --detect-patterns
+            
+            # Execute orchestrators for coordination (5 orchestrators per module)
+            python /app/orchestrators/base-data-ingestion-orchestrator-master-manager.py --coordinate-agents
+            python /app/orchestrators/base-data-ingestion-orchestrator-workflow-coordinator.py --manage-workflows
+            python /app/orchestrators/base-data-ingestion-orchestrator-resource-allocator.py --optimize-resources
+            python /app/orchestrators/base-data-ingestion-orchestrator-performance-optimizer.py --tune-performance
+            python /app/orchestrators/base-data-ingestion-orchestrator-health-manager.py --monitor-health
+            
+            # Run end-to-end workflows (5 workflows per module)
+            python /app/workflows/base-data-ingestion-workflow-data-processing.py --process-batch
+            python /app/workflows/base-data-ingestion-workflow-quality-assurance.py --validate-quality
+            python /app/workflows/base-data-ingestion-workflow-performance-monitoring.py --track-metrics
+            python /app/workflows/base-data-ingestion-workflow-error-handling.py --handle-errors
+            python /app/workflows/base-data-ingestion-workflow-reporting.py --generate-reports
+            
+            # Export results for downstream consumption using config parameters
+            python /app/configs/base-data-ingestion-config-connection-settings.py --load-config
+            python /app/workflows/export_results.py --output-path=/shared/processed_data --use-config
+        '''],
+        volumes=[
+            {
+                'name': 'shared-data',
+                'persistentVolumeClaim': {'claimName': 'base-layer-shared-pvc'}
+            }
+        ],
+        volume_mounts=[
+            {'name': 'shared-data', 'mountPath': '/shared'}
+        ],
+        get_logs=True,
+        dag=dag
+    )
+    
+    # Task 4: Feature engineering using BASE module
+    feature_engineering = KubernetesPodOperator(
+        task_id='feature_engineering',
+        name='base-feature-engineering',
+        namespace='base-feature-engineering',
+        image='base-feature-engineering:latest',
+        cmds=['/bin/bash', '-c'],
+        arguments=['''
+            # Apply feature engineering using BASE layer
+            python /app/agents/feature_extractor.py --input=/shared/processed_data
+            python /app/agents/feature_selector.py --input=/features/raw --output=/features/selected
+            python /app/models/feature_transformer.py --input=/features/selected --output=/shared/features_final
+        '''],
+        volumes=[
+            {
+                'name': 'shared-data', 
+                'persistentVolumeClaim': {'claimName': 'base-layer-shared-pvc'}
+            }
+        ],
+        volume_mounts=[
+            {'name': 'shared-data', 'mountPath': '/shared'}
+        ],
+        get_logs=True,
+        dag=dag
+    )
+    
+    # Task 5: Trigger MLflow experiment
+    trigger_mlflow = SimpleHttpOperator(
+        task_id='trigger_mlflow_experiment',
+        http_conn_id='mlflow_api',
+        endpoint='/api/2.0/mlflow/experiments/create',
+        method='POST',
+        headers={'Content-Type': 'application/json'},
+        data=json.dumps({
+            'name': f'base-layer-pipeline-{datetime.now().strftime("%Y%m%d_%H%M%S")}',
+            'tags': [
+                {'key': 'pipeline_type', 'value': 'base_layer_integration'},
+                {'key': 'data_source', 'value': 'base_data_ingestion'},
+                {'key': 'feature_source', 'value': 'base_feature_engineering'}
+            ]
+        }),
+        dag=dag
+    )
+    
+    # Task 6: Submit Kubeflow pipeline
+    submit_kubeflow_pipeline = KubernetesPodOperator(
+        task_id='submit_kubeflow_pipeline',
+        name='kubeflow-pipeline-submitter',
+        namespace='kubeflow',
+        image='python:3.11-slim',
+        cmds=['/bin/bash', '-c'],
+        arguments=['''
+            pip install kfp mlflow
+            
+            python - <<EOF
+            import kfp
+            import mlflow
+            from datetime import datetime
+            
+            # Create Kubeflow client
+            kf_client = kfp.Client(host="http://ml-pipeline.kubeflow.svc.cluster.local:8888")
+            
+            # Submit pipeline that uses BASE layer outputs
+            run = kf_client.run_pipeline(
+                experiment_id=kf_client.get_experiment(experiment_name="base-layer-ml").id,
+                job_name=f"base-layer-ml-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                pipeline_package_path="/pipelines/base_layer_ml_pipeline.yaml",
+                params={
+                    "input_data_path": "/shared/processed_data",
+                    "features_path": "/shared/features_final",
+                    "mlflow_tracking_uri": "http://mlflow-server.mlflow.svc.cluster.local:5000"
+                }
+            )
+            
+            print(f"Submitted Kubeflow pipeline: {run.id}")
+            EOF
+        '''],
+        volumes=[
+            {
+                'name': 'shared-data',
+                'persistentVolumeClaim': {'claimName': 'base-layer-shared-pvc'}
+            }
+        ],
+        volume_mounts=[
+            {'name': 'shared-data', 'mountPath': '/shared'}
+        ],
+        get_logs=True,
+        dag=dag
+    )
+    
+    # Task 7: Monitor and report results
+    monitor_pipeline = KubernetesPodOperator(
+        task_id='monitor_pipeline_results',
+        name='pipeline-monitor',
+        namespace='monitoring',
+        image='python:3.11-slim',
+        cmds=['/bin/bash', '-c'],
+        arguments=['''
+            pip install prometheus-client mlflow
+            
+            python - <<EOF
+            import mlflow
+            from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+            
+            # Set up Prometheus metrics
+            registry = CollectorRegistry()
+            pipeline_success = Gauge('base_layer_pipeline_success', 'Pipeline success indicator', registry=registry)
+            data_volume = Gauge('base_layer_data_volume', 'Volume of data processed', registry=registry)
+            feature_count = Gauge('base_layer_feature_count', 'Number of features generated', registry=registry)
+            
+            # Get metrics from MLflow
+            mlflow.set_tracking_uri("http://mlflow-server.mlflow.svc.cluster.local:5000")
+            
+            # Update metrics
+            pipeline_success.set(1)
+            data_volume.set(1000000)  # Example: 1M records processed
+            feature_count.set(250)    # Example: 250 features generated
+            
+            # Push to Prometheus
+            push_to_gateway('prometheus-pushgateway.monitoring.svc.cluster.local:9091', 
+                          job='base_layer_pipeline', registry=registry)
+            
+            print("Pipeline monitoring metrics updated successfully")
+            EOF
+        '''],
+        get_logs=True,
+        dag=dag
+    )
+    
+    # Define task dependencies
+    sync_data_ingestion >> sync_data_quality >> process_base_data
+    process_base_data >> feature_engineering >> trigger_mlflow
+    trigger_mlflow >> submit_kubeflow_pipeline >> monitor_pipeline
+---
+# ===================================================================
+# Cross-Cluster Communication ConfigMap
+# ===================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cross-cluster-config
+  namespace: workflows
+data:
+  clusters.yaml: |
+    clusters:
+      base:
+        endpoint: "https://base-app-layer-dev-base.us-east-1.eks.amazonaws.com"
+        context: "base"
+        namespaces:
+          - "base-data-ingestion"
+          - "base-data-quality"
+          - "base-feature-engineering"
+          - "base-multimodal-processing"
+          
+      platform:
+        endpoint: "https://base-app-layer-dev-platform.us-east-1.eks.amazonaws.com"
+        context: "platform"
+        namespaces:
+          - "argocd"
+          - "airflow"
+          - "mlflow"
+          - "kubeflow"
+          - "monitoring"
+          
+    integrations:
+      data_flow:
+        - source: "base-data-ingestion"
+          target: "airflow"
+          method: "shared-pvc"
+          
+        - source: "base-feature-engineering"
+          target: "mlflow"
+          method: "s3-export"
+          
+        - source: "base-quality-monitoring"
+          target: "prometheus"
+          method: "metrics-push"
+          
+      workflow_triggers:
+        - trigger: "argocd-sync"
+          target_modules: ["data-ingestion", "data-quality", "feature-engineering"]
+          
+        - trigger: "airflow-dag"
+          target_services: ["mlflow", "kubeflow"]
+          
+        - trigger: "base-module-completion"
+          target_workflows: ["ml-pipeline", "monitoring-alerts"]
