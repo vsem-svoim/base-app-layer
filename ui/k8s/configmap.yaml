@@ -183,7 +183,7 @@ data:
                 return (
                     <div className="bg-white rounded-lg shadow-sm border card-hover p-6">
                         <div className="text-center">
-                            <i data-lucide={service.icon} className={\`h-12 w-12 mx-auto \${service.color} mb-4\`}></i>
+                            <i data-lucide={service.icon} className={`h-12 w-12 mx-auto ${service.color} mb-4`}></i>
                             <h3 className="text-lg font-semibold text-gray-900 mb-2">
                                 {service.name}
                             </h3>
