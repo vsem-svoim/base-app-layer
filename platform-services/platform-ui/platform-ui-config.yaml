@@ -1,4 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui-dashboard
+  namespace: platform-ui
+  labels:
+    app: platform-ui-dashboard
+    app.kubernetes.io/name: platform-ui-dashboard
+    app.kubernetes.io/part-of: base-platform
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-ui-dashboard
+  template:
+    metadata:
+      labels:
+        app: platform-ui-dashboard
+        app.kubernetes.io/name: platform-ui-dashboard
+        app.kubernetes.io/part-of: base-platform
+        app.kubernetes.io/component: frontend
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: platform-ui-config
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: platform-ui-config
+        configMap:
+          name: platform-ui-redirect
+      - name: nginx-config
+        configMap:
+          name: platform-ui-nginx-config
+---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-redirect
+  namespace: platform-ui
 data:
   index.html: |
     <!DOCTYPE html>
@@ -6,12 +61,7 @@ data:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BASE Platform Dashboard</title>
-        <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-        <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <title>BASE Platform - Redirecting...</title>
         <style>
             body { 
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -58,6 +108,10 @@ data:
             .status-unhealthy { background-color: #dc3545; }
             .status-unknown { background-color: #ffc107; }
         </style>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     </head>
     <body>
         <div id="root"></div>
@@ -415,6 +469,34 @@ data:
         </script>
     </body>
     </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-nginx-config
+  namespace: platform-ui
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile        on;
+        keepalive_timeout  65;
+        
+        server {
+            listen 80;
+            server_name _;
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            location / {
+                try_files $uri $uri/ /index.html;
+            }
+        }
+    }
 kind: ConfigMap
 metadata:
   annotations:
