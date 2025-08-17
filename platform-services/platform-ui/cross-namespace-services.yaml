@@ -74,7 +74,7 @@ data:
         server {
             listen 8200;
             
-            # Strip /vault prefix and proxy to vault backend
+            # Handle Vault API calls directly
             location /vault/ {
                 proxy_pass http://vault_backend/;
                 proxy_set_header Host $host;
@@ -99,9 +99,22 @@ data:
                 proxy_buffering off;
             }
             
+            # Health check endpoint
+            location /v1/sys/health {
+                proxy_pass http://vault_backend/v1/sys/health;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
             # Catch-all for root requests
             location / {
-                return 301 /vault/;
+                proxy_pass http://vault_backend/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
             }
         }
     }
