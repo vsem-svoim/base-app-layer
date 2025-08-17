@@ -5,6 +5,10 @@ metadata:
   namespace: platform-ui
   labels:
     app: vault-proxy
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /v1/sys/health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/success-codes: "200"
 spec:
   type: NodePort
   ports:
@@ -79,6 +83,8 @@ data:
                 proxy_connect_timeout 30s;
                 proxy_send_timeout 30s;
                 proxy_read_timeout 30s;
+                proxy_redirect off;
+                proxy_buffering off;
             }
         }
     }
@@ -88,6 +94,10 @@ kind: Service
 metadata:
   name: argocd-server
   namespace: platform-ui
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/success-codes: "200,307"
 spec:
   type: NodePort
   ports:
