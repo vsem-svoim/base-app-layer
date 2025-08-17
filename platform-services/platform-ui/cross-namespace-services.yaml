@@ -10,12 +10,13 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/success-codes: "200"
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
   - name: http
     port: 8200
     targetPort: 8200
     protocol: TCP
+    nodePort: 30820
   selector:
     app: vault-proxy
 ---
@@ -129,12 +130,13 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/success-codes: "200,307"
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
   - name: http
     port: 80
     targetPort: 8080
     protocol: TCP
+    nodePort: 30880
   selector:
     app: argocd-proxy
 ---
@@ -184,12 +186,13 @@ metadata:
   labels:
     app: airflow-proxy
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
   - name: http
     port: 8080
     targetPort: 8080
     protocol: TCP
+    nodePort: 30840
   selector:
     app: airflow-proxy
 ---
