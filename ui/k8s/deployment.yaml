@@ -22,40 +22,30 @@ spec:
         app.kubernetes.io/component: frontend
     spec:
       containers:
-      - name: finportiq-app
-        image: finportiq/registration-ui:latest
+      - name: nginx
+        image: nginx:1.25-alpine
         ports:
-        - containerPort: 3000
+        - containerPort: 80
           name: http
-        env:
-        - name: NODE_ENV
-          value: "production"
-        - name: PORT
-          value: "3000"
-        - name: NEXTAUTH_URL
-          value: "http://base-platform-dashboard-44440474.us-east-1.elb.amazonaws.com"
-        - name: NEXTAUTH_SECRET
-          value: "base-platform-secret-key-for-auth"
-        - name: DATABASE_URL
-          value: "postgresql://platform:platform@postgresql.platform-ui.svc.cluster.local:5432/platform"
-        - name: STRIPE_SECRET_KEY
-          value: "sk_test_placeholder"
-        - name: STRIPE_PUBLISHABLE_KEY
-          value: "pk_test_placeholder"
-        - name: STRIPE_WEBHOOK_SECRET
-          value: "whsec_placeholder"
+        volumeMounts:
+        - name: platform-ui-content
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
         livenessProbe:
           httpGet:
-            path: /api/health
-            port: 3000
+            path: /
+            port: 80
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /api/health
-            port: 3000
+            path: /
+            port: 80
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 3
@@ -67,7 +57,12 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      volumes:
+      - name: platform-ui-content
+        configMap:
+          name: platform-ui-content
+      - name: nginx-config
+        configMap:
+          name: platform-ui-nginx-config
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        fsGroup: 1001
+        runAsUser: 0

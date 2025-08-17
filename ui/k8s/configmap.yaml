@@ -1,72 +1,379 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: deployment-scripts
-  labels:
-    app: registration-ui
-    app.kubernetes.io/name: registration-ui
-    app.kubernetes.io/part-of: finportiq-platform
-    app.kubernetes.io/component: frontend
+  name: platform-ui-content
+  namespace: platform-ui
 data:
-  deploy-finportiq-automated.sh: |
-    #!/bin/bash
-    set -e
-    
-    echo "Starting FinPortIQ automated deployment..."
-    
-    # Deployment configuration
-    NAMESPACE=${NAMESPACE:-"finportiq-shared"}
-    ENVIRONMENT=${ENVIRONMENT:-"development"}
-    CLUSTER_NAME=${CLUSTER_NAME:-"finportiq-cluster"}
-    
-    echo "Deployment Configuration:"
-    echo "  Namespace: $NAMESPACE"
-    echo "  Environment: $ENVIRONMENT"
-    echo "  Cluster: $CLUSTER_NAME"
-    
-    # Create namespace if not exists
-    kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-    
-    # Deploy ArgoCD if not exists
-    if ! kubectl get namespace old-f-argocd > /dev/null 2>&1; then
-        echo "Deploying ArgoCD..."
-        helm repo add argo https://argoproj.github.io/argo-helm
-        helm repo update
-        helm install old-f-argocd argo/argo-cd \
-          --namespace old-f-argocd \
-          --create-namespace \
-          --wait --timeout=600s
-    fi
-    
-    # Deploy shared services
-    echo "Deploying shared services..."
-    kubectl apply -f /app/scripts/shared-services-automated.yaml
-    
-    # Wait for services to be ready
-    echo "Waiting for services to be ready..."
-    kubectl wait --for=condition=available --timeout=600s deployment --all -n $NAMESPACE
-    
-    echo "FinPortIQ deployment completed successfully!"
-    
-  check-deployment-status.sh: |
-    #!/bin/bash
-    
-    echo "Checking FinPortIQ deployment status..."
-    
-    # Check ArgoCD applications
-    echo "=== ArgoCD Applications ==="
-    kubectl get applications -n old-f-argocd -o wide
-    
-    # Check pod status
-    echo "=== Pod Status ==="
-    kubectl get pods --all-namespaces | grep old-f
-    
-    # Check service status
-    echo "=== Service Status ==="
-    kubectl get services --all-namespaces | grep old-f
-    
-    # Check ingress status
-    echo "=== Ingress Status ==="
-    kubectl get ingress --all-namespaces | grep old-f
-    
-    echo "Status check completed."
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BASE Platform Dashboard</title>
+        <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.320.0/lucide.min.css" rel="stylesheet">
+        <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+        <style>
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <div id="root"></div>
+        
+        <script type="text/babel">
+            const { useState, useEffect } = React;
+            
+            const services = [
+                {
+                    name: "ArgoCD",
+                    description: "GitOps Continuous Deployment", 
+                    icon: "rocket",
+                    url: "/argocd",
+                    namespace: "argocd",
+                    color: "text-blue-500"
+                },
+                {
+                    name: "Vault",
+                    description: "Secrets Management & Authentication",
+                    icon: "vault",
+                    url: "/vault", 
+                    namespace: "vault",
+                    color: "text-yellow-500"
+                },
+                {
+                    name: "Airflow",
+                    description: "Workflow Orchestration",
+                    icon: "wind",
+                    url: "/airflow",
+                    namespace: "airflow",
+                    color: "text-cyan-500"
+                }
+            ];
+
+            function VaultLogin({ onLogin }) {
+                const [username, setUsername] = useState('');
+                const [password, setPassword] = useState('');
+                const [loading, setLoading] = useState(false);
+                const [error, setError] = useState('');
+
+                const handleLogin = async (e) => {
+                    e.preventDefault();
+                    setLoading(true);
+                    setError('');
+
+                    try {
+                        const response = await fetch('/vault/v1/auth/userpass/login/' + username, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password }),
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            localStorage.setItem('vault_token', data.auth.client_token);
+                            localStorage.setItem('user_info', JSON.stringify({
+                                username,
+                                policies: data.auth.policies,
+                                role: data.auth.metadata?.role || 'user'
+                            }));
+                            onLogin({
+                                username,
+                                token: data.auth.client_token,
+                                policies: data.auth.policies,
+                                role: data.auth.metadata?.role || 'user'
+                            });
+                        } else {
+                            setError('Invalid credentials. Try: admin, developer, or data-scientist');
+                        }
+                    } catch (err) {
+                        setError('Authentication failed. Please check your connection.');
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                return (
+                    <div className="min-h-screen flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+                        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                            <div className="flex justify-center">
+                                <i data-lucide="shield" className="h-12 w-12 text-orange-500"></i>
+                            </div>
+                            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                                BASE Platform
+                            </h2>
+                            <p className="mt-2 text-center text-sm text-gray-600">
+                                Secure Vault Authentication Required
+                            </p>
+                        </div>
+
+                        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                            <div className="bg-white py-8 px-6 shadow-lg rounded-lg border">
+                                <form onSubmit={handleLogin} className="space-y-6">
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-gray-700">
+                                            <i data-lucide="user" className="w-4 h-4 mr-2"></i>
+                                            Username
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            placeholder="admin, developer, or data-scientist"
+                                            required
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-gray-700">
+                                            <i data-lucide="shield" className="w-4 h-4 mr-2"></i>
+                                            Password
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Enter your Vault password"
+                                            required
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                                        />
+                                    </div>
+
+                                    {error && (
+                                        <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md border border-red-200">
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <i data-lucide="loader-2" className="animate-spin mr-2 h-4 w-4"></i>
+                                                Authenticating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i data-lucide="shield" className="mr-2 h-4 w-4"></i>
+                                                Sign In with Vault
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            function ServiceCard({ service }) {
+                return (
+                    <div className="bg-white rounded-lg shadow-sm border card-hover p-6">
+                        <div className="text-center">
+                            <i data-lucide={service.icon} className={\`h-12 w-12 mx-auto \${service.color} mb-4\`}></i>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                {service.name}
+                            </h3>
+                            <p className="text-gray-600 mb-4">{service.description}</p>
+                            <div className="space-y-4">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    {service.namespace}
+                                </span>
+                                <a
+                                    href={service.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                >
+                                    <i data-lucide="external-link" className="mr-2 h-4 w-4"></i>
+                                    Open Service
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            function App() {
+                const [userInfo, setUserInfo] = useState(null);
+                const [loading, setLoading] = useState(true);
+
+                useEffect(() => {
+                    lucide.createIcons();
+                    
+                    const token = localStorage.getItem('vault_token');
+                    const savedUserInfo = localStorage.getItem('user_info');
+
+                    if (token && savedUserInfo) {
+                        fetch('/vault/v1/auth/token/lookup-self', {
+                            headers: { 'X-Vault-Token': token }
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                setUserInfo(JSON.parse(savedUserInfo));
+                            } else {
+                                localStorage.removeItem('vault_token');
+                                localStorage.removeItem('user_info');
+                            }
+                        })
+                        .catch(() => {
+                            localStorage.removeItem('vault_token');
+                            localStorage.removeItem('user_info');
+                        })
+                        .finally(() => setLoading(false));
+                    } else {
+                        setLoading(false);
+                    }
+                }, []);
+
+                const handleLogin = (userData) => {
+                    setUserInfo(userData);
+                    setTimeout(() => lucide.createIcons(), 100);
+                };
+
+                const handleLogout = () => {
+                    localStorage.removeItem('vault_token');
+                    localStorage.removeItem('user_info');
+                    setUserInfo(null);
+                };
+
+                if (loading) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center">
+                            <div className="text-center">
+                                <i data-lucide="loader-2" className="h-8 w-8 animate-spin mx-auto text-orange-500 mb-4"></i>
+                                <h4 className="text-lg font-medium">Checking authentication...</h4>
+                                <p className="text-gray-500">Verifying Vault token</p>
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (!userInfo) {
+                    return <VaultLogin onLogin={handleLogin} />;
+                }
+
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <nav className="bg-white shadow-sm border-b">
+                            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                                <div className="flex justify-between h-16">
+                                    <div className="flex items-center">
+                                        <i data-lucide="shield" className="h-8 w-8 text-orange-500 mr-3"></i>
+                                        <h1 className="text-xl font-semibold text-gray-900">BASE Platform</h1>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <span className="text-sm text-gray-700 flex items-center">
+                                            <i data-lucide="user" className="w-4 h-4 mr-1"></i>
+                                            Welcome, {userInfo.username}
+                                        </span>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                        >
+                                            <i data-lucide="log-out" className="mr-2 h-4 w-4"></i>
+                                            Logout
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                            <div className="text-center mb-12">
+                                <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                                    Enterprise Data Platform Services
+                                </h1>
+                                <p className="text-xl text-gray-600 mb-6">
+                                    Authenticated access to your platform services
+                                </p>
+                                <div className="flex justify-center space-x-2">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                        <i data-lucide="shield" className="w-3 h-3 mr-1"></i>
+                                        Authenticated
+                                    </span>
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                        Platform Cluster
+                                    </span>
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+                                        AWS us-east-1
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                                {services.map((service, index) => (
+                                    <ServiceCard key={index} service={service} />
+                                ))}
+                            </div>
+
+                            <div className="bg-white rounded-lg shadow-sm border p-6">
+                                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <i data-lucide="user" className="mr-2 h-5 w-5"></i>
+                                    Session Information
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <strong>User:</strong> {userInfo.username}
+                                    </div>
+                                    <div>
+                                        <strong>Role:</strong> {userInfo.role}
+                                    </div>
+                                    <div>
+                                        <strong>Policies:</strong> {userInfo.policies?.join(', ')}
+                                    </div>
+                                    <div>
+                                        <strong>Environment:</strong> Development
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                );
+            }
+            
+            ReactDOM.render(<App />, document.getElementById('root'));
+        </script>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-nginx-config
+  namespace: platform-ui
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile        on;
+        keepalive_timeout  65;
+        
+        server {
+            listen 80;
+            server_name _;
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            location / {
+                try_files $uri $uri/ /index.html;
+            }
+        }
+    }
