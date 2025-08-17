@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ml-apps
+  namespace: argocd
+spec:
+  description: "Machine Learning applications and platforms"
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://community-charts.github.io/helm-charts'
+  - 'https://kubeflow.github.io/pipelines'
+  - 'https://storage.googleapis.com/seldon-charts'
+
+  destinations:
+  - namespace: 'mlflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'kubeflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'kubeflow-*'
+    server: https://kubernetes.default.svc
+  - namespace: 'seldon-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'ml-*'
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  roles:
+  - name: ml-admin
+    description: "ML platform administrators"
+    policies:
+    - p, proj:ml-apps:ml-admin, applications, *, ml-apps/*, allow
+    groups:
+    - ml-engineering
+    - data-science

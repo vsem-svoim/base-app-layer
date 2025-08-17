@@ -1,0 +1,457 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list", "patch", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+subjects:
+- kind: ServiceAccount
+  name: vault-bootstrap
+  namespace: vault
+roleRef:
+  kind: Role
+  name: vault-bootstrap
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: vault-bootstrap
+    spec:
+      serviceAccountName: vault-bootstrap
+      restartPolicy: Never
+      containers:
+      - name: vault-bootstrap
+        image: hashicorp/vault:1.15.2
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "🔐 Starting Vault Bootstrap Automation..."
+          
+          # Install prerequisites
+          apk add --no-cache curl jq aws-cli
+          
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+          
+          # Wait for Vault pod to be ready
+          echo "⏳ Waiting for Vault pod to be ready..."
+          until kubectl get pod vault-0 -n vault >/dev/null 2>&1; do
+            echo "Waiting for Vault pod..."
+            sleep 10
+          done
+          
+          # Get Vault pod IP directly
+          VAULT_POD_IP=$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.podIP}')
+          export VAULT_ADDR="http://$VAULT_POD_IP:8200"
+          
+          # Wait for Vault API to respond (even if not ready)
+          until curl -s "$VAULT_ADDR/v1/sys/health" >/dev/null 2>&1; do
+            echo "Waiting for Vault API on $VAULT_ADDR..."
+            sleep 5
+          done
+          
+          # Check if already initialized
+          if vault status | grep -q "Initialized.*true"; then
+            echo "✅ Vault already initialized"
+            
+            # Check if keys exist
+            if kubectl get secret vault-unseal-keys -n vault >/dev/null 2>&1; then
+              echo "✅ Unseal keys already exist, attempting unseal..."
+              
+              # Unseal if sealed
+              if vault status | grep -q "Sealed.*true"; then
+                KEY1=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key1}' | base64 -d)
+                KEY2=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key2}' | base64 -d)
+                KEY3=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key3}' | base64 -d)
+                
+                vault operator unseal "$KEY1"
+                vault operator unseal "$KEY2"
+                vault operator unseal "$KEY3"
+                
+                echo "✅ Vault unsealed successfully"
+              else
+                echo "✅ Vault already unsealed"
+              fi
+              
+              exit 0
+            fi
+          fi
+          
+          # Initialize Vault
+          echo "🔑 Initializing Vault..."
+          INIT_OUTPUT=$(vault operator init -key-shares=5 -key-threshold=3 -format=json)
+          
+          # Extract keys and token
+          UNSEAL_KEY_1=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[0]')
+          UNSEAL_KEY_2=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[1]')
+          UNSEAL_KEY_3=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[2]')
+          ROOT_TOKEN=$(echo "$INIT_OUTPUT" | jq -r '.root_token')
+          
+          # Store keys in Kubernetes secret
+          kubectl create secret generic vault-unseal-keys -n vault \
+            --from-literal=key1="$UNSEAL_KEY_1" \
+            --from-literal=key2="$UNSEAL_KEY_2" \
+            --from-literal=key3="$UNSEAL_KEY_3" \
+            --from-literal=root-token="$ROOT_TOKEN"
+          
+          # Unseal Vault
+          echo "🔓 Unsealing Vault..."
+          vault operator unseal "$UNSEAL_KEY_1"
+          vault operator unseal "$UNSEAL_KEY_2"
+          vault operator unseal "$UNSEAL_KEY_3"
+          
+          # Login with root token
+          vault login "$ROOT_TOKEN"
+          
+          # Comprehensive Vault Configuration with Automation Hooks
+          echo "⚙️ Starting Comprehensive Vault Configuration..."
+          
+          # Function to enable secret engines with error handling
+          enable_secret_engine() {
+            local path=$1
+            local type=$2
+            echo "🔧 Enabling $type secrets engine at path: $path"
+            if vault secrets enable -path="$path" "$type" 2>/dev/null; then
+              echo "✅ Successfully enabled $type at $path"
+            else
+              echo "ℹ️  $type already enabled at $path or error occurred"
+              vault secrets list | grep -E "^$path/"
+            fi
+          }
+          
+          # Function to enable auth methods with error handling
+          enable_auth_method() {
+            local path=$1
+            local type=$2
+            echo "🔑 Enabling $type auth method at path: $path"
+            if vault auth enable -path="$path" "$type" 2>/dev/null; then
+              echo "✅ Successfully enabled $type auth at $path"
+            else
+              echo "ℹ️  $type auth already enabled at $path or error occurred"
+              vault auth list | grep -E "^$path/"
+            fi
+          }
+          
+          # Enable comprehensive secrets engines
+          echo "🔧 Configuring comprehensive secrets engines..."
+          enable_secret_engine "secret" "kv-v2"
+          enable_secret_engine "aws" "aws"
+          enable_secret_engine "azure" "azure"
+          enable_secret_engine "gcp" "gcp"
+          enable_secret_engine "database" "database"
+          enable_secret_engine "ssh" "ssh"
+          enable_secret_engine "pki" "pki"
+          enable_secret_engine "transit" "transit"
+          enable_secret_engine "totp" "totp"
+          enable_secret_engine "ldap" "openldap"
+          enable_secret_engine "consul" "consul"
+          enable_secret_engine "nomad" "nomad"
+          enable_secret_engine "rabbitmq" "rabbitmq"
+          
+          echo "✅ All secrets engines configuration completed"
+          
+          # Enable comprehensive auth methods
+          echo "🔑 Configuring comprehensive auth methods..."
+          enable_auth_method "kubernetes" "kubernetes"
+          enable_auth_method "aws" "aws"
+          enable_auth_method "azure" "azure"
+          enable_auth_method "gcp" "gcp"
+          enable_auth_method "ldap" "ldap"
+          enable_auth_method "userpass" "userpass"
+          enable_auth_method "oidc" "oidc"
+          enable_auth_method "jwt" "jwt"
+          enable_auth_method "approle" "approle"
+          enable_auth_method "cert" "cert"
+          
+          echo "✅ All auth methods configuration completed"
+          
+          # Display comprehensive configuration status
+          echo ""
+          echo "📊 VAULT CONFIGURATION SUMMARY"
+          echo "=============================="
+          echo "🔐 Enabled Secrets Engines:"
+          vault secrets list -format=table
+          echo ""
+          echo "🔑 Enabled Auth Methods:"
+          vault auth list -format=table
+          echo ""
+          
+          # Create basic policies
+          vault policy write admin - << 'POLICY'
+          path "*" {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+          POLICY
+          
+          vault policy write platform-services - << 'POLICY'
+          # KV v2 secrets access
+          path "secret/data/platform/*" {
+            capabilities = ["read", "list"]
+          }
+          # Cloud providers access
+          path "aws/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          path "azure/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          path "gcp/token/platform-*" {
+            capabilities = ["read"]
+          }
+          # Database access
+          path "database/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          # SSH access
+          path "ssh/sign/platform-*" {
+            capabilities = ["create", "update"]
+          }
+          # PKI access
+          path "pki/issue/platform" {
+            capabilities = ["create", "update"]
+          }
+          # Transit encryption
+          path "transit/encrypt/platform" {
+            capabilities = ["create", "update"]
+          }
+          path "transit/decrypt/platform" {
+            capabilities = ["create", "update"]
+          }
+          # TOTP access
+          path "totp/code/platform-*" {
+            capabilities = ["create", "update"]
+          }
+          POLICY
+          
+          vault policy write base-layer - << 'POLICY'
+          # BASE layer modules comprehensive access
+          path "secret/data/base-layer/*" {
+            capabilities = ["read", "list"]
+          }
+          path "aws/creds/base-*" {
+            capabilities = ["read"]
+          }
+          path "azure/creds/base-*" {
+            capabilities = ["read"]
+          }
+          path "gcp/token/base-*" {
+            capabilities = ["read"]
+          }
+          path "database/creds/base-*" {
+            capabilities = ["read"]
+          }
+          path "ssh/sign/base-*" {
+            capabilities = ["create", "update"]
+          }
+          path "pki/issue/base-layer" {
+            capabilities = ["create", "update"]
+          }
+          path "transit/encrypt/base-layer" {
+            capabilities = ["create", "update"]
+          }
+          path "transit/decrypt/base-layer" {
+            capabilities = ["create", "update"]
+          }
+          POLICY
+          
+          vault policy write ml-platform - << 'POLICY'
+          # ML platform comprehensive access
+          path "secret/data/ml-platform/*" {
+            capabilities = ["read", "list"]
+          }
+          path "aws/creds/ml-*" {
+            capabilities = ["read"]
+          }
+          path "azure/creds/ml-*" {
+            capabilities = ["read"]
+          }
+          path "gcp/token/ml-*" {
+            capabilities = ["read"]
+          }
+          path "database/creds/ml-*" {
+            capabilities = ["read"]
+          }
+          path "ssh/sign/ml-*" {
+            capabilities = ["create", "update"]
+          }
+          path "pki/issue/ml-platform" {
+            capabilities = ["create", "update"]
+          }
+          POLICY
+          
+          # Configure Kubernetes auth
+          SA_JWT_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          SA_CA_CRT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt)
+          K8S_HOST="https://kubernetes.default.svc:443"
+          
+          vault write auth/kubernetes/config \
+            token_reviewer_jwt="$SA_JWT_TOKEN" \
+            kubernetes_host="$K8S_HOST" \
+            kubernetes_ca_cert="$SA_CA_CRT"
+          
+          # Create Kubernetes roles
+          vault write auth/kubernetes/role/argocd \
+            bound_service_account_names=argocd-server,argocd-application-controller \
+            bound_service_account_namespaces=argocd \
+            policies=platform-services \
+            ttl=24h
+          
+          vault write auth/kubernetes/role/platform-services \
+            bound_service_account_names="*" \
+            bound_service_account_namespaces=vault,monitoring,airflow \
+            policies=platform-services \
+            ttl=8h
+          
+          # Store basic platform secrets
+          vault kv put secret/platform/bootstrap \
+            status="completed" \
+            timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            cluster="base-app-layer-dev-platform"
+          
+          # Create credentials file in vault directory
+          echo "📝 Creating credentials file..."
+          cat > /vault/data/vault-credentials.txt << EOF
+# Vault Credentials and Configuration
+# Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# ==========================================
+
+## Vault Tokens and Keys
+ROOT_TOKEN=$ROOT_TOKEN
+UNSEAL_KEY_1=$UNSEAL_KEY_1
+UNSEAL_KEY_2=$UNSEAL_KEY_2
+UNSEAL_KEY_3=$UNSEAL_KEY_3
+
+## Vault URLs
+VAULT_ADDR=$VAULT_ADDR
+VAULT_UI=https://vault.base-app-layer.dev
+
+## Bootstrap Status
+VAULT_INITIALIZED=true
+VAULT_UNSEALED=true
+BOOTSTRAP_COMPLETED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+EOF
+          
+          echo "✅ Vault bootstrap completed successfully!"
+          echo "🔑 Root token and unseal keys stored in vault-unseal-keys secret"
+          echo "📝 Credentials file created at: /vault/data/vault-credentials.txt"
+          echo "🏗️ Basic auth methods and policies configured"
+          
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-unsealer
+  namespace: vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-unsealer
+  template:
+    metadata:
+      labels:
+        app: vault-unsealer
+    spec:
+      serviceAccountName: vault-bootstrap
+      containers:
+      - name: vault-unsealer
+        image: hashicorp/vault:1.15.2
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          export VAULT_ADDR="http://vault.vault.svc.cluster.local:8200"
+          
+          while true; do
+            if vault status >/dev/null 2>&1; then
+              if vault status | grep -q "Sealed.*true"; then
+                echo "🔓 Vault is sealed, attempting unseal..."
+                
+                if kubectl get secret vault-unseal-keys -n vault >/dev/null 2>&1; then
+                  KEY1=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key1}' | base64 -d)
+                  KEY2=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key2}' | base64 -d)
+                  KEY3=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key3}' | base64 -d)
+                  
+                  vault operator unseal "$KEY1" >/dev/null 2>&1 || true
+                  vault operator unseal "$KEY2" >/dev/null 2>&1 || true
+                  vault operator unseal "$KEY3" >/dev/null 2>&1 || true
+                  
+                  if vault status | grep -q "Sealed.*false"; then
+                    echo "✅ Vault successfully unsealed"
+                  fi
+                else
+                  echo "⚠️ Unseal keys not found, waiting for bootstrap job..."
+                fi
+              else
+                echo "✅ Vault is unsealed"
+              fi
+            else
+              echo "⏳ Vault not ready, waiting..."
+            fi
+            
+            sleep 60
+          done
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"

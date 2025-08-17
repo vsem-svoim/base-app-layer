@@ -1,0 +1,87 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# AWS-специфичные ресурсы + базовые ресурсы с AWS патчами
+resources:
+  - ../../base                      # Включаем базовые ресурсы для применения патчей
+  - aws-gp3-storage.yaml            # AWS gp3 StorageClass
+  - istio-config.yaml               # Istio service mesh конфигурация
+  - aws-bedrock-integration.yaml    # Опционально: AI обработка
+  - aws-sagemaker-integration.yaml  # Опционально: ML модели  
+  - aws-hyperpod-integration.yaml   # Опционально: distributed training
+
+# AWS-специфичные образы контейнеров (через патчи для существующих deployments)
+# images: не работает для патчинга существующих ресурсов
+
+# AWS-специфичные патчи для базовых развертываний
+patches:
+  # Замена образов на python:latest для всех deployments
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: python:latest
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CLOUD_PROVIDER
+          value: aws
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AWS_REGION
+          value: us-east-1
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          kubernetes.io/os: linux
+      - op: add
+        path: /spec/template/spec/tolerations
+        value:
+          - key: "base-apps"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  - target:
+      kind: PersistentVolumeClaim
+    patch: |-
+      - op: replace
+        path: /spec/storageClassName
+        value: gp3
+
+  - target:
+      kind: Service
+      name: ".*-service"
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+# AWS-специфичные метки
+labels:
+  - includeSelectors: false
+    pairs:
+      cloud.provider: aws
+      cloud.region: us-east-1
+      base.io/provider: aws
+
+# AWS-специфичная конфигурация приложения с интеграцией Bedrock/SageMaker
+configMapGenerator:
+  - name: data-ingestion-aws-config
+    literals:
+      - CLOUD_PROVIDER=aws
+      - AWS_REGION=us-east-1
+      - STORAGE_CLASS=gp3
+      - LOAD_BALANCER_TYPE=nlb

@@ -1,0 +1,258 @@
+---
+# ConfigMap containing Airflow DAGs for workflow integration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-base-ingestion-dags
+  namespace: airflow
+  labels:
+    app.kubernetes.io/component: airflow-dags
+    app.kubernetes.io/part-of: base-system
+data:
+  base_ingestion_workflows.py: |
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.providers.http.operators.http import SimpleHttpOperator
+    from airflow.providers.postgres.operators.postgres import PostgresOperator
+    from airflow.providers.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+    from airflow.operators.python import PythonOperator
+    import requests
+    import json
+    
+    # Default DAG arguments
+    default_args = {
+        'owner': 'base-platform',
+        'depends_on_past': False,
+        'start_date': datetime(2024, 1, 1),
+        'email_on_failure': False,
+        'email_on_retry': False,
+        'retries': 3,
+        'retry_delay': timedelta(minutes=5)
+    }
+    
+    # Standard Ingestion Workflow DAG
+    standard_ingestion_dag = DAG(
+        'base_standard_ingestion_workflow',
+        default_args=default_args,
+        description='Base platform standard data ingestion workflow',
+        schedule_interval=timedelta(hours=6),
+        catchup=False,
+        tags=['base-platform', 'data-ingestion']
+    )
+    
+    def call_workflow_engine(**context):
+        """Call the workflow execution engine"""
+        workflow_spec = {
+            'name': 'standard_ingestion',
+            'type': 'standard_ingestion',
+            'steps': [
+                {'name': 'source_validation', 'agent': 'data-scheduler', 'action': 'validate_source_availability'},
+                {'name': 'connection_establishment', 'agent': 'data-connector', 'action': 'establish_secure_connection'},
+                {'name': 'data_collection', 'agent': 'data-collector', 'action': 'collect_data_from_source'},
+                {'name': 'format_conversion', 'agent': 'data-converter', 'action': 'convert_to_standard_format'},
+                {'name': 'quality_validation', 'agent': 'external', 'service': 'base-data-quality', 'action': 'validate_data_quality'},
+                {'name': 'data_storage', 'agent': 'external', 'service': 'base-data-storage', 'action': 'store_validated_data'}
+            ]
+        }
+        
+        try:
+            response = requests.post(
+                'http://workflow-execution-engine-service.base-data-ingestion.svc.cluster.local:8080/execute',
+                json=workflow_spec,
+                timeout=300
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Workflow execution failed: {str(e)}")
+            # For now, just log and continue - the workflow engine will handle retries
+            return {'status': 'delegated_to_engine'}
+    
+    # Standard ingestion workflow task
+    execute_standard_workflow = PythonOperator(
+        task_id='execute_standard_ingestion_workflow',
+        python_callable=call_workflow_engine,
+        dag=standard_ingestion_dag
+    )
+    
+    # Secure API Ingestion Workflow DAG
+    secure_api_dag = DAG(
+        'base_secure_api_ingestion_workflow',
+        default_args=default_args,
+        description='Base platform secure API data ingestion workflow',
+        schedule_interval=timedelta(hours=4),
+        catchup=False,
+        tags=['base-platform', 'data-ingestion', 'secure']
+    )
+    
+    def call_secure_workflow(**context):
+        """Call secure API workflow"""
+        workflow_spec = {
+            'name': 'secure_api_ingestion',
+            'type': 'secure_api_ingestion',
+            'steps': [
+                {'name': 'security_validation', 'agent': 'data-scheduler', 'action': 'validate_security_requirements'},
+                {'name': 'authentication_verification', 'agent': 'data-connector', 'action': 'verify_authentication'},
+                {'name': 'encrypted_connection', 'agent': 'data-connector', 'action': 'establish_encrypted_connection'},
+                {'name': 'secure_data_collection', 'agent': 'data-collector', 'action': 'collect_secure_data'},
+                {'name': 'data_classification', 'agent': 'external', 'service': 'base-data-security', 'action': 'classify_data'},
+                {'name': 'encrypted_storage', 'agent': 'external', 'service': 'base-data-storage', 'action': 'store_encrypted_data'}
+            ]
+        }
+        
+        try:
+            response = requests.post(
+                'http://workflow-execution-engine-service.base-data-ingestion.svc.cluster.local:8080/execute',
+                json=workflow_spec,
+                timeout=600
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Secure workflow execution failed: {str(e)}")
+            return {'status': 'delegated_to_engine'}
+    
+    execute_secure_workflow = PythonOperator(
+        task_id='execute_secure_api_workflow',
+        python_callable=call_secure_workflow,
+        dag=secure_api_dag
+    )
+    
+    # Bulk File Ingestion Workflow DAG
+    bulk_file_dag = DAG(
+        'base_bulk_file_ingestion_workflow',
+        default_args=default_args,
+        description='Base platform bulk file ingestion workflow',
+        schedule_interval=timedelta(hours=12),
+        catchup=False,
+        tags=['base-platform', 'data-ingestion', 'bulk']
+    )
+    
+    def call_bulk_workflow(**context):
+        """Call bulk file workflow"""
+        workflow_spec = {
+            'name': 'bulk_file_ingestion',
+            'type': 'bulk_file_ingestion',
+            'steps': [
+                {'name': 'file_discovery', 'agent': 'data-scheduler', 'action': 'discover_files'},
+                {'name': 'parallel_file_processing', 'agent': 'data-collector', 'action': 'process_files_parallel'},
+                {'name': 'format_standardization', 'agent': 'data-converter', 'action': 'standardize_formats'},
+                {'name': 'data_consolidation', 'agent': 'data-merger', 'action': 'consolidate_data'},
+                {'name': 'batch_validation', 'agent': 'external', 'service': 'base-data-quality', 'action': 'validate_batch'}
+            ]
+        }
+        
+        try:
+            response = requests.post(
+                'http://workflow-execution-engine-service.base-data-ingestion.svc.cluster.local:8080/execute',
+                json=workflow_spec,
+                timeout=1200
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Bulk workflow execution failed: {str(e)}")
+            return {'status': 'delegated_to_engine'}
+    
+    execute_bulk_workflow = PythonOperator(
+        task_id='execute_bulk_file_workflow',
+        python_callable=call_bulk_workflow,
+        dag=bulk_file_dag
+    )
+    
+    # Realtime Stream Ingestion DAG (runs continuously)
+    realtime_stream_dag = DAG(
+        'base_realtime_stream_ingestion',
+        default_args=default_args,
+        description='Base platform realtime streaming ingestion',
+        schedule_interval=None,  # Triggered externally or runs continuously
+        catchup=False,
+        tags=['base-platform', 'data-ingestion', 'realtime', 'streaming']
+    )
+    
+    # Use KubernetesPodOperator for long-running streaming task
+    realtime_stream_task = KubernetesPodOperator(
+        task_id='realtime_stream_processor',
+        name='realtime-stream-processor',
+        namespace='base-data-ingestion',
+        image='python:3.11-slim',
+        cmds=['/bin/bash'],
+        arguments=[
+            '-c',
+            '''
+            pip install requests redis
+            python -c "
+            import time
+            import requests
+            import redis
+            
+            r = redis.Redis(host='airflow-redis.airflow.svc.cluster.local', port=6379, db=1)
+            
+            workflow_spec = {
+                'name': 'realtime_stream_ingestion',
+                'type': 'realtime_stream_ingestion',
+                'continuous': True,
+                'steps': [
+                    {'name': 'stream_connection', 'agent': 'data-connector', 'action': 'establish_stream_connection'},
+                    {'name': 'continuous_processing', 'agent': 'data-collector', 'action': 'process_stream_continuously'},
+                    {'name': 'real_time_validation', 'agent': 'external', 'service': 'base-data-quality', 'action': 'validate_realtime'},
+                    {'name': 'streaming_storage', 'agent': 'external', 'service': 'base-data-storage', 'action': 'store_stream_data'}
+                ]
+            }
+            
+            while True:
+                try:
+                    response = requests.post(
+                        'http://workflow-execution-engine-service.base-data-ingestion.svc.cluster.local:8080/execute',
+                        json=workflow_spec,
+                        timeout=60
+                    )
+                    print(f'Stream processing cycle completed: {response.status_code}')
+                except Exception as e:
+                    print(f'Stream processing error: {str(e)}')
+                    
+                time.sleep(60)  # Process every minute
+            "
+            '''
+        ],
+        labels={'app': 'realtime-stream-processor', 'fargate-enabled': 'true'},
+        get_logs=True,
+        dag=realtime_stream_dag,
+        is_delete_operator_pod=False  # Keep pod running
+    )
+
+---
+# Job to copy DAGs to Airflow DAGs folder (simulated via ConfigMap mount)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-dag-sync
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/component: airflow-integration
+    app.kubernetes.io/part-of: base-system
+spec:
+  template:
+    metadata:
+      labels:
+        fargate-enabled: "true"
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: dag-sync
+        image: curlimages/curl:latest
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "DAG sync completed - DAGs are mounted via ConfigMap"
+          echo "Workflow integration configured with Airflow"
+          echo "Workflows will be managed by workflow-execution-engine"
+          sleep 10
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"

@@ -1,0 +1,396 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: argocd
+data:
+  dashboard.py: |
+    import streamlit as st
+    from datetime import datetime
+    import json
+    
+    st.set_page_config(page_title="BASE Platform Console", layout="wide", initial_sidebar_state="collapsed")
+    
+    # Professional enterprise styling
+    st.markdown("""
+    <style>
+    .stApp { background: #0e1117; color: #fafafa; font-family: 'Inter', -apple-system, sans-serif; }
+    .main-header { 
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%); 
+        padding: 2rem; margin: -1rem -1rem 2rem -1rem; border-radius: 12px;
+        border-left: 4px solid #3b82f6; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    .service-card { 
+        background: #1e293b; border: 1px solid #334155; border-radius: 12px; 
+        padding: 1.5rem; margin: 1rem 0; transition: all 0.3s ease;
+        cursor: pointer; position: relative; overflow: hidden;
+    }
+    .service-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: transparent; transition: all 0.3s ease;
+    }
+    .service-card:hover { 
+        border-color: #3b82f6; transform: translateY(-4px); 
+        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.2);
+    }
+    .service-card:hover::before { background: #3b82f6; }
+    .service-card.active { border-color: #10b981; background: #0f2027; }
+    .service-card.active::before { background: #10b981; }
+    .service-card.pending { border-color: #f59e0b; background: #1f1611; }
+    .service-card.pending::before { background: #f59e0b; }
+    
+    .status-badge {
+        position: absolute; top: 1rem; right: 1rem;
+        padding: 0.375rem 0.875rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .status-active { background: #10b981; color: white; }
+    .status-pending { background: #f59e0b; color: white; }
+    .status-failed { background: #ef4444; color: white; }
+    .status-not-deployed { background: #6b7280; color: white; }
+    
+    .service-details { margin-top: 1rem; }
+    .service-url { 
+        font-family: 'JetBrains Mono', 'Fira Code', monospace; color: #60a5fa; font-size: 0.875rem; 
+        background: #0f172a; padding: 0.75rem; border-radius: 8px; margin: 0.5rem 0;
+        border: 1px solid #1e293b;
+    }
+    .deployment-stage {
+        background: #111827; border: 1px solid #374151; border-radius: 8px;
+        padding: 1.25rem; margin: 0.75rem 0; position: relative;
+    }
+    .stage-complete { border-color: #10b981; background: #064e3b; }
+    .stage-partial { border-color: #f59e0b; background: #451a03; }
+    .stage-pending { border-color: #6b7280; background: #1f2937; }
+    
+    .resource-list {
+        background: #0f172a; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
+        border: 1px solid #1e293b;
+    }
+    .resource-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 0.5rem 0; border-bottom: 1px solid #1e293b;
+    }
+    .resource-item:last-child { border-bottom: none; }
+    
+    .stButton > button { 
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+        color: white !important; border: none !important; border-radius: 8px !important;
+        padding: 0.75rem 1.5rem !important; font-weight: 600 !important;
+        transition: all 0.3s ease !important; text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+    }
+    .stButton > button:hover { 
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3) !important;
+    }
+    .stMetric { 
+        background: #1e293b; padding: 1.5rem; border-radius: 12px; 
+        border: 1px solid #334155; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .nav-button {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        margin: 0.25rem 0 !important;
+    }
+    .nav-button:hover {
+        background: linear-gradient(135deg, #047857 0%, #065f46 100%) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.markdown("""
+    <div class="main-header">
+        <h1 style="margin: 0; color: #fafafa; font-size: 2.5rem; font-weight: 700;">BASE Platform Console</h1>
+        <p style="margin: 0.75rem 0 0 0; color: #cbd5e1; font-size: 1.125rem;">Enterprise Data Platform • Kubernetes Orchestration • Real-time Operations</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Service definitions with complete integration
+    def get_service_definitions():
+        return {
+            "argocd": {
+                "name": "ArgoCD",
+                "description": "GitOps Continuous Deployment Platform",
+                "namespace": "argocd",
+                "internal_service": "argocd-server",
+                "internal_port": 80,
+                "alb_path": "/argocd",
+                "deploy_command": "./deploy-platform.sh core",
+                "category": "Core Infrastructure",
+                "icon": "⚙️"
+            },
+            "vault": {
+                "name": "HashiCorp Vault", 
+                "description": "Secrets Management & Encryption",
+                "namespace": "vault",
+                "internal_service": "vault",
+                "internal_port": 8200,
+                "alb_path": "/vault",
+                "deploy_command": "./deploy-platform.sh core",
+                "category": "Security",
+                "icon": "🔐"
+            },
+            "istio-system": {
+                "name": "Istio Service Mesh",
+                "description": "Traffic Management & Security Policies",
+                "namespace": "istio-system", 
+                "internal_service": "kiali",
+                "internal_port": 20001,
+                "alb_path": "/kiali",
+                "deploy_command": "./deploy-platform.sh core",
+                "category": "Network Infrastructure",
+                "icon": "🕸️"
+            },
+            "monitoring": {
+                "name": "Grafana Dashboard",
+                "description": "Metrics, Monitoring & Alerting",
+                "namespace": "monitoring",
+                "internal_service": "grafana", 
+                "internal_port": 80,
+                "alb_path": "/grafana",
+                "deploy_command": "./deploy-platform.sh shared",
+                "category": "Observability",
+                "icon": "📊"
+            },
+            "airflow": {
+                "name": "Apache Airflow",
+                "description": "Workflow Orchestration & Data Pipelines", 
+                "namespace": "airflow",
+                "internal_service": "airflow-webserver",
+                "internal_port": 8080,
+                "alb_path": "/airflow",
+                "deploy_command": "./deploy-platform.sh orchestration", 
+                "category": "Data Processing",
+                "icon": "🔄"
+            }
+        }
+    
+    # Enhanced Kubernetes API integration
+    def get_comprehensive_k8s_data():
+        try:
+            from kubernetes import client, config
+            
+            try:
+                config.load_incluster_config()
+            except:
+                return None
+            
+            v1 = client.CoreV1Api()
+            apps_v1 = client.AppsV1Api()
+            networking_v1 = client.NetworkingV1Api()
+            
+            # Cluster overview
+            nodes = v1.list_node()
+            namespaces = v1.list_namespace()
+            
+            # Service analysis
+            services = get_service_definitions()
+            service_status = {}
+            
+            for service_id, service_info in services.items():
+                try:
+                    # Pod status
+                    pods = v1.list_namespaced_pod(namespace=service_info["namespace"])
+                    running_pods = len([p for p in pods.items if p.status.phase == "Running" and 
+                                      all(cs.ready for cs in (p.status.container_statuses or []))])
+                    total_pods = len(pods.items)
+                    
+                    # Service status
+                    svc_list = v1.list_namespaced_service(namespace=service_info["namespace"])
+                    service_count = len([s for s in svc_list.items if s.metadata.name == service_info["internal_service"]])
+                    
+                    # Deployment status
+                    try:
+                        deployments = apps_v1.list_namespaced_deployment(namespace=service_info["namespace"])
+                        deployment_count = len(deployments.items)
+                    except:
+                        deployment_count = 0
+                    
+                    service_status[service_id] = {
+                        "running_pods": running_pods,
+                        "total_pods": total_pods,
+                        "services": service_count,
+                        "deployments": deployment_count,
+                        "status": "ACTIVE" if running_pods > 0 else "NOT_RUNNING" if total_pods > 0 else "NOT_DEPLOYED"
+                    }
+                except:
+                    service_status[service_id] = {
+                        "running_pods": 0, "total_pods": 0, "services": 0, "deployments": 0,
+                        "status": "NOT_DEPLOYED"
+                    }
+            
+            # ALB status
+            try:
+                ingress = networking_v1.read_namespaced_ingress(name="platform-alb", namespace="argocd")
+                alb_hostname = ingress.status.load_balancer.ingress[0].hostname if ingress.status.load_balancer.ingress else None
+            except:
+                alb_hostname = None
+            
+            return {
+                "cluster_nodes": len(nodes.items),
+                "cluster_namespaces": len(namespaces.items),
+                "alb_hostname": alb_hostname,
+                "services": service_status
+            }
+            
+        except Exception as e:
+            st.error(f"Kubernetes API Connection Failed: {str(e)}")
+            return None
+    
+    # Get platform data
+    platform_data = get_comprehensive_k8s_data()
+    services = get_service_definitions()
+    
+    if platform_data:
+        # Platform metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Cluster Nodes", 
+                platform_data["cluster_nodes"],
+                "EKS Managed Nodes"
+            )
+        
+        with col2:
+            active_services = sum(1 for s in platform_data["services"].values() if s["status"] == "ACTIVE")
+            st.metric(
+                "Active Services", 
+                f"{active_services}/{len(services)}",
+                f"{int(active_services/len(services)*100)}% operational"
+            )
+        
+        with col3:
+            st.metric(
+                "Load Balancer",
+                "ACTIVE" if platform_data["alb_hostname"] else "NOT_CONFIGURED",
+                platform_data["alb_hostname"][:30] + "..." if platform_data["alb_hostname"] else "No ALB"
+            )
+        
+        with col4:
+            total_pods = sum(s["running_pods"] for s in platform_data["services"].values())
+            st.metric(
+                "Running Pods",
+                total_pods,
+                "Across all namespaces"
+            )
+        
+        st.divider()
+        
+        # Service cards with navigation
+        st.markdown("### Platform Services")
+        
+        base_url = f"http://{platform_data['alb_hostname']}" if platform_data["alb_hostname"] else None
+        
+        for service_id, service_info in services.items():
+            status_data = platform_data["services"][service_id]
+            status = status_data["status"]
+            
+            # Determine card class
+            card_class = "active" if status == "ACTIVE" else "pending" if status == "NOT_RUNNING" else ""
+            status_class = f"status-{status.lower().replace('_', '-')}"
+            
+            # Service URL
+            if base_url and status == "ACTIVE":
+                service_url = f"{base_url}{service_info['alb_path']}"
+                url_display = f"🌐 {service_url}"
+            else:
+                internal_url = f"{service_info['internal_service']}.{service_info['namespace']}.svc.cluster.local:{service_info['internal_port']}"
+                url_display = f"🔗 {internal_url}"
+            
+            st.markdown(f"""
+            <div class="service-card {card_class}">
+                <div class="status-badge {status_class}">{status.replace('_', ' ')}</div>
+                <h3 style="margin: 0 2rem 0.5rem 0; color: #f1f5f9;">{service_info['name']}</h3>
+                <p style="color: #cbd5e1; margin: 0.5rem 0;">{service_info['description']}</p>
+                <div class="service-details">
+                    <p><strong>Category:</strong> {service_info['category']}</p>
+                    <p><strong>Resources:</strong> {status_data['running_pods']}/{status_data['total_pods']} pods, {status_data['services']} services, {status_data['deployments']} deployments</p>
+                    <div class="service-url">{url_display}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Action buttons
+            col_a, col_b, col_c = st.columns(3)
+            
+            with col_a:
+                if status == "ACTIVE" and base_url:
+                    if st.button(f"Open {service_info['name']}", key=f"open_{service_id}", use_container_width=True):
+                        service_url = f"{base_url}{service_info['alb_path']}"
+                        st.markdown(f"**🚀 Opening:** [{service_info['name']}]({service_url})")
+                        st.success(f"Navigate to: {service_url}")
+            
+            with col_b:
+                if st.button(f"Port Forward", key=f"pf_{service_id}", use_container_width=True):
+                    port_cmd = f"kubectl port-forward -n {service_info['namespace']} svc/{service_info['internal_service']} {service_info['internal_port']}:{service_info['internal_port']}"
+                    st.code(port_cmd)
+                    st.info(f"Then access: http://localhost:{service_info['internal_port']}")
+            
+            with col_c:
+                if status == "NOT_DEPLOYED":
+                    if st.button(f"Deploy", key=f"deploy_{service_id}", use_container_width=True):
+                        st.code(service_info['deploy_command'])
+                        st.warning(f"Run the command above to deploy {service_info['name']}")
+        
+        st.divider()
+        
+        # Deployment stages
+        st.markdown("### Deployment Stages")
+        
+        stages = [
+            ("Wave 0: Core", ["argocd"], "Essential infrastructure components"),
+            ("Wave 1: Security", ["vault", "istio-system"], "Security and networking layer"),  
+            ("Wave 2: Observability", ["monitoring"], "Monitoring and logging stack"),
+            ("Wave 3: Data Processing", ["airflow"], "Workflow orchestration platform")
+        ]
+        
+        stage_cols = st.columns(4)
+        for i, (stage_name, stage_services, stage_desc) in enumerate(stages):
+            with stage_cols[i]:
+                # Calculate stage status
+                stage_active = sum(1 for svc in stage_services if platform_data["services"][svc]["status"] == "ACTIVE")
+                stage_total = len(stage_services)
+                
+                if stage_active == stage_total and stage_active > 0:
+                    stage_status = "complete"
+                    stage_icon = "✅"
+                    stage_text = "COMPLETE"
+                elif stage_active > 0:
+                    stage_status = "partial"
+                    stage_icon = "⚠️"
+                    stage_text = "PARTIAL"
+                else:
+                    stage_status = "pending"
+                    stage_icon = "⏳"
+                    stage_text = "PENDING"
+                
+                st.markdown(f"""
+                <div class="deployment-stage stage-{stage_status}">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #f1f5f9;">{stage_icon} {stage_name}</h4>
+                    <p style="margin: 0.25rem 0; color: #cbd5e1; font-size: 0.875rem;">{stage_desc}</p>
+                    <p style="margin: 0.5rem 0 0 0;"><strong>Status:</strong> {stage_text} ({stage_active}/{stage_total})</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Footer
+        st.divider()
+        st.markdown(f"""
+        <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 1rem;">
+            <p>Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')} | 
+            Cluster: {platform_data['cluster_nodes']} nodes | 
+            Active Services: {active_services}/{len(services)} | 
+            Platform Version: BASE v2.0</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    else:
+        st.error("🚨 **Unable to connect to Kubernetes API**")
+        st.markdown("""
+        **Troubleshooting:**
+        - Verify RBAC permissions for platform-ui-sa service account
+        - Check if Kubernetes API server is accessible
+        - Ensure platform-ui pod has proper cluster access
+        """)

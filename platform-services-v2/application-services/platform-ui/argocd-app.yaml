@@ -1,0 +1,288 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-ui
+  namespace: argocd
+  labels:
+    app: platform-ui
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ak/base-app-layer  # Replace with your actual repo
+    targetRevision: HEAD
+    path: platform-services-v2/application-services/platform-ui
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: argocd
+data:
+  health.py: |
+    from flask import Flask
+    app = Flask(__name__)
+    
+    @app.route('/health')
+    @app.route('/')
+    def health():
+        return "OK", 200
+    
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=8080)
+
+  app.py: |
+    import streamlit as st
+    from datetime import datetime
+    
+    st.set_page_config(page_title="BASE Platform", layout="wide")
+    
+    st.markdown("""
+    <style>
+    .stApp { background: #0a0e1a; color: #e4e7eb; }
+    .service-tile { 
+        background: #161b22; border: 1px solid #30363d; border-radius: 6px; 
+        padding: 1.5rem; margin: 1rem 0; transition: all 0.2s;
+    }
+    .service-tile:hover { border-color: #58a6ff; }
+    .status-active { background: #238636; color: white; padding: 0.3rem 0.8rem; border-radius: 4px; font-size: 0.8rem; }
+    .status-pending { background: #9a6700; color: white; padding: 0.3rem 0.8rem; border-radius: 4px; font-size: 0.8rem; }
+    .stButton > button { 
+        background-color: #238636 !important; 
+        color: white !important; 
+        border: 1px solid #2ea043 !important;
+        width: 100% !important;
+    }
+    .internal-url { font-family: monospace; color: #58a6ff; font-size: 0.9rem; }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("BASE Platform Console")
+    st.markdown("**Enterprise Data Platform - Internal Service Management**")
+    
+    # Get internal service data
+    def get_internal_services():
+        try:
+            from kubernetes import client, config
+            try:
+                config.load_incluster_config()
+            except:
+                return None
+            
+            v1 = client.CoreV1Api()
+            
+            services = {
+                "argocd": {
+                    "name": "ArgoCD",
+                    "description": "GitOps Continuous Deployment",
+                    "internal_url": "argocd-server.argocd.svc.cluster.local:80",
+                    "namespace": "argocd"
+                },
+                "vault": {
+                    "name": "HashiCorp Vault", 
+                    "description": "Secrets Management",
+                    "internal_url": "vault.vault.svc.cluster.local:8200",
+                    "namespace": "vault"
+                },
+                "monitoring": {
+                    "name": "Grafana",
+                    "description": "Monitoring Dashboard",
+                    "internal_url": "grafana.monitoring.svc.cluster.local:80",
+                    "namespace": "monitoring"
+                },
+                "airflow": {
+                    "name": "Apache Airflow",
+                    "description": "Workflow Orchestration", 
+                    "internal_url": "airflow-webserver.airflow.svc.cluster.local:8080",
+                    "namespace": "airflow"
+                }
+            }
+            
+            # Check which services are running
+            for service_id, service_info in services.items():
+                try:
+                    pods = v1.list_namespaced_pod(namespace=service_info["namespace"])
+                    running = len([p for p in pods.items if p.status.phase == "Running"])
+                    total = len(pods.items)
+                    service_info["running"] = running
+                    service_info["total"] = total
+                    service_info["status"] = "ACTIVE" if running > 0 else "NOT_RUNNING"
+                except:
+                    service_info["running"] = 0
+                    service_info["total"] = 0
+                    service_info["status"] = "NOT_DEPLOYED"
+            
+            return services
+        except Exception as e:
+            return None
+    
+    services = get_internal_services()
+    
+    if services:
+        # Metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            active_count = sum(1 for s in services.values() if s["status"] == "ACTIVE")
+            st.metric("Active Services", f"{active_count}/{len(services)}")
+        with col2:
+            st.metric("Access Method", "Internal Cluster")
+        with col3:
+            st.metric("Network", "service.namespace.svc.cluster.local")
+        
+        st.divider()
+        st.markdown("### Internal Service Access")
+        
+        for service_id, service in services.items():
+            status_class = "status-active" if service["status"] == "ACTIVE" else "status-pending"
+            status_text = service["status"]
+            
+            st.markdown(f"""
+            <div class="service-tile">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; color: #f0f6fc;">{service["name"]}</h4>
+                    <span class="{status_class}">{status_text}</span>
+                </div>
+                <p>{service["description"]}</p>
+                <p><strong>Status:</strong> {service["running"]}/{service["total"]} pods running</p>
+                <p class="internal-url">Internal: {service["internal_url"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if service["status"] == "ACTIVE":
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if st.button(f"Port-forward {service['name']}", key=f"pf_{service_id}"):
+                        port = service["internal_url"].split(":")[-1]
+                        st.code(f"kubectl port-forward -n {service['namespace']} svc/{service['internal_url'].split('.')[0]} {port}:{port}")
+                        st.success(f"Access locally: http://localhost:{port}")
+                
+                with col_b:
+                    if st.button(f"Service Info", key=f"info_{service_id}"):
+                        st.info(f"Namespace: {service['namespace']}")
+                        st.info(f"Internal DNS: {service['internal_url']}")
+    else:
+        st.error("Cannot connect to Kubernetes API")
+        st.markdown("""
+        **Manual Access Commands:**
+        ```bash
+        # ArgoCD
+        kubectl port-forward -n argocd svc/argocd-server 8080:80
+        
+        # Vault (when deployed)
+        kubectl port-forward -n vault svc/vault 8200:8200
+        
+        # Grafana (when deployed)  
+        kubectl port-forward -n monitoring svc/grafana 3000:80
+        ```
+        """)
+    
+    st.divider()
+    st.caption(f"Updated: {datetime.now().strftime('%H:%M:%S UTC')} | Internal cluster networking")
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui
+  namespace: argocd
+  labels:
+    app: platform-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-ui
+  template:
+    metadata:
+      labels:
+        app: platform-ui
+    spec:
+      serviceAccountName: platform-ui-sa
+      containers:
+      - name: streamlit
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8501
+        - containerPort: 8080
+        command: ["/bin/bash"]
+        args: ["-c", "pip install streamlit kubernetes requests flask && export PATH=$PATH:/root/.local/bin && python /config/health.py & /root/.local/bin/streamlit run /config/app.py --server.port=8501 --server.address=0.0.0.0"]
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health  
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: platform-ui-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-ui
+  namespace: argocd
+  labels:
+    app: platform-ui
+spec:
+  type: ClusterIP
+  ports:
+  - name: streamlit
+    port: 8501
+    targetPort: 8501
+  - name: health
+    port: 80
+    targetPort: 8080
+  selector:
+    app: platform-ui
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform-ui-sa
+  namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-ui-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "namespaces"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-ui-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-ui-reader
+subjects:
+- kind: ServiceAccount
+  name: platform-ui-sa
+  namespace: argocd

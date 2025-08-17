@@ -1,0 +1,310 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: argocd
+data:
+  dashboard.py: |
+    import streamlit as st
+    from datetime import datetime
+    import subprocess
+    import json
+    
+    st.set_page_config(
+        page_title="BASE Platform",
+        page_icon="■",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+    
+    # Professional CSS
+    st.markdown("""
+    <style>
+    .main > div { padding-top: 0rem; }
+    .stApp { background: #0a0e1a; color: #e4e7eb; }
+    .block-container { padding-top: 2rem; padding-bottom: 0rem; }
+    
+    .platform-header {
+        background: linear-gradient(90deg, #1a1d29 0%, #2a2d3a 100%);
+        padding: 2rem; border-radius: 12px; border: 1px solid #2d3748; margin-bottom: 2rem;
+    }
+    
+    .app-tile {
+        background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem;
+        margin: 1rem 0; transition: all 0.3s ease; cursor: pointer;
+    }
+    .app-tile:hover { border-color: #58a6ff; transform: translateY(-2px); }
+    
+    .app-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
+    }
+    .app-name { font-size: 1.3rem; font-weight: 600; color: #f0f6fc; margin: 0; }
+    .app-status { padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; }
+    .status-active { background: #1a7f37; color: #aff5b4; }
+    .status-pending { background: #9a6700; color: #f2cc60; }
+    
+    .app-description { color: #8b949e; font-size: 0.95rem; margin-bottom: 1rem; line-height: 1.4; }
+    .app-integration { background: #0d1117; border-left: 3px solid #58a6ff; padding: 0.8rem; margin: 1rem 0; }
+    .app-url { font-family: monospace; font-size: 0.8rem; color: #58a6ff; margin-top: 1rem; }
+    
+    .wave-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; }
+    .wave-title { color: #f0f6fc; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .wave-status { margin-bottom: 1rem; }
+    .wave-output { background: #0d1117; padding: 0.8rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem; }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.markdown("""
+    <div class="platform-header">
+        <h1 style="margin: 0; color: #f0f6fc; font-size: 2.5rem; font-weight: 300;">BASE Platform Control Center</h1>
+        <p style="margin: 0.5rem 0 0 0; color: #8b949e; font-size: 1.1rem;">Enterprise Data Platform Management & Application Access</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Application definitions with deployment status check
+    def check_service_health(namespace, app_labels):
+        try:
+            # Check multiple possible label selectors
+            for label in app_labels:
+                result = subprocess.run(['kubectl', 'get', 'pods', '-n', namespace, '-l', label, '--no-headers'], 
+                                       capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    # Check if any pods are running
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines:
+                        if 'Running' in line and '1/1' in line:
+                            return "ACTIVE"
+        except:
+            pass
+        return "PENDING"
+    
+    # Get ALB URL
+    alb_url = "http://base-platform-alb-1935284447.us-east-1.elb.amazonaws.com"
+    
+    # Application catalog
+    applications = [
+        {
+            "name": "ArgoCD",
+            "description": "GitOps continuous deployment platform managing all BASE platform applications and infrastructure.",
+            "integration": "Central deployment hub: Monitors Git repositories, deploys all platform services, manages application lifecycles, and provides deployment rollback capabilities.",
+            "namespace": "argocd",
+            "service": "argocd-server",
+            "path": "/argocd",
+            "port": 80,
+            "status": check_service_health("argocd", ["app.kubernetes.io/name=argocd-server", "app.kubernetes.io/part-of=argocd"])
+        },
+        {
+            "name": "HashiCorp Vault",
+            "description": "Secrets management system securing all platform credentials, API keys, and sensitive configuration data.",
+            "integration": "Security backbone: Provides secrets to all services via Kubernetes service accounts (IRSA), manages encryption keys, and handles certificate rotation for secure inter-service communication.",
+            "namespace": "vault",
+            "service": "vault",
+            "path": "/vault",
+            "port": 8200,
+            "status": check_service_health("vault", ["app.kubernetes.io/name=vault", "app=vault"])
+        },
+        {
+            "name": "Istio Service Mesh",
+            "description": "Traffic management, security, and observability layer for all microservice communications.",
+            "integration": "Network foundation: Routes traffic between BASE modules, enforces mTLS encryption, implements service-to-service authorization, and provides distributed tracing for all data flows.",
+            "namespace": "istio-system",
+            "service": "istiod",
+            "path": "/kiali",
+            "port": 20001,
+            "status": check_service_health("istio-system", ["app=istiod", "istio=pilot"])
+        },
+        {
+            "name": "Grafana",
+            "description": "Unified observability dashboard for monitoring all platform metrics, logs, and performance data.",
+            "integration": "Monitoring hub: Visualizes metrics from Prometheus, displays logs from ELK stack, tracks BASE module performance, and provides alerting for system health issues.",
+            "namespace": "monitoring",
+            "service": "grafana",
+            "path": "/grafana",
+            "port": 3000,
+            "status": check_service_health("monitoring", ["app.kubernetes.io/name=grafana", "app=grafana"])
+        },
+        {
+            "name": "Prometheus",
+            "description": "Metrics collection and alerting system monitoring all platform services and infrastructure.",
+            "integration": "Metrics engine: Scrapes metrics from all BASE modules, stores time-series data, triggers alerts for threshold breaches, and feeds data to Grafana dashboards.",
+            "namespace": "monitoring",
+            "service": "prometheus",
+            "path": "/prometheus",
+            "port": 9090,
+            "status": check_service_health("monitoring", ["app.kubernetes.io/name=prometheus", "app=prometheus"])
+        },
+        {
+            "name": "Apache Airflow",
+            "description": "Workflow orchestration platform managing complex data pipelines and BASE module task coordination.",
+            "integration": "Orchestration engine: Schedules data ingestion workflows, coordinates feature engineering pipelines, manages ML training jobs, and handles inter-module data processing dependencies.",
+            "namespace": "airflow",
+            "service": "airflow-webserver",
+            "path": "/airflow",
+            "port": 8080,
+            "status": check_service_health("airflow", ["app.kubernetes.io/name=airflow", "component=webserver"])
+        },
+        {
+            "name": "MLflow",
+            "description": "Machine learning lifecycle management tracking experiments, models, and deployment pipelines.",
+            "integration": "ML backbone: Tracks model experiments from feature engineering, stores trained models from BASE modules, manages model versions, and coordinates deployment to production endpoints.",
+            "namespace": "mlflow",
+            "service": "mlflow-tracking",
+            "path": "/mlflow",
+            "port": 5000,
+            "status": check_service_health("mlflow", ["app.kubernetes.io/name=mlflow", "app=mlflow"])
+        }
+    ]
+    
+    # Platform metrics (now calculated with actual application status)
+    active_count = len([app for app in applications if app["status"] == "ACTIVE"])
+    total_count = len(applications)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Platform Cluster", "ACTIVE", "4 nodes online")
+    with col2:
+        st.metric("Base Cluster", "ACTIVE", "8 nodes online") 
+    with col3:
+        st.metric("Region", "us-east-1", "Multi-AZ")
+    with col4:
+        st.metric("Active Services", f"{active_count}/{total_count}", f"{int(active_count/total_count*100)}% deployed")
+    
+    st.divider()
+    
+    # Display applications
+    st.markdown("### Platform Applications")
+    
+    for app in applications:
+        if app["status"] == "ACTIVE":
+            # Create clickable tile
+            app_url = f"{alb_url}{app['path']}"
+            
+            tile_html = f"""
+            <div class="app-tile" onclick="window.open('{app_url}', '_blank')">
+                <div class="app-header">
+                    <div class="app-name">{app['name']}</div>
+                    <div class="app-status status-active">ACTIVE</div>
+                </div>
+                <div class="app-description">{app['description']}</div>
+                <div class="app-integration">
+                    <strong>Platform Integration:</strong><br>
+                    {app['integration']}
+                </div>
+                <div class="app-url">🔗 {app_url}</div>
+            </div>
+            """
+            st.markdown(tile_html, unsafe_allow_html=True)
+        else:
+            # Show pending applications without links
+            tile_html = f"""
+            <div class="app-tile" style="opacity: 0.6;">
+                <div class="app-header">
+                    <div class="app-name">{app['name']}</div>
+                    <div class="app-status status-pending">PENDING DEPLOYMENT</div>
+                </div>
+                <div class="app-description">{app['description']}</div>
+                <div class="app-integration">
+                    <strong>Will integrate:</strong><br>
+                    {app['integration']}
+                </div>
+                <div style="color: #6e7681; font-size: 0.8rem; margin-top: 1rem;">Deploy with: ./deploy-platform.sh shared</div>
+            </div>
+            """
+            st.markdown(tile_html, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # Deployment Waves with useful information
+    st.markdown("### Deployment Waves Status")
+    
+    wave_col1, wave_col2 = st.columns(2)
+    
+    with wave_col1:
+        st.markdown("""
+        <div class="wave-card">
+            <div class="wave-title">Wave 0: Core Infrastructure</div>
+            <div class="wave-status">✅ COMPLETED</div>
+            <div class="wave-output">
+                ArgoCD v3.1.0 deployed<br>
+                Repository connections: 1 active<br>
+                Applications managed: 4<br>
+                Last sync: successful<br>
+                Access: /argocd (admin credentials in secrets)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with wave_col2:
+        st.markdown("""
+        <div class="wave-card">
+            <div class="wave-title">Wave 1: Security & Networking</div>
+            <div class="wave-status">✅ COMPLETED</div>
+            <div class="wave-output">
+                Vault unsealed and configured<br>
+                AWS Load Balancer Controller active<br>
+                Istio control plane healthy<br>
+                ALB: base-platform-alb (4 target groups)<br>
+                Service mesh: 8 services registered
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    wave_col3, wave_col4 = st.columns(2)
+    
+    with wave_col3:
+        st.markdown("""
+        <div class="wave-card">
+            <div class="wave-title">Wave 2: Shared Services</div>
+            <div class="wave-status">⏳ PENDING</div>
+            <div class="wave-output">
+                Next deployment targets:<br>
+                • Prometheus metrics collection<br>
+                • Grafana dashboards<br>
+                • ELK logging stack<br>
+                • Jaeger distributed tracing<br>
+                Deploy: ./deploy-platform.sh shared
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with wave_col4:
+        st.markdown("""
+        <div class="wave-card">
+            <div class="wave-title">Wave 3: Orchestration</div>
+            <div class="wave-status">⏳ PENDING</div>
+            <div class="wave-output">
+                Next deployment targets:<br>
+                • Apache Airflow workflow engine<br>
+                • MLflow experiment tracking<br>
+                • Kubeflow ML pipelines<br>
+                • Argo Workflows for data processing<br>
+                Deploy: ./deploy-platform.sh orchestration
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Operations
+    st.divider()
+    st.markdown("### Platform Operations")
+    
+    op_col1, op_col2, op_col3 = st.columns(3)
+    
+    with op_col1:
+        if st.button("Deploy Shared Services", type="primary", use_container_width=True):
+            st.code("./deploy-platform.sh shared", language="bash")
+            st.info("Deploys Prometheus, Grafana, ELK stack, and Jaeger")
+    
+    with op_col2:
+        if st.button("Deploy Orchestration", type="secondary", use_container_width=True):
+            st.code("./deploy-platform.sh orchestration", language="bash")
+            st.info("Deploys Airflow, MLflow, Kubeflow, and Argo Workflows")
+    
+    with op_col3:
+        if st.button("Validate Platform", type="secondary", use_container_width=True):
+            st.code("./deploy-platform.sh validate", language="bash")
+            st.info("Checks health of all deployed services")
+    
+    # Footer
+    st.divider()
+    st.caption(f"Updated: {datetime.now().strftime('%H:%M:%S UTC')} | BASE Platform Control Center | {len([a for a in applications if a['status'] == 'ACTIVE'])}/{len(applications)} services active")

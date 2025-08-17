@@ -1,0 +1,67 @@
+name: Platform CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'platform-services/**'
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-structure:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Validate Kustomize
+      run: |
+        for component in platform-services/kustomize/base-layer/*/; do
+          if [ -d "$component" ]; then
+            echo "Validating $component"
+            kubectl kustomize "$component/overlays/dev" --dry-run
+          fi
+        done
+
+    - name: Validate ArgoCD Applications
+      run: |
+        for app in platform-services/argocd/applications/*/*.yaml; do
+          if [ -f "$app" ]; then
+            echo "Validating $app"
+            kubectl apply --dry-run=client -f "$app"
+          fi
+        done
+
+    - name: Validate Helm Charts
+      run: |
+        for chart in platform-services/helm-charts/*/; do
+          if [ -f "$chart/Chart.yaml" ]; then
+            echo "Validating $chart"
+            helm lint "$chart"
+          fi
+        done
+
+  terraform-plan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+
+    - name: Terraform Init
+      working-directory: platform-services/terraform/environments/${{ matrix.environment }}
+      run: terraform init
+
+    - name: Terraform Plan
+      working-directory: platform-services/terraform/environments/${{ matrix.environment }}
+      run: terraform plan

@@ -1,0 +1,10 @@
+# Platform Configuration - Generated from Stage 1 and Stage 2 outputs
+PROJECT_NAME="plat"
+GITHUB_USER="vsem-svoim"
+GITHUB_ORG="vsem-svoim"
+ENVIRONMENT="dev"
+REPOSITORY_URL="https://github.com/vsem-svoim/base-app-layer.git"
+CLUSTER_NAME="plat-dev"
+CLOUD_PROVIDER="aws"
+REGION="us-east-1"
+BASE_LAYER_COMPONENTS="data_ingestion,data_control,data_distribution,data_quality,data_security,data_storage,data_streaming,event_coordination,feature_engineering,metadata_discovery,multimodal_processing,pipeline_management,quality_monitoring,schema_contracts"

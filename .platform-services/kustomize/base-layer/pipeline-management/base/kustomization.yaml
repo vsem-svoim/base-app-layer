@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../../../pipeline_management/agents/
+  - ../../../../../pipeline_management/configs/
+  - ../../../../../pipeline_management/models/
+  - ../../../../../pipeline_management/orchestrators/
+  - ../../../../../pipeline_management/workflows/
+
+configMapGenerator:
+  - name: pipeline-management-prompts
+    files:
+      - ../../../../../pipeline_management/prompts/
+
+commonLabels:
+  app.kubernetes.io/part-of: base-system
+  base.io/category: pipeline_management
+
+namespace: base-pipeline-management
+namePrefix: base-pipeline-management-

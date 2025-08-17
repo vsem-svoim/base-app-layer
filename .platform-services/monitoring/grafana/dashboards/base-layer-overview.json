@@ -1,0 +1,25 @@
+{
+  "dashboard": {
+    "title": "BASE Layer Overview",
+    "panels": [
+      {
+        "title": "Component Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"base-.*\"}"
+          }
+        ]
+      },
+      {
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "cpu_usage_percent{job=~\"base-.*\"}"
+          }
+        ]
+      }
+    ]
+  }
+}

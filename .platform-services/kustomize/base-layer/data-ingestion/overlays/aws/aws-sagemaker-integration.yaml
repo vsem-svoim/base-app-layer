@@ -1,0 +1,34 @@
+# Опциональная интеграция AWS SageMaker для ML моделей
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sagemaker-integration-config
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: ml-integration
+    cloud.provider: aws
+    integration.type: sagemaker
+data:
+  SAGEMAKER_ENABLED: "false"  # Опционально включается
+  SAGEMAKER_REGION: "us-east-1"
+  SAGEMAKER_EXECUTION_ROLE_ARN: "arn:aws:iam::ACCOUNT:role/SageMakerExecutionRole"
+  SAGEMAKER_ENDPOINT_PREFIX: "data-ingestion"
+  SAGEMAKER_INSTANCE_TYPE: "ml.t3.medium"
+  SAGEMAKER_MODEL_REGISTRY: "data-ingestion-models"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sagemaker-credentials
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/name: data-ingestion
+    app.kubernetes.io/component: ml-integration
+    cloud.provider: aws
+    integration.type: sagemaker
+type: Opaque
+stringData:
+  # Заполняется через Crossplane или внешне
+  SAGEMAKER_EXECUTION_ROLE_ARN: ""
+  MODEL_REGISTRY_URI: ""

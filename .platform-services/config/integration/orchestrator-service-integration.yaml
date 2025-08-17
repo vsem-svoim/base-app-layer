@@ -1,0 +1,180 @@
+---
+# ConfigMap for orchestrator integration with infrastructure services
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orchestrator-integration-config
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/component: integration
+    app.kubernetes.io/part-of: base-system
+data:
+  # Database Integration
+  database.properties: |
+    # PostgreSQL Integration (using Airflow's PostgreSQL instance)
+    postgresql.host=airflow-postgresql.airflow.svc.cluster.local
+    postgresql.port=5432
+    postgresql.database=orchestrator_state
+    postgresql.username=airflow
+    postgresql.password_secret=airflow-postgresql
+    postgresql.ssl_mode=prefer
+    postgresql.connection_pool_size=20
+    postgresql.connection_timeout=30s
+    postgresql.idle_timeout=5m
+    
+  # Redis Integration 
+  redis.properties: |
+    # Redis Integration (using Airflow's Redis for caching and messaging)
+    redis.host=airflow-redis.airflow.svc.cluster.local  
+    redis.port=6379
+    redis.database=1
+    redis.password_secret=airflow-redis-password
+    redis.connection_pool_size=10
+    redis.connection_timeout=5s
+    redis.idle_timeout=60s
+    
+  # Event Bus Integration (Kafka alternative using Redis Streams)
+  eventbus.properties: |
+    # Using Redis Streams as event bus until Kafka is available
+    eventbus.type=redis_streams
+    eventbus.host=airflow-redis.airflow.svc.cluster.local
+    eventbus.port=6379
+    eventbus.topics=ingestion.workflow.started,ingestion.workflow.completed,ingestion.workflow.failed,ingestion.agent.health
+    eventbus.consumer_group=ingestion-orchestrator
+    eventbus.batch_size=100
+    eventbus.processing_timeout=30s
+    
+  # MLflow Integration
+  mlflow.properties: |
+    # MLflow Integration for ML model management
+    mlflow.host=mlflow.mlflow.svc.cluster.local
+    mlflow.port=5000
+    mlflow.tracking_uri=http://mlflow.mlflow.svc.cluster.local:5000
+    mlflow.experiment_name=data-ingestion
+    mlflow.timeout=30s
+    
+  # Service Discovery Configuration
+  service_discovery.yaml: |
+    services:
+      # Data Ingestion Agents
+      data-collector:
+        host: base-data-collector-service.base-data-ingestion.svc.cluster.local
+        port: 9090
+        health_check: /health
+        timeout: 30s
+        
+      data-connector:
+        host: base-data-connector-service.base-data-ingestion.svc.cluster.local
+        port: 9090
+        health_check: /health
+        timeout: 30s
+        
+      data-converter:
+        host: base-data-converter-service.base-data-ingestion.svc.cluster.local
+        port: 9090
+        health_check: /health
+        timeout: 30s
+        
+      data-scheduler:
+        host: base-data-scheduler-service.base-data-ingestion.svc.cluster.local
+        port: 9090
+        health_check: /health
+        timeout: 30s
+        
+      data-merger:
+        host: base-data-merger-service.base-data-ingestion.svc.cluster.local
+        port: 9090
+        health_check: /health
+        timeout: 30s
+        
+      data-fetch-retry:
+        host: base-data-fetch-retry-service.base-data-ingestion.svc.cluster.local
+        port: 9090
+        health_check: /health
+        timeout: 30s
+        
+      # External Platform Services (to be implemented)
+      base-data-quality:
+        host: base-data-quality-service.base-data-quality.svc.cluster.local
+        port: 8080
+        endpoint: /api/v1/validate
+        timeout: 60s
+        
+      base-data-storage:
+        host: base-data-storage-service.base-data-storage.svc.cluster.local
+        port: 8080
+        endpoint: /api/v1/store
+        timeout: 300s
+        
+      base-feature-engineering:
+        host: base-feature-engineering-service.base-feature-engineering.svc.cluster.local
+        port: 8080
+        endpoint: /api/v1/process
+        timeout: 120s
+        
+      base-data-security:
+        host: base-data-security-service.base-data-security.svc.cluster.local
+        port: 8080
+        endpoint: /api/v1/classify-encrypt
+        timeout: 30s
+        
+  # Workflow Integration Configuration
+  workflow_integration.yaml: |
+    workflow_engine:
+      type: kubernetes_workflows
+      namespace: base-data-ingestion
+      executor: kubernetes
+      parallelism: 50
+      
+    workflow_scheduling:
+      scheduler: airflow
+      scheduler_endpoint: http://airflow-webserver.airflow.svc.cluster.local:8080
+      dag_folder: /opt/airflow/dags/base-ingestion
+      
+    workflow_state:
+      backend: postgresql
+      connection: postgresql://airflow@airflow-postgresql.airflow.svc.cluster.local:5432/orchestrator_state
+      
+    workflow_monitoring:
+      metrics_backend: prometheus
+      metrics_endpoint: /metrics
+      alerts_enabled: true
+      
+---
+# Secret for database and Redis passwords
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orchestrator-integration-secrets
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/component: integration
+    app.kubernetes.io/part-of: base-system
+type: Opaque
+data:
+  # Base64 encoded credentials (using airflow as default)
+  postgresql_password: YWlyZmxvdw==  # airflow
+  redis_password: ""                  # empty - no password set
+  mlflow_api_key: ""                  # empty - no API key required
+
+---
+# ServiceMonitor for Prometheus integration
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: orchestrator-integration-metrics
+  namespace: base-data-ingestion
+  labels:
+    app.kubernetes.io/component: integration
+    app.kubernetes.io/part-of: base-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ingestion
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+  - port: health
+    interval: 30s
+    path: /health

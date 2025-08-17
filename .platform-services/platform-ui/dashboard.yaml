@@ -1,0 +1,386 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui-dashboard
+  namespace: platform-ui
+  labels:
+    app: platform-ui-dashboard
+    component: dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-ui-dashboard
+  template:
+    metadata:
+      labels:
+        app: platform-ui-dashboard
+        component: dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: dashboard-config
+          mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: dashboard-config
+        configMap:
+          name: platform-ui-config
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-ui-service
+  namespace: platform-ui
+  labels:
+    app: platform-ui-dashboard
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: platform-ui-dashboard
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-ui-ingress
+  namespace: platform-ui
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: base-platform-dashboard
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "72.79.77.223/32"
+spec:
+  rules:
+  - host: platform.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui-service
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: platform-ui
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BASE Platform Dashboard</title>
+        <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+            .dashboard-container { min-height: 100vh; padding: 2rem 0; }
+            .service-card { 
+                border: none; 
+                border-radius: 15px; 
+                transition: all 0.3s ease;
+                backdrop-filter: blur(10px);
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .service-card:hover { 
+                transform: translateY(-10px); 
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            }
+            .service-icon { font-size: 3rem; margin-bottom: 1rem; }
+            .status-indicator { 
+                width: 12px; 
+                height: 12px; 
+                border-radius: 50%; 
+                display: inline-block; 
+                margin-left: 8px;
+            }
+            .status-healthy { background-color: #28a745; }
+            .status-unhealthy { background-color: #dc3545; }
+            .status-unknown { background-color: #ffc107; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        
+        <script type="text/babel">
+            const { useState, useEffect } = React;
+            
+            const services = [
+                {
+                    name: "ArgoCD",
+                    description: "GitOps Continuous Deployment",
+                    icon: "fas fa-rocket",
+                    url: "/argocd",
+                    namespace: "argocd",
+                    color: "text-info"
+                },
+                {
+                    name: "Airflow",
+                    description: "Workflow Orchestration",
+                    icon: "fas fa-wind",
+                    url: "/airflow",
+                    namespace: "airflow", 
+                    color: "text-primary"
+                },
+                {
+                    name: "MLflow",
+                    description: "ML Lifecycle Management",
+                    icon: "fas fa-brain",
+                    url: "/mlflow",
+                    namespace: "mlflow",
+                    color: "text-success"
+                },
+                {
+                    name: "Kubeflow",
+                    description: "ML Workflows on Kubernetes",
+                    icon: "fas fa-cogs",
+                    url: "/kubeflow",
+                    namespace: "kubeflow",
+                    color: "text-warning"
+                },
+                {
+                    name: "Grafana",
+                    description: "Monitoring & Observability",
+                    icon: "fas fa-chart-line",
+                    url: "/grafana",
+                    namespace: "monitoring",
+                    color: "text-danger"
+                },
+                {
+                    name: "Prometheus",
+                    description: "Metrics Collection",
+                    icon: "fas fa-tachometer-alt",
+                    url: "/prometheus",
+                    namespace: "monitoring",
+                    color: "text-warning"
+                },
+                {
+                    name: "Istio",
+                    description: "Service Mesh & Traffic Management",
+                    icon: "fas fa-network-wired",
+                    url: "/istio",
+                    namespace: "istio-system",
+                    color: "text-info"
+                },
+                {
+                    name: "Vault",
+                    description: "Secrets Management",
+                    icon: "fas fa-vault",
+                    url: "/vault",
+                    namespace: "vault",
+                    color: "text-warning"
+                },
+                {
+                    name: "Crossplane",
+                    description: "Infrastructure as Code",
+                    icon: "fas fa-layer-group",
+                    url: "/crossplane",
+                    namespace: "crossplane-system",
+                    color: "text-secondary"
+                }
+            ];
+            
+            function ServiceCard({ service }) {
+                const [status, setStatus] = useState('unknown');
+                
+                useEffect(() => {
+                    // Simulate health check
+                    const checkHealth = async () => {
+                        try {
+                            const response = await fetch(`/api/health/${service.namespace}`);
+                            setStatus(response.ok ? 'healthy' : 'unhealthy');
+                        } catch (error) {
+                            setStatus('unknown');
+                        }
+                    };
+                    
+                    checkHealth();
+                    const interval = setInterval(checkHealth, 30000);
+                    return () => clearInterval(interval);
+                }, [service.namespace]);
+                
+                return (
+                    <div className="col-md-6 col-lg-4 mb-4">
+                        <div className="card service-card h-100 text-white">
+                            <div className="card-body text-center">
+                                <i className={`${service.icon} service-icon ${service.color}`}></i>
+                                <h5 className="card-title">
+                                    {service.name}
+                                    <span className={`status-indicator status-${status}`}></span>
+                                </h5>
+                                <p className="card-text">{service.description}</p>
+                                <p className="small text-muted">Namespace: {service.namespace}</p>
+                                <a href={service.url} className="btn btn-outline-light">
+                                    <i className="fas fa-external-link-alt me-2"></i>
+                                    Open Service
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            function Dashboard() {
+                const [clusterInfo, setClusterInfo] = useState({});
+                
+                useEffect(() => {
+                    // Get cluster information
+                    fetch('/api/cluster-info')
+                        .then(response => response.json())
+                        .then(data => setClusterInfo(data))
+                        .catch(error => console.error('Failed to fetch cluster info:', error));
+                }, []);
+                
+                return (
+                    <div className="dashboard-container">
+                        <div className="container">
+                            <div className="row mb-5">
+                                <div className="col-12 text-center">
+                                    <h1 className="display-4 text-white mb-3">
+                                        <i className="fas fa-layer-group me-3"></i>
+                                        BASE Platform Dashboard
+                                    </h1>
+                                    <p className="lead text-white-50">
+                                        Unified access to your enterprise data platform services
+                                    </p>
+                                    <div className="badge bg-success me-2">
+                                        <i className="fas fa-server me-1"></i>
+                                        Platform Cluster
+                                    </div>
+                                    <div className="badge bg-info me-2">
+                                        <i className="fas fa-database me-1"></i>
+                                        Base Cluster
+                                    </div>
+                                    <div className="badge bg-warning">
+                                        <i className="fas fa-cloud me-1"></i>
+                                        AWS us-east-1
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="row">
+                                {services.map((service, index) => (
+                                    <ServiceCard key={index} service={service} />
+                                ))}
+                            </div>
+                            
+                            <div className="row mt-5">
+                                <div className="col-12">
+                                    <div className="card service-card text-white">
+                                        <div className="card-body">
+                                            <h5 className="card-title">
+                                                <i className="fas fa-info-circle me-2"></i>
+                                                Platform Information
+                                            </h5>
+                                            <div className="row">
+                                                <div className="col-md-4">
+                                                    <strong>Environment:</strong> Development
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <strong>Region:</strong> us-east-1
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <strong>Deployment:</strong> GitOps
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            ReactDOM.render(<Dashboard />, document.getElementById('root'));
+        </script>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: platform-ui
+data:
+  default.conf: |
+    resolver kube-dns.kube-system.svc.cluster.local valid=10s;
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Simple health check endpoint
+        location = /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Main dashboard
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        # Dynamic proxy to ArgoCD (always available)
+        location /argocd/ {
+            proxy_pass http://argocd-server.argocd.svc.cluster.local:80/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # API endpoints
+        location /api/health/ {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        location /api/cluster-info {
+            access_log off;
+            return 200 '{"cluster": "base-app-layer-dev-platform", "region": "us-east-1", "environment": "dev"}';
+            add_header Content-Type application/json;
+        }
+    }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-ui
+  labels:
+    name: platform-ui
+    component: dashboard

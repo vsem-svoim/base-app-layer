@@ -1,0 +1,160 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: deployment-wave-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: deployment-monitoring
+    app.kubernetes.io/component: alerting
+spec:
+  groups:
+    - name: deployment.waves
+      interval: 30s
+      rules:
+        - alert: ApplicationSyncFailed
+          expr: |
+            argocd_app_info{sync_status!="Synced"} == 1
+          for: 5m
+          labels:
+            severity: critical
+            component: deployment
+            wave: "{{ $labels.wave }}"
+          annotations:
+            summary: "ArgoCD Application sync failed"
+            description: "Application {{ $labels.name }} in namespace {{ $labels.namespace }} has failed to sync for more than 5 minutes. Current status: {{ $labels.sync_status }}"
+        
+        - alert: ApplicationHealthDegraded
+          expr: |
+            argocd_app_info{health_status!="Healthy"} == 1
+          for: 3m
+          labels:
+            severity: warning
+            component: deployment
+          annotations:
+            summary: "ArgoCD Application health degraded"
+            description: "Application {{ $labels.name }} is not healthy. Current health status: {{ $labels.health_status }}"
+        
+        - alert: DeploymentWaveStalled
+          expr: |
+            (
+              count(argocd_app_info{deployment_wave=~"[1-4]", sync_status="Synced", health_status="Healthy"}) by (deployment_wave)
+              / 
+              count(argocd_app_info{deployment_wave=~"[1-4]"}) by (deployment_wave)
+            ) < 1
+          for: 10m
+          labels:
+            severity: critical
+            component: deployment
+          annotations:
+            summary: "Deployment wave {{ $labels.deployment_wave }} stalled"
+            description: "Not all applications in deployment wave {{ $labels.deployment_wave }} are healthy and synced for more than 10 minutes"
+        
+        - alert: WorkflowExecutionFailed
+          expr: |
+            increase(argo_workflows_error_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            component: workflow
+          annotations:
+            summary: "Argo Workflow execution failed"
+            description: "Argo Workflow errors detected in the last 5 minutes"
+        
+        - alert: EventSourceDown
+          expr: |
+            up{job="argo-events-eventsource"} == 0
+          for: 2m
+          labels:
+            severity: warning
+            component: events
+          annotations:
+            summary: "Argo Events EventSource is down"
+            description: "EventSource {{ $labels.instance }} has been down for more than 2 minutes"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-health-alerts
+  namespace: monitoring
+spec:
+  groups:
+    - name: platform.health
+      interval: 60s
+      rules:
+        - alert: BaseLayerComponentDown
+          expr: |
+            up{namespace=~"base-.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: "{{ $labels.namespace }}"
+          annotations:
+            summary: "Base layer component is down"
+            description: "Component {{ $labels.job }} in namespace {{ $labels.namespace }} has been down for more than 5 minutes"
+        
+        - alert: MLPlatformDegraded
+          expr: |
+            (
+              count(up{namespace=~"(seldon-system|mlflow|kubeflow)"} == 1)
+              /
+              count(up{namespace=~"(seldon-system|mlflow|kubeflow)"})
+            ) < 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: ml-platform
+          annotations:
+            summary: "ML Platform health degraded"
+            description: "Less than 80% of ML platform components are healthy"
+        
+        - alert: CrossplaneProviderFailure
+          expr: |
+            crossplane_provider_unhealthy == 1
+          for: 5m
+          labels:
+            severity: critical
+            component: infrastructure
+          annotations:
+            summary: "Crossplane provider failure detected"
+            description: "Crossplane provider {{ $labels.provider }} is unhealthy"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-webhook-config
+  namespace: monitoring
+data:
+  webhook.yml: |
+    route:
+      group_by: ['alertname', 'component']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 24h
+      receiver: 'deployment-webhook'
+      routes:
+        - match:
+            component: deployment
+          receiver: 'deployment-automation'
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+    
+    receivers:
+      - name: 'deployment-webhook'
+        webhook_configs:
+          - url: 'http://argo-events-webhook.argocd.svc.cluster.local:12000/prometheus'
+            send_resolved: true
+      
+      - name: 'deployment-automation'
+        webhook_configs:
+          - url: 'http://argo-events-webhook.argocd.svc.cluster.local:12000/deployment'
+            send_resolved: false
+            http_config:
+              basic_auth:
+                username: 'deployment'
+                password: 'automation'
+      
+      - name: 'critical-alerts'
+        webhook_configs:
+          - url: 'http://argo-events-webhook.argocd.svc.cluster.local:12000/critical'
+            send_resolved: true

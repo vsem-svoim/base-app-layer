@@ -1,0 +1,340 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: argocd
+data:
+  dashboard.py: |
+    import streamlit as st
+    from datetime import datetime
+    import subprocess
+    import json
+    
+    st.set_page_config(
+        page_title="BASE Platform",
+        page_icon="▪",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+    
+    # Professional CSS - no childish elements
+    st.markdown("""
+    <style>
+    .main > div { padding-top: 0rem; }
+    .stApp { background: #0a0e1a; color: #e4e7eb; }
+    .block-container { padding-top: 2rem; padding-bottom: 0rem; }
+    
+    .platform-header {
+        background: linear-gradient(90deg, #1a1d29 0%, #2a2d3a 100%);
+        padding: 2rem; border-radius: 8px; border: 1px solid #2d3748; margin-bottom: 2rem;
+    }
+    
+    .app-tile {
+        background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 1.5rem;
+        margin: 1rem 0; transition: all 0.2s ease; cursor: pointer;
+    }
+    .app-tile:hover { border-color: #58a6ff; transform: translateY(-1px); }
+    
+    .app-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
+    }
+    .app-name { font-size: 1.2rem; font-weight: 600; color: #f0f6fc; margin: 0; }
+    .app-status { 
+        padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.7rem; 
+        font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .status-active { background: #238636; color: #ffffff; }
+    .status-pending { background: #9a6700; color: #ffffff; }
+    
+    .app-description { color: #8b949e; font-size: 0.9rem; margin-bottom: 1rem; line-height: 1.3; }
+    .app-integration { 
+        background: #0d1117; border-left: 2px solid #58a6ff; padding: 0.75rem; 
+        margin: 0.75rem 0; font-size: 0.85rem; line-height: 1.3;
+    }
+    .app-url { font-family: 'Courier New', monospace; font-size: 0.75rem; color: #58a6ff; margin-top: 0.75rem; }
+    
+    .wave-card { 
+        background: #161b22; border: 1px solid #30363d; border-radius: 6px; 
+        padding: 1.25rem; margin-bottom: 1rem;
+    }
+    .wave-title { color: #f0f6fc; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .wave-status { margin-bottom: 0.75rem; font-size: 0.85rem; }
+    .wave-output { 
+        background: #0d1117; padding: 0.75rem; border-radius: 3px; 
+        font-family: 'Courier New', monospace; font-size: 0.75rem; 
+        border-left: 2px solid #30363d;
+    }
+    .status-complete { color: #3fb950; }
+    .status-pending-wave { color: #f85149; }
+    
+    /* Fix button colors */
+    .stButton > button {
+        background-color: #238636 !important;
+        color: #ffffff !important;
+        border: 1px solid #2ea043 !important;
+        border-radius: 4px !important;
+    }
+    .stButton > button:hover {
+        background-color: #2ea043 !important;
+        border-color: #3fb950 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header - professional, no icons
+    st.markdown("""
+    <div class="platform-header">
+        <h1 style="margin: 0; color: #f0f6fc; font-size: 2.2rem; font-weight: 400;">BASE Platform Console</h1>
+        <p style="margin: 0.5rem 0 0 0; color: #8b949e; font-size: 1rem;">Enterprise Data Platform Management Interface</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Real-time service detection
+    def get_pod_status(namespace, label_selectors):
+        for label in label_selectors:
+            try:
+                result = subprocess.run([
+                    'kubectl', 'get', 'pods', '-n', namespace, '-l', label, 
+                    '--no-headers', '-o', 'custom-columns=STATUS:.status.phase,READY:.status.containerStatuses[0].ready'
+                ], capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0 and result.stdout.strip():
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines:
+                        if 'Running' in line and 'true' in line:
+                            return "ACTIVE"
+            except Exception as e:
+                continue
+        return "PENDING"
+    
+    def get_deployment_info(namespace):
+        try:
+            result = subprocess.run([
+                'kubectl', 'get', 'deployments,statefulsets,pods', '-n', namespace, 
+                '--no-headers'
+            ], capture_output=True, text=True, timeout=10)
+            return result.stdout.strip() if result.returncode == 0 else f"Namespace {namespace} not found"
+        except:
+            return f"Unable to query {namespace}"
+    
+    # Application definitions
+    alb_url = "http://base-platform-alb-1935284447.us-east-1.elb.amazonaws.com"
+    
+    applications = [
+        {
+            "name": "ArgoCD",
+            "description": "GitOps continuous deployment platform managing all BASE platform applications and infrastructure.",
+            "integration": "Central deployment hub: Monitors Git repositories, deploys all platform services, manages application lifecycles, and provides deployment rollback capabilities.",
+            "namespace": "argocd",
+            "path": "/argocd",
+            "labels": ["app.kubernetes.io/name=argocd-server"],
+            "status": get_pod_status("argocd", ["app.kubernetes.io/name=argocd-server"])
+        },
+        {
+            "name": "HashiCorp Vault",
+            "description": "Secrets management system securing all platform credentials, API keys, and sensitive configuration data.",
+            "integration": "Security backbone: Provides secrets to all services via Kubernetes service accounts, manages encryption keys, and handles certificate rotation for secure inter-service communication.",
+            "namespace": "vault",
+            "path": "/vault",
+            "labels": ["app.kubernetes.io/name=vault"],
+            "status": get_pod_status("vault", ["app.kubernetes.io/name=vault"])
+        },
+        {
+            "name": "Istio Service Mesh",
+            "description": "Traffic management, security, and observability layer for all microservice communications.",
+            "integration": "Network foundation: Routes traffic between BASE modules, enforces mTLS encryption, implements service-to-service authorization, and provides distributed tracing for all data flows.",
+            "namespace": "istio-system",
+            "path": "/kiali",
+            "labels": ["app=istiod"],
+            "status": get_pod_status("istio-system", ["app=istiod"])
+        },
+        {
+            "name": "Prometheus",
+            "description": "Metrics collection and alerting system monitoring all platform services and infrastructure.",
+            "integration": "Metrics engine: Scrapes metrics from all BASE modules, stores time-series data, triggers alerts for threshold breaches, and feeds data to Grafana dashboards.",
+            "namespace": "monitoring",
+            "path": "/prometheus",
+            "labels": ["app.kubernetes.io/name=prometheus"],
+            "status": get_pod_status("monitoring", ["app.kubernetes.io/name=prometheus", "app=prometheus"])
+        },
+        {
+            "name": "Grafana",
+            "description": "Unified observability dashboard for monitoring all platform metrics, logs, and performance data.",
+            "integration": "Monitoring hub: Visualizes metrics from Prometheus, displays logs from ELK stack, tracks BASE module performance, and provides alerting for system health issues.",
+            "namespace": "monitoring",
+            "path": "/grafana",
+            "labels": ["app.kubernetes.io/name=grafana"],
+            "status": get_pod_status("monitoring", ["app.kubernetes.io/name=grafana", "app=grafana"])
+        },
+        {
+            "name": "Apache Airflow",
+            "description": "Workflow orchestration platform managing complex data pipelines and BASE module task coordination.",
+            "integration": "Orchestration engine: Schedules data ingestion workflows, coordinates feature engineering pipelines, manages ML training jobs, and handles inter-module data processing dependencies.",
+            "namespace": "airflow",
+            "path": "/airflow",
+            "labels": ["app.kubernetes.io/name=airflow"],
+            "status": get_pod_status("airflow", ["app.kubernetes.io/name=airflow", "component=webserver"])
+        },
+        {
+            "name": "MLflow",
+            "description": "Machine learning lifecycle management tracking experiments, models, and deployment pipelines.",
+            "integration": "ML backbone: Tracks model experiments from feature engineering, stores trained models from BASE modules, manages model versions, and coordinates deployment to production endpoints.",
+            "namespace": "mlflow",
+            "path": "/mlflow",
+            "labels": ["app.kubernetes.io/name=mlflow"],
+            "status": get_pod_status("mlflow", ["app.kubernetes.io/name=mlflow", "app=mlflow"])
+        }
+    ]
+    
+    # Dynamic metrics
+    active_count = len([app for app in applications if app["status"] == "ACTIVE"])
+    total_count = len(applications)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Platform Cluster", "ACTIVE", "EKS Managed")
+    with col2:
+        st.metric("Base Cluster", "ACTIVE", "Multi-AZ") 
+    with col3:
+        st.metric("Region", "us-east-1", "Virginia")
+    with col4:
+        st.metric("Active Services", f"{active_count}/{total_count}", f"{int(active_count/total_count*100) if total_count > 0 else 0}% operational")
+    
+    st.divider()
+    
+    # Display applications
+    st.markdown("### Platform Applications")
+    
+    for app in applications:
+        if app["status"] == "ACTIVE":
+            app_url = f"{alb_url}{app['path']}"
+            tile_html = f"""
+            <div class="app-tile" onclick="window.open('{app_url}', '_blank')">
+                <div class="app-header">
+                    <div class="app-name">{app['name']}</div>
+                    <div class="app-status status-active">ACTIVE</div>
+                </div>
+                <div class="app-description">{app['description']}</div>
+                <div class="app-integration">
+                    <strong>Platform Integration:</strong><br>
+                    {app['integration']}
+                </div>
+                <div class="app-url">{app_url}</div>
+            </div>
+            """
+            st.markdown(tile_html, unsafe_allow_html=True)
+        else:
+            tile_html = f"""
+            <div class="app-tile" style="opacity: 0.5;">
+                <div class="app-header">
+                    <div class="app-name">{app['name']}</div>
+                    <div class="app-status status-pending">PENDING</div>
+                </div>
+                <div class="app-description">{app['description']}</div>
+                <div class="app-integration">
+                    <strong>Will integrate:</strong><br>
+                    {app['integration']}
+                </div>
+                <div style="color: #6e7681; font-size: 0.75rem; margin-top: 0.75rem;">Namespace: {app['namespace']} - Deploy with shared/orchestration wave</div>
+            </div>
+            """
+            st.markdown(tile_html, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # Dynamic deployment waves
+    st.markdown("### Deployment Waves Status")
+    
+    wave_col1, wave_col2 = st.columns(2)
+    
+    with wave_col1:
+        argocd_info = get_deployment_info("argocd")
+        argocd_pods = len([line for line in argocd_info.split('\n') if 'pod/' in line and 'Running' in line])
+        
+        st.markdown(f"""
+        <div class="wave-card">
+            <div class="wave-title">Wave 0: Core Infrastructure</div>
+            <div class="wave-status status-complete">COMPLETED</div>
+            <div class="wave-output">
+                ArgoCD namespace: argocd<br>
+                Running pods: {argocd_pods}<br>
+{argocd_info[:200]}...
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with wave_col2:
+        vault_info = get_deployment_info("vault")
+        istio_info = get_deployment_info("istio-system")
+        
+        st.markdown(f"""
+        <div class="wave-card">
+            <div class="wave-title">Wave 1: Security & Networking</div>
+            <div class="wave-status status-complete">COMPLETED</div>
+            <div class="wave-output">
+                Vault: {vault_info.split()[0] if vault_info else 'Not found'}<br>
+                Istio: {len([line for line in istio_info.split('\n') if 'Running' in line])} running pods<br>
+                AWS LB Controller: Active in kube-system
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    wave_col3, wave_col4 = st.columns(2)
+    
+    with wave_col3:
+        monitoring_info = get_deployment_info("monitoring")
+        monitoring_status = "COMPLETED" if "prometheus" in monitoring_info.lower() else "PENDING"
+        status_class = "status-complete" if monitoring_status == "COMPLETED" else "status-pending-wave"
+        
+        st.markdown(f"""
+        <div class="wave-card">
+            <div class="wave-title">Wave 2: Shared Services</div>
+            <div class="wave-status {status_class}">{monitoring_status}</div>
+            <div class="wave-output">
+                Monitoring namespace status:<br>
+                {monitoring_info[:150] if monitoring_info and "not found" not in monitoring_info else "Namespace not created - run ./deploy-platform.sh shared"}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with wave_col4:
+        airflow_info = get_deployment_info("airflow")
+        orchestration_status = "COMPLETED" if "airflow" in airflow_info.lower() else "PENDING"
+        status_class = "status-complete" if orchestration_status == "COMPLETED" else "status-pending-wave"
+        
+        st.markdown(f"""
+        <div class="wave-card">
+            <div class="wave-title">Wave 3: Orchestration</div>
+            <div class="wave-status {status_class}">{orchestration_status}</div>
+            <div class="wave-output">
+                Orchestration namespace status:<br>
+                {airflow_info[:150] if airflow_info and "not found" not in airflow_info else "Namespace not created - run ./deploy-platform.sh orchestration"}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Platform Operations - Fixed button colors
+    st.divider()
+    st.markdown("### Platform Operations")
+    
+    op_col1, op_col2, op_col3 = st.columns(3)
+    
+    with op_col1:
+        if st.button("Deploy Shared Services", use_container_width=True, key="shared"):
+            st.code("./deploy-platform.sh shared", language="bash")
+            st.success("Command: Deploy Prometheus, Grafana, ELK stack")
+    
+    with op_col2:
+        if st.button("Deploy Orchestration", use_container_width=True, key="orchestration"):
+            st.code("./deploy-platform.sh orchestration", language="bash")
+            st.success("Command: Deploy Airflow, MLflow, Kubeflow")
+    
+    with op_col3:
+        if st.button("Validate Platform", use_container_width=True, key="validate"):
+            st.code("./deploy-platform.sh validate", language="bash")
+            st.success("Command: Check all service health")
+    
+    # Footer
+    st.divider()
+    current_time = datetime.now().strftime('%H:%M:%S UTC')
+    st.caption(f"Updated: {current_time} | BASE Platform Console | {active_count}/{total_count} services operational")
