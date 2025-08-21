@@ -40,6 +40,8 @@ spec:
         base.io/type: agent
     spec:
       serviceAccountName: base-data-fetch-retry-sa
+      nodeSelector:
+        NodeGroup: base-data-services
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -48,6 +50,8 @@ spec:
       - name: data-fetch-retry
         image: python:latest
         imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Gen AI Data Fetch Retry Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
         ports:
         - name: http-metrics
           containerPort: 9090

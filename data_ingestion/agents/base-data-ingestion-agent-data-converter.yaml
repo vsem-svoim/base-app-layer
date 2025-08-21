@@ -50,6 +50,8 @@ spec:
       - name: data-converter
         image: python:3.13.7-slim
         imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Gen AI Data Converter Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
         ports:
         - name: http-metrics
           containerPort: 9090
