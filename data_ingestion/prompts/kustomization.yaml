@@ -19,11 +19,11 @@ resources:
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: base-data-ingestion
-  app.kubernetes.io/component: prompts
-  app.kubernetes.io/part-of: base-layer
-  module.type: data-ingestion
-  deployment.wave: "3"
+    app.kubernetes.io/name: base-data-ingestion
+    app.kubernetes.io/component: prompts
+    app.kubernetes.io/part-of: base-layer
+    module.type: data-ingestion
+    deployment.wave: "3"
 
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "3"
