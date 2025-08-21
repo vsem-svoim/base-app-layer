@@ -6,17 +6,21 @@ metadata:
   namespace: mlflow
 
 resources:
-  - namespace.yaml
-  - mlflow-rbac.yaml
-  - mlflow-postgresql.yaml
-  - mlflow-deployment.yaml
-  - mlflow-service.yaml
-  - mlflow-ingress.yaml
+- namespace.yaml
+- manifests/mlflow-deployment.yaml
+- mlflow-rbac.yaml
+- mlflow-service.yaml
+- mlflow-ingress.yaml
 
-namespace: mlflow
+namePrefix: ""
+nameSuffix: ""
 
 commonLabels:
   app.kubernetes.io/name: mlflow
   app.kubernetes.io/component: ml-lifecycle
-  app.kubernetes.io/part-of: base-platform
+  app.kubernetes.io/part-of: base-app-layer
   deployment.wave: "2"
+
+images:
+- name: python
+  newTag: "3.11-slim"

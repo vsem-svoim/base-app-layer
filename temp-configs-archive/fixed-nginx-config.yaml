@@ -1,0 +1,228 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: platform-ui
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        
+        # Increase buffer sizes for large responses
+        proxy_buffering on;
+        proxy_buffer_size 16k;
+        proxy_buffers 4 16k;
+        proxy_busy_buffers_size 16k;
+        
+        # Main dashboard
+        location = / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+        
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        # Grafana with proper sub_filter
+        location /grafana/ {
+            proxy_pass http://grafana.platform-monitoring.svc.cluster.local:3000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # Handle Grafana redirects and assets
+            proxy_redirect off;
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter '"/' '"/grafana/';
+            sub_filter "'/" "'/grafana/";
+            sub_filter 'href="/' 'href="/grafana/';
+            sub_filter 'src="/' 'src="/grafana/';
+            sub_filter_types text/html text/css text/javascript application/javascript application/json;
+        }
+        
+        # Prometheus with path handling
+        location /prometheus/ {
+            proxy_pass http://prometheus.platform-monitoring.svc.cluster.local:9090/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Handle Prometheus redirects
+            proxy_redirect off;
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter 'href="/' 'href="/prometheus/';
+            sub_filter 'src="/' 'src="/prometheus/';
+            sub_filter '"/' '"/prometheus/';
+            sub_filter_types text/html text/css text/javascript application/javascript;
+        }
+        
+        # Kibana with proper headers
+        location /kibana/ {
+            rewrite ^/kibana/(.*)$ /$1 break;
+            proxy_pass http://kibana.platform-logging.svc.cluster.local:5601;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # Kibana specific headers
+            proxy_set_header kbn-xsrf true;
+            proxy_redirect off;
+        }
+        
+        # MLflow (this one works, keeping as-is)
+        location /mlflow/ {
+            proxy_pass http://mlflow.platform-orchestration.svc.cluster.local:5000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # ArgoCD with HTTPS backend and path handling
+        location /argocd/ {
+            proxy_pass https://argocd-server.argocd.svc.cluster.local/;
+            proxy_ssl_verify off;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # ArgoCD specific handling
+            proxy_redirect off;
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter 'href="/' 'href="/argocd/';
+            sub_filter 'src="/' 'src="/argocd/';
+            sub_filter '"/' '"/argocd/';
+            sub_filter_types text/html text/css text/javascript application/javascript;
+        }
+        
+        # Health check
+        location /health {
+            return 200 "OK\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Debug endpoint to test individual services
+        location /debug {
+            return 200 '{"grafana": "http://grafana.platform-monitoring.svc.cluster.local:3000", "prometheus": "http://prometheus.platform-monitoring.svc.cluster.local:9090", "kibana": "http://kibana.platform-logging.svc.cluster.local:5601"}';
+            add_header Content-Type application/json;
+        }
+    }
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BASE Platform Dashboard</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+            .container { max-width: 1200px; margin: 0 auto; background: rgba(255,255,255,0.95); padding: 30px; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
+            .header { text-align: center; margin-bottom: 40px; }
+            .header h1 { color: #2c3e50; margin-bottom: 10px; font-size: 2.5em; }
+            .header p { color: #666; font-size: 1.1em; }
+            .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; margin: 40px 0; }
+            .service { background: white; padding: 25px; border-radius: 12px; border: 1px solid #e9ecef; box-shadow: 0 5px 15px rgba(0,0,0,0.08); transition: all 0.3s ease; position: relative; overflow: hidden; }
+            .service::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #667eea, #764ba2); }
+            .service:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
+            .service h3 { margin: 0 0 10px 0; color: #2c3e50; font-size: 1.4em; }
+            .service p { color: #666; margin-bottom: 20px; line-height: 1.6; }
+            .service-link { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; transition: all 0.3s; font-weight: 500; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); }
+            .service-link:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+            .service-link.disabled { background: #6c757d; cursor: not-allowed; }
+            .service-link.disabled:hover { transform: none; }
+            .status { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+            .status.running { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .status.fixing { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+            .stats { display: flex; justify-content: space-around; margin: 40px 0; padding: 25px; background: rgba(255,255,255,0.7); border-radius: 12px; }
+            .stat { text-align: center; }
+            .stat-number { font-size: 2em; font-weight: bold; color: #667eea; }
+            .stat-label { color: #666; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚀 BASE App Layer Platform</h1>
+                <p>Enterprise Data Platform - Unified Service Dashboard</p>
+            </div>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">6</div>
+                    <div class="stat-label">Active Services</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">75%</div>
+                    <div class="stat-label">Platform Complete</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">EKS Clusters</div>
+                </div>
+            </div>
+            
+            <div class="services">
+                <div class="service">
+                    <div class="status running">✅ RUNNING</div>
+                    <h3>📊 Grafana</h3>
+                    <p>Monitoring dashboards, metrics visualization, and alerting platform</p>
+                    <a href="/grafana/" class="service-link" target="_blank">Open Grafana Dashboard</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status running">✅ RUNNING</div>
+                    <h3>🔍 Prometheus</h3>
+                    <p>Metrics collection system with powerful query language and alerting</p>
+                    <a href="/prometheus/" class="service-link" target="_blank">Open Prometheus Console</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status running">✅ RUNNING</div>
+                    <h3>📈 Kibana</h3>
+                    <p>Log analysis, visualization, and Elasticsearch data exploration</p>
+                    <a href="/kibana/" class="service-link" target="_blank">Open Kibana Interface</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status running">✅ RUNNING</div>
+                    <h3>🤖 MLflow</h3>
+                    <p>Machine learning lifecycle management and experiment tracking</p>
+                    <a href="/mlflow/" class="service-link" target="_blank">Open MLflow UI</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status running">✅ RUNNING</div>
+                    <h3>🚀 ArgoCD</h3>
+                    <p>GitOps continuous deployment and application lifecycle management</p>
+                    <a href="/argocd/" class="service-link" target="_blank">Open ArgoCD Console</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixing">🔧 DEPLOYING</div>
+                    <h3>🔄 Airflow</h3>
+                    <p>Workflow orchestration and data pipeline management</p>
+                    <span class="service-link disabled">Coming Soon</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px; padding-top: 25px; border-top: 2px solid #eee;">
+                <p style="color: #666; font-size: 1.1em;"><strong>🌐 Single Entry Point:</strong> All services accessible through this unified dashboard</p>
+                <p style="color: #888; font-size: 0.9em;">Infrastructure: AWS EKS • Service Mesh: Istio • GitOps: ArgoCD • Monitoring: Prometheus Stack</p>
+            </div>
+        </div>
+    </body>
+    </html>

@@ -361,7 +361,7 @@ setup_kubectl() {
                     aws eks update-kubeconfig \
                         --region "${REGION}" \
                         --name "$platform_cluster_name" \
-                        --alias platform-services || log_warning "Не удалось обновить kubeconfig для Platform кластера"
+                        --alias .platform-services || log_warning "Не удалось обновить kubeconfig для Platform кластера"
                     log "✅ kubectl настроен для Platform кластера: $platform_cluster_name"
                 fi
             fi

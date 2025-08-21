@@ -1,0 +1,57 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: wave1-shared-services
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  generators:
+  - list:
+      elements:
+      # Wave 1: Platform Services (ACTUALLY DEPLOYED)
+      - name: platform-ui
+        namespace: platform-ui
+        path: platform-services-v2/application-services/platform-ui
+        description: "Platform UI - Unified dashboard and interface"
+        
+      - name: istio-system
+        namespace: istio-system
+        path: platform-services-v2/shared-services/istio
+        description: "Istio Service Mesh - Traffic management and security"
+        
+  template:
+    metadata:
+      name: '{{name}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+        argocd.argoproj.io/sync-options: CreateNamespace=true
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+      
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/your-org/base-app-layer.git
+        path: '{{path}}'
+        targetRevision: main
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        - PrunePropagationPolicy=foreground
+        - PruneLast=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

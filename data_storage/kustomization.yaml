@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-data-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+
+namespace: base-data-storage
+
+resources:
+  - agents/
+  - models/
+  - orchestrators/
+  - workflows/
+  - configs/
+
+commonLabels:
+  app.kubernetes.io/name: base-data-storage
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: data-storage
+  deployment.wave: "4"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "4"
+  module.description: "Data storage, lifecycle management, and archival module"

@@ -1,0 +1,48 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seldon-controller-manager
+  namespace: seldon-system
+  labels:
+    app.kubernetes.io/name: seldon-core
+    app.kubernetes.io/component: ml-serving
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seldon-core
+      app.kubernetes.io/component: ml-serving
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seldon-core
+        app.kubernetes.io/component: ml-serving
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: seldon-manager
+      containers:
+      - name: manager
+        image: seldonio/seldon-core-operator:1.18.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9443
+          name: webhook
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: RELATED_IMAGE_EXECUTOR
+          value: "seldonio/seldon-core-executor:1.18.0"
+        - name: RELATED_IMAGE_STORAGE_INITIALIZER
+          value: "seldonio/seldon-core-storage-initializer:1.18.0"
+        - name: MANAGER_LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

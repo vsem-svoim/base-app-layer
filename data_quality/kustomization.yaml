@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-data-quality
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+
+namespace: base-data-quality
+
+resources:
+  - agents/
+  - models/
+  - orchestrators/
+  - workflows/
+  - configs/
+
+commonLabels:
+  app.kubernetes.io/name: base-data-quality
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: data-quality
+  deployment.wave: "4"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "4"
+  module.description: "Data quality validation and cleansing module"

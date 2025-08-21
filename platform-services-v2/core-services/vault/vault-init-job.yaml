@@ -1,0 +1,164 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: vault
+  labels:
+    app: vault-init
+    component: initialization
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app: vault-init
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: vault-init
+      initContainers:
+      - name: wait-for-vault
+        image: curlimages/curl:8.4.0
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for Vault to be ready..."
+          until curl -s http://vault.vault.svc.cluster.local:8200/v1/sys/health; do
+            echo "Vault not ready, waiting..."
+            sleep 10
+          done
+          echo "Vault is ready!"
+      containers:
+      - name: vault-init
+        image: hashicorp/vault:1.15.2
+        command:
+        - sh
+        - -c
+        args:
+        - |
+          export VAULT_ADDR="http://vault.vault.svc.cluster.local:8200"
+          export VAULT_FORMAT="json"
+          
+          echo "🔐 Starting Vault initialization..."
+          
+          # Check if Vault is already initialized
+          if vault status 2>/dev/null | grep -q "Initialized.*true"; then
+            echo "✅ Vault is already initialized"
+            exit 0
+          fi
+          
+          echo "🔑 Initializing Vault with 5 key shares, threshold 3..."
+          INIT_OUTPUT=$(vault operator init -key-shares=5 -key-threshold=3 -format=json)
+          
+          # Extract keys and root token
+          UNSEAL_KEY_1=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[0]')
+          UNSEAL_KEY_2=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[1]')
+          UNSEAL_KEY_3=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[2]')
+          UNSEAL_KEY_4=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[3]')
+          UNSEAL_KEY_5=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[4]')
+          ROOT_TOKEN=$(echo "$INIT_OUTPUT" | jq -r '.root_token')
+          
+          # Create Kubernetes secret with unseal keys and root token
+          kubectl create secret generic vault-unseal-keys -n vault \
+            --from-literal=key1="$UNSEAL_KEY_1" \
+            --from-literal=key2="$UNSEAL_KEY_2" \
+            --from-literal=key3="$UNSEAL_KEY_3" \
+            --from-literal=key4="$UNSEAL_KEY_4" \
+            --from-literal=key5="$UNSEAL_KEY_5" \
+            --from-literal=root-token="$ROOT_TOKEN" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "✅ Vault initialized and keys stored in Kubernetes secret"
+          
+          # Unseal Vault
+          echo "🔓 Unsealing Vault..."
+          vault operator unseal "$UNSEAL_KEY_1"
+          vault operator unseal "$UNSEAL_KEY_2"
+          vault operator unseal "$UNSEAL_KEY_3"
+          
+          # Login and configure basic settings
+          vault auth "$ROOT_TOKEN"
+          
+          echo "🔧 Configuring Vault..."
+          
+          # Enable secrets engines
+          vault secrets enable -path=secret kv-v2
+          vault secrets enable -path=platform kv-v2
+          
+          # Create platform admin policy
+          echo 'path "*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }' | vault policy write platform-admin -
+          
+          # Create platform services policy
+          echo 'path "secret/data/platform/*" { capabilities = ["read", "list"] } path "platform/data/*" { capabilities = ["read", "list"] }' | vault policy write platform-services -
+          
+          # Enable Kubernetes auth
+          vault auth enable kubernetes
+          
+          # Configure Kubernetes auth
+          vault write auth/kubernetes/config \
+            token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+            kubernetes_host="https://kubernetes.default.svc:443" \
+            kubernetes_ca_cert="$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt)"
+          
+          # Create roles for platform services
+          vault write auth/kubernetes/role/argocd \
+            bound_service_account_names=argocd-server,argocd-application-controller \
+            bound_service_account_namespaces=argocd \
+            policies=platform-services \
+            ttl=24h
+          
+          # Store ArgoCD credentials in Vault
+          ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d)
+          vault kv put platform/argocd \
+            username="admin" \
+            password="$ARGOCD_PASSWORD" \
+            url="http://argocd-server.argocd.svc.cluster.local"
+          
+          echo "✅ Vault configuration completed successfully!"
+          echo "🔐 ArgoCD credentials stored in vault at platform/argocd"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-init
+  namespace: vault
+  labels:
+    app: vault-init
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-init
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-init
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-init
+subjects:
+- kind: ServiceAccount
+  name: vault-init
+  namespace: vault

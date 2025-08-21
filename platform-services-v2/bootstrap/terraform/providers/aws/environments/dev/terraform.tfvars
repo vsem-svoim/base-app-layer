@@ -58,12 +58,12 @@ base_cluster_config = {
   
   managed_node_groups = {
     base_apps = {
-      instance_types = ["m7i.2xlarge", "m7i.4xlarge", "m6i.2xlarge"]
+      instance_types = ["m7i.4xlarge", "m7i.2xlarge"]
       capacity_type  = "SPOT"
       min_size      = 1
-      max_size      = 2
+      max_size      = 5
       desired_size  = 1
-      disk_size     = 100
+      disk_size     = 500
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_x86_64"
       
@@ -76,9 +76,9 @@ base_cluster_config = {
       
       mixed_instances_policy = {
         instances_distribution = {
-          on_demand_percentage     = 40  # More on-demand for stability
+          on_demand_percentage     = 30  # Optimized for data processing workloads
           spot_allocation_strategy = "price-capacity-optimized"
-          spot_instance_pools      = 2
+          spot_instance_pools      = 3
         }
       }
     }
@@ -97,27 +97,19 @@ platform_cluster_config = {
       label_selectors    = {}
       subnet_type        = "private"
     }
-    platform_monitoring = {
-      namespace_selectors = ["monitoring", "logging"]
-      label_selectors    = {}
-      subnet_type        = "private"
-    }
-    ml_platform = {
-      namespace_selectors = ["mlflow", "kubeflow", "seldon"]
-      label_selectors    = {}
-      subnet_type        = "private"
-    }
+    # Removed platform_monitoring and ml_platform Fargate profiles
+    # These services need to run on managed nodes to support Istio sidecars
   }
   
   managed_node_groups = {
-    # System workloads (ArgoCD, Load Balancers) - 100% On-Demand for stability
+    # System workloads (ArgoCD, Load Balancers, Monitoring, Orchestration) - 100% On-Demand for stability
     platform_system = {
-      instance_types = ["c7i.xlarge", "c7i.2xlarge"]
+      instance_types = ["c7i.2xlarge", "c7i.4xlarge", "m7i.2xlarge", "m7i.4xlarge"]
       capacity_type  = "ON_DEMAND"
       min_size      = 1
-      max_size      = 3
-      desired_size  = 1
-      disk_size     = 100
+      max_size      = 2
+      desired_size  = 2
+      disk_size     = 200
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_x86_64"
       
@@ -128,14 +120,14 @@ platform_cluster_config = {
       }
     }
     
-    # General workloads (monitoring, etc) - 60% On-Demand, 40% Spot
+    # General workloads (monitoring, etc) - 40% On-Demand, 60% Spot
     platform_general = {
-      instance_types = ["c7i.xlarge", "c7i.2xlarge", "c7i.4xlarge", "r7i.xlarge", "r7i.2xlarge"]
+      instance_types = ["c7i.2xlarge", "c7i.4xlarge", "r7i.2xlarge", "r7i.4xlarge", "m7i.2xlarge", "m7i.4xlarge"]
       capacity_type  = "SPOT"
       min_size      = 1
       max_size      = 3
       desired_size  = 1
-      disk_size     = 150
+      disk_size     = 300
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_x86_64"
       
@@ -147,7 +139,7 @@ platform_cluster_config = {
       
       mixed_instances_policy = {
         instances_distribution = {
-          on_demand_percentage     = 60
+          on_demand_percentage     = 40
           spot_allocation_strategy = "price-capacity-optimized"
         }
       }
@@ -155,12 +147,12 @@ platform_cluster_config = {
     
     # Compute workloads (ML, data processing) - 30% On-Demand, 70% Spot
     platform_compute = {
-      instance_types = ["c7i.xlarge", "c7i.2xlarge", "c7i.4xlarge"]
+      instance_types = ["c7i.2xlarge", "c7i.4xlarge", "m7i.2xlarge", "m7i.4xlarge"]
       capacity_type  = "SPOT"
       min_size      = 1
       max_size      = 3
       desired_size  = 1
-      disk_size     = 200
+      disk_size     = 500
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_x86_64"
       
@@ -178,14 +170,14 @@ platform_cluster_config = {
       }
     }
     
-    # Memory workloads (databases, caching) - 50% On-Demand, 50% Spot
+    # Memory workloads (databases, caching) - 40% On-Demand, 60% Spot
     platform_memory = {
-      instance_types = ["r7i.xlarge", "r7i.2xlarge", "r7i.4xlarge"]
+      instance_types = ["r7i.2xlarge", "r7i.4xlarge", "m7i.2xlarge", "m7i.4xlarge"]
       capacity_type  = "SPOT"
       min_size      = 1
       max_size      = 3
       desired_size  = 1
-      disk_size     = 200
+      disk_size     = 500
       disk_type     = "gp3"
       ami_type      = "BOTTLEROCKET_x86_64"
       
@@ -197,7 +189,7 @@ platform_cluster_config = {
       
       mixed_instances_policy = {
         instances_distribution = {
-          on_demand_percentage     = 50
+          on_demand_percentage     = 40
           spot_allocation_strategy = "price-capacity-optimized"
         }
       }
@@ -205,14 +197,14 @@ platform_cluster_config = {
     
     # GPU workloads (ML training, inference) - min 0, desired 0, max 2
     platform_gpu = {
-      instance_types = ["g5.xlarge", "g5.2xlarge", "g5.4xlarge"]
+      instance_types = ["g6.2xlarge", "g6.xlarge"]
       capacity_type  = "SPOT"
       min_size      = 0
       max_size      = 2
       desired_size  = 0
-      disk_size     = 300
+      disk_size     = 500
       disk_type     = "gp3"
-      ami_type      = "AL2_x86_64_GPU"
+      ami_type      = "BOTTLEROCKET_x86_64_NVIDIA"
       
       labels = {
         NodeGroup    = "platform-gpu"
@@ -231,7 +223,7 @@ platform_cluster_config = {
       
       mixed_instances_policy = {
         instances_distribution = {
-          on_demand_percentage     = 40
+          on_demand_percentage     = 50
           spot_allocation_strategy = "price-capacity-optimized"
         }
       }
@@ -258,6 +250,11 @@ cluster_addons = {
     addon_version        = ""
     configuration_values = ""
   }
+  eks-pod-identity-agent = {
+    most_recent           = true
+    addon_version        = ""
+    configuration_values = ""
+  }
   aws-ebs-csi-driver = {
     most_recent           = true
     addon_version        = ""
@@ -266,9 +263,16 @@ cluster_addons = {
 }
 
 # ===================================================================
-# IRSA Configuration
+# EKS Pod Identity Configuration (Modern Approach - Now Supported!)
 # ===================================================================
-enable_irsa = true
+enable_pod_identity = true
+
+# ===================================================================
+# IRSA Configuration (Disabled - Using Pod Identity)
+# ===================================================================
+enable_irsa = false
+
+# Note: Migrated to EKS Pod Identity for better integration
 
 irsa_roles = {
   argocd = {
@@ -299,6 +303,39 @@ irsa_roles = {
     ]
     namespaces       = ["kube-system"]
     service_accounts = ["aws-load-balancer-controller"]
+  }
+  ebs_csi_driver = {
+    policy_arns = [
+      "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+    ]
+    namespaces       = ["kube-system"]
+    service_accounts = ["ebs-csi-controller-sa"]
+  }
+}
+
+# ===================================================================
+# EKS Pod Identity Associations (Replaces IRSA roles above)
+# ===================================================================
+pod_identity_associations = {
+  ebs_csi_driver = {
+    namespace        = "kube-system"
+    service_account  = "ebs-csi-controller-sa"
+    policy_arns     = ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
+  }
+  aws_load_balancer_controller = {
+    namespace       = "kube-system" 
+    service_account = "aws-load-balancer-controller"
+    policy_arns    = ["arn:aws:iam::084129280818:policy/AWSLoadBalancerControllerIAMPolicy"]
+  }
+  argocd_server = {
+    namespace       = "argocd"
+    service_account = "argocd-server"
+    policy_arns    = ["arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"]
+  }
+  monitoring = {
+    namespace       = "monitoring"
+    service_account = "prometheus"
+    policy_arns    = ["arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"]
   }
 }
 

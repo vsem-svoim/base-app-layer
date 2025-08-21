@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-schema-contracts
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+
+namespace: base-schema-contracts
+
+resources:
+  - agents/
+  - models/
+  - orchestrators/
+  - workflows/
+  - configs/
+
+commonLabels:
+  app.kubernetes.io/name: base-schema-contracts
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: schema-contracts
+  deployment.wave: "7"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "7"
+  module.description: "Schema management and data contracts module"

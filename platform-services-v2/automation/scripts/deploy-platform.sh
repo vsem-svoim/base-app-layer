@@ -15,12 +15,21 @@ PROJECT_NAME="base-app-layer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLATFORM_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Component sets - Redesigned for zero-error deployment
-CORE_SERVICES="argocd"
-INFRASTRUCTURE_SERVICES="vault aws-load-balancer-controller istio"
-SHARED_SERVICES="monitoring logging service-mesh"
-ORCHESTRATION_SERVICES="airflow mlflow kubeflow argo-workflows"
-APPLICATION_SERVICES="platform-ui api-gateway data-services"
+# Component sets - Properly structured Wave deployment
+# Wave 0: Core Services - Foundation for GitOps
+CORE_SERVICES="argocd vault cert-manager aws-load-balancer-controller"
+
+# Wave 1: Platform Services - UI, Service Mesh, API Gateway
+SHARED_SERVICES="platform-ui istio api-gateway"
+
+# Wave 2: Monitoring & Logging - Observability stack
+ORCHESTRATION_SERVICES="monitoring logging"
+
+# Wave 3: ML & Orchestration - Workflow and ML services
+APPLICATION_SERVICES="airflow mlflow kubeflow argo-workflows"
+
+# Legacy infrastructure services (deprecated - moved to core)
+INFRASTRUCTURE_SERVICES=""
 
 # Deployment timeouts (seconds)
 TERRAFORM_TIMEOUT=1800
@@ -77,6 +86,12 @@ check_component_health() {
             ;;
         "vault")
             kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=vault -n vault --timeout=${timeout}s
+            ;;
+        "cert-manager")
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=${timeout}s
+            ;;
+        "aws-load-balancer-controller")
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system --timeout=${timeout}s
             ;;
         "monitoring")
             kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus -n monitoring --timeout=${timeout}s 2>/dev/null || true
@@ -250,6 +265,86 @@ EOF
         info "Get node IP with: kubectl get nodes -o wide"
         info "Get admin password with: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
     fi
+    
+    # Deploy other Wave 0 core services
+    for service in vault cert-manager aws-load-balancer-controller; do
+        if [[ " $CORE_SERVICES " =~ " $service " ]]; then
+            log "Deploying core service: $service"
+            
+            case $service in
+                "vault")
+                    # Create namespace first
+                    kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+                    
+                    # Deploy Vault StatefulSet
+                    if [[ -f "$PLATFORM_ROOT/core-services/vault/vault.yaml" ]]; then
+                        kubectl apply -f "$PLATFORM_ROOT/core-services/vault/vault.yaml"
+                        
+                        # Wait for Vault to be ready before bootstrap
+                        log "Waiting for Vault StatefulSet to be ready..."
+                        kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=300s
+                        
+                        check_component_health "vault" "vault"
+                        COMPONENT_STATUS="$COMPONENT_STATUS vault:deployed"
+                    else
+                        warn "Vault manifest not found at $PLATFORM_ROOT/core-services/vault/vault.yaml"
+                    fi
+                    ;;
+                    
+                "cert-manager")
+                    # Deploy cert-manager using official manifests
+                    log "Deploying cert-manager..."
+                    
+                    # Install cert-manager CRDs and controller
+                    if [[ -f "$PLATFORM_ROOT/core-services/cert-manager/cert-manager-installation.yaml" ]]; then
+                        kubectl apply -f "$PLATFORM_ROOT/core-services/cert-manager/cert-manager-installation.yaml"
+                        
+                        # Wait for cert-manager to be ready
+                        log "Waiting for cert-manager..."
+                        kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=300s
+                        
+                        check_component_health "cert-manager" "cert-manager"
+                        COMPONENT_STATUS="$COMPONENT_STATUS cert-manager:deployed"
+                    else
+                        warn "cert-manager installation manifest not found"
+                    fi
+                    ;;
+                    
+                "aws-load-balancer-controller")
+                    # Deploy AWS Load Balancer Controller using Helm
+                    log "Deploying AWS Load Balancer Controller via Helm..."
+                    
+                    # Install Helm if not present
+                    if ! command -v helm &> /dev/null; then
+                        log "Installing Helm..."
+                        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+                    fi
+                    
+                    # Add EKS Helm repository
+                    helm repo add eks https://aws.github.io/eks-charts
+                    helm repo update
+                    
+                    # Install AWS Load Balancer Controller
+                    helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+                      -n kube-system \
+                      --set clusterName=platform-app-layer-dev \
+                      --set serviceAccount.create=true \
+                      --set serviceAccount.name=aws-load-balancer-controller \
+                      --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::084129280818:role/platform-app-layer-dev-aws_load_balancer_controller-irsa" \
+                      --set nodeSelector."eks\.amazonaws\.com/nodegroup"=platform_system \
+                      --set region=us-east-1 \
+                      --set vpcId=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=base-app-layer-dev-vpc" --query "Vpcs[0].VpcId" --output text --region us-east-1)
+                    
+                    # Wait for deployment
+                    log "Waiting for AWS Load Balancer Controller..."
+                    kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system --timeout=300s
+                    
+                    check_component_health "aws-load-balancer-controller" "kube-system"
+                    COMPONENT_STATUS="$COMPONENT_STATUS aws-load-balancer-controller:deployed"
+                    ;;
+            esac
+        fi
+    done
     
     log "Core services deployment completed successfully"
 }
@@ -630,7 +725,7 @@ case "${1:-deploy}" in
         main
         ;;
     "core")
-        log "Deploying only core services (ArgoCD)"
+        log "Deploying Wave 0 core services (ArgoCD, Vault, Cert-Manager, AWS LB Controller)"
         deploy_core_services
         validate_deployment
         ;;
@@ -659,12 +754,12 @@ case "${1:-deploy}" in
         echo ""
         echo "Wave-based Components:"
         echo "  deploy        - Full deployment (default)"
-        echo "  core          - Wave 0: Core services (ArgoCD)"
-        echo "  infrastructure- Wave 1: Infrastructure (Vault, Istio, Cert-Manager)"
-        echo "  shared        - Wave 2: Shared services (Monitoring, Logging)"
-        echo "  orchestration - Wave 3: Orchestration services (Airflow, MLflow)"
-        echo "  apps          - Application services (Platform UI)"
-        echo "  base          - BASE layer modules"
+        echo "  core          - Wave 0: Core services (ArgoCD, Vault, Cert-Manager, AWS LB Controller)"
+        echo "  infrastructure- Wave 1: Infrastructure (Istio) [deprecated - services moved to shared]"
+        echo "  shared        - Wave 1: Platform services (Platform UI, Istio, API Gateway)"
+        echo "  orchestration - Wave 2: Monitoring & Logging (Prometheus, Grafana, ELK)"
+        echo "  apps          - Wave 3: ML & Orchestration (Airflow, MLflow, Kubeflow)"
+        echo "  base          - Wave 4+: BASE layer modules"
         echo "  validate      - Validate deployment status"
         exit 1
         ;;

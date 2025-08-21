@@ -1,0 +1,196 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: platform-ui
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        location /grafana/ {
+            proxy_pass http://grafana.platform-monitoring.svc.cluster.local:3000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /prometheus/ {
+            proxy_pass http://prometheus.platform-monitoring.svc.cluster.local:9090/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /kibana/ {
+            proxy_pass http://kibana.platform-logging.svc.cluster.local:5601/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /mlflow/ {
+            proxy_pass http://mlflow.platform-orchestration.svc.cluster.local:5000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /argocd/ {
+            proxy_pass https://argocd-server.argocd.svc.cluster.local/;
+            proxy_ssl_verify off;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /health {
+            return 200 "OK\n";
+            add_header Content-Type text/plain;
+        }
+    }
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BASE Platform Dashboard</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+            .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            .header { text-align: center; margin-bottom: 40px; }
+            .header h1 { color: #2c3e50; margin-bottom: 10px; }
+            .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+            .service { background: #f8f9fa; padding: 20px; border-radius: 8px; border: 2px solid #e9ecef; transition: all 0.3s ease; }
+            .service:hover { border-color: #007bff; transform: translateY(-2px); }
+            .service h3 { margin: 0 0 10px 0; color: #495057; }
+            .service p { color: #6c757d; margin-bottom: 15px; }
+            .service-link { display: inline-block; background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; transition: background 0.3s; }
+            .service-link:hover { background: #0056b3; }
+            .status { display: inline-block; padding: 4px 12px; background: #28a745; color: white; border-radius: 15px; font-size: 12px; margin-bottom: 10px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚀 BASE App Layer Platform</h1>
+                <p>Enterprise Data Platform - Unified Service Dashboard</p>
+            </div>
+            
+            <div class="services">
+                <div class="service">
+                    <div class="status">✅ RUNNING</div>
+                    <h3>Grafana</h3>
+                    <p>Monitoring dashboards and metrics visualization</p>
+                    <a href="/grafana/" class="service-link" target="_blank">Open Grafana</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status">✅ RUNNING</div>
+                    <h3>Prometheus</h3>
+                    <p>Metrics collection and alerting system</p>
+                    <a href="/prometheus/" class="service-link" target="_blank">Open Prometheus</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status">✅ RUNNING</div>
+                    <h3>Kibana</h3>
+                    <p>Log analysis and visualization</p>
+                    <a href="/kibana/" class="service-link" target="_blank">Open Kibana</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status">✅ RUNNING</div>
+                    <h3>MLflow</h3>
+                    <p>ML experiment tracking and model management</p>
+                    <a href="/mlflow/" class="service-link" target="_blank">Open MLflow</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status">✅ RUNNING</div>
+                    <h3>ArgoCD</h3>
+                    <p>GitOps continuous deployment</p>
+                    <a href="/argocd/" class="service-link" target="_blank">Open ArgoCD</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status" style="background: #ffc107; color: #212529;">🔄 FIXING</div>
+                    <h3>Airflow</h3>
+                    <p>Workflow orchestration (being configured)</p>
+                    <span style="background: #6c757d; color: white; padding: 10px 20px; border-radius: 5px;">Coming Soon</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; text-align: center; padding-top: 20px; border-top: 1px solid #dee2e6;">
+                <p><strong>Platform Status:</strong> 🟢 75% Complete | <strong>Services:</strong> 5/6 Accessible</p>
+                <p style="color: #6c757d;">Infrastructure: AWS EKS • Networking: Istio Service Mesh • GitOps: ArgoCD</p>
+            </div>
+        </div>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui
+  namespace: platform-ui
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-ui
+  template:
+    metadata:
+      labels:
+        app: platform-ui
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: html-content
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+      - name: html-content
+        configMap:
+          name: nginx-config

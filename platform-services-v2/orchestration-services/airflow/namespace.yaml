@@ -6,4 +6,4 @@ metadata:
     app.kubernetes.io/name: airflow
     app.kubernetes.io/component: orchestration
     deployment.wave: "2"
-    istio-injection: enabled
+    istio-injection: disabled

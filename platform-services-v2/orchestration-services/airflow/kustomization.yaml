@@ -3,10 +3,13 @@ kind: Kustomization
 
 metadata:
   name: airflow-orchestration
-  namespace: platform-orchestration
+  namespace: airflow
 
 resources:
+- namespace.yaml
 - manifests/airflow-deployment.yaml
+- airflow-rbac.yaml
+- airflow-ingress.yaml
 
 namePrefix: ""
 nameSuffix: ""
@@ -15,6 +18,7 @@ commonLabels:
   app.kubernetes.io/name: airflow
   app.kubernetes.io/component: orchestration
   app.kubernetes.io/part-of: base-app-layer
+  deployment.wave: "2"
 
 images:
 - name: apache/airflow

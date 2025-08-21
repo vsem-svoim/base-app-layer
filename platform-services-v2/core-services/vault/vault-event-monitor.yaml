@@ -1,0 +1,120 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-event-monitor
+  namespace: vault
+  labels:
+    app: vault-event-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-event-monitor
+  template:
+    metadata:
+      labels:
+        app: vault-event-monitor
+    spec:
+      serviceAccountName: vault-event-monitor
+      containers:
+      - name: event-monitor
+        image: alpine/k8s:1.28.4
+        command:
+        - sh
+        - -c
+        - |
+          apk add --no-cache curl jq
+          
+          echo "📡 Vault Event Monitor Started"
+          
+          # Function to send notification
+          send_alert() {
+            local message="$1"
+            local severity="$2"
+            local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            
+            echo "[$timestamp] [$severity] $message"
+            
+            # Log to stdout for centralized logging
+            echo "{\"timestamp\":\"$timestamp\",\"service\":\"vault\",\"severity\":\"$severity\",\"message\":\"$message\"}"
+            
+            # TODO: Add webhook integration for Slack/Teams
+            # curl -X POST "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK" \
+            #   -H 'Content-type: application/json' \
+            #   --data "{\"text\":\"🔐 Vault Alert: $message\"}"
+          }
+          
+          # Monitor Vault events
+          kubectl get events -n vault -w --field-selector involvedObject.kind=Pod,involvedObject.name=vault-0 | while read line; do
+            if echo "$line" | grep -q "vault-0"; then
+              if echo "$line" | grep -q "Started"; then
+                send_alert "Vault pod started - lifecycle controller will handle initialization" "INFO"
+              elif echo "$line" | grep -q "Failed"; then
+                send_alert "Vault pod failed - investigating..." "ERROR"
+              fi
+            fi
+          done &
+          
+          # Monitor custom Vault lifecycle events
+          kubectl get events -n vault -w --field-selector reason=VaultInitialized | while read line; do
+            send_alert "Vault has been initialized successfully" "SUCCESS"
+          done &
+          
+          kubectl get events -n vault -w --field-selector reason=VaultUnsealed | while read line; do
+            send_alert "Vault has been unsealed successfully" "SUCCESS"
+          done &
+          
+          kubectl get events -n vault -w --field-selector reason=VaultConfigured | while read line; do
+            send_alert "Vault configuration completed - ArgoCD credentials stored" "SUCCESS"
+          done &
+          
+          kubectl get events -n vault -w --field-selector reason=VaultReady | while read line; do
+            send_alert "🎉 Vault is fully operational and ready for use!" "SUCCESS"
+          done &
+          
+          # Monitor error events
+          kubectl get events -n vault -w | grep -E "(VaultInitError|VaultUnsealError|VaultConfigError|VaultKeysError)" | while read line; do
+            send_alert "Vault error detected: $line" "ERROR"
+          done &
+          
+          # Keep the container running
+          tail -f /dev/null
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "25m"
+          limits:
+            memory: "128Mi"
+            cpu: "50m"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-event-monitor
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-event-monitor
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-event-monitor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-event-monitor
+subjects:
+- kind: ServiceAccount
+  name: vault-event-monitor
+  namespace: vault

@@ -407,3 +407,67 @@ resource "aws_iam_role_policy_attachment" "irsa" {
   role       = aws_iam_role.irsa[each.value.role_name].name
   policy_arn = each.value.policy_arn
 }
+
+# ===================================================================
+# EKS Pod Identity (Modern Approach)
+# ===================================================================
+
+# Pod Identity Associations
+resource "aws_eks_pod_identity_association" "main" {
+  for_each = var.enable_pod_identity ? var.pod_identity_associations : {}
+
+  cluster_name    = aws_eks_cluster.main.name
+  namespace       = each.value.namespace
+  service_account = each.value.service_account
+  role_arn        = aws_iam_role.pod_identity[each.key].arn
+
+  tags = merge(var.common_tags, {
+    Name = "${local.cluster_name}-${each.key}-pod-identity"
+    Type = "pod-identity-association"
+  })
+}
+
+# IAM Roles for Pod Identity
+resource "aws_iam_role" "pod_identity" {
+  for_each = var.enable_pod_identity ? var.pod_identity_associations : {}
+
+  name = "${substr("${local.cluster_name}-${each.key}", 0, 59)}-pod-identity"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "pods.eks.amazonaws.com"
+        }
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
+      }
+    ]
+  })
+
+  tags = merge(var.common_tags, {
+    Name = "${substr("${local.cluster_name}-${each.key}", 0, 59)}-pod-identity"
+    Type = "iam-role"
+  })
+}
+
+# Policy Attachments for Pod Identity Roles
+resource "aws_iam_role_policy_attachment" "pod_identity" {
+  for_each = var.enable_pod_identity ? {
+    for pair in flatten([
+      for role_name, role_config in var.pod_identity_associations : [
+        for policy_arn in role_config.policy_arns : {
+          role_name   = role_name
+          policy_arn  = policy_arn
+        }
+      ]
+    ]) : "${pair.role_name}-${replace(pair.policy_arn, "/[^a-zA-Z0-9]/", "-")}" => pair
+  } : {}
+
+  role       = aws_iam_role.pod_identity[each.value.role_name].name
+  policy_arn = each.value.policy_arn
+}

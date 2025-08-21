@@ -1,0 +1,72 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: wave2-orchestration-services
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  generators:
+  - list:
+      elements:
+      # Wave 2: Orchestration Services (ACTUALLY DEPLOYED)
+      - name: airflow
+        namespace: airflow
+        path: platform-services-v2/orchestration-services/airflow
+        description: "Apache Airflow - Workflow orchestration and DAG management"
+        
+      - name: mlflow
+        namespace: mlflow
+        path: platform-services-v2/orchestration-services/mlflow
+        description: "MLflow - ML experiment tracking and model registry"
+        
+      - name: kubeflow
+        namespace: kubeflow
+        path: platform-services-v2/orchestration-services/kubeflow
+        description: "Kubeflow - End-to-end ML workflows on Kubernetes"
+        
+      - name: superset
+        namespace: superset
+        path: platform-services-v2/orchestration-services/superset
+        description: "Apache Superset - Business intelligence and data visualization"
+        
+      - name: seldon
+        namespace: seldon-system
+        path: platform-services-v2/orchestration-services/seldon
+        description: "Seldon Core - ML model serving and inference"
+        
+  template:
+    metadata:
+      name: '{{name}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+        argocd.argoproj.io/sync-options: CreateNamespace=true
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+      
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/your-org/base-app-layer.git
+        path: '{{path}}'
+        targetRevision: main
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        - PrunePropagationPolicy=foreground
+        - PruneLast=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

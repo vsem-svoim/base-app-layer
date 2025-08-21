@@ -307,7 +307,7 @@ spec:
     spec:
       serviceAccountName: data-services
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_general
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: data-gateway
         image: nginx:1.25-alpine

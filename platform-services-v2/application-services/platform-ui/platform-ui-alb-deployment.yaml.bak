@@ -1,0 +1,1122 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-ui
+  labels:
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform-ui
+  namespace: platform-ui
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-ui-reader
+rules:
+- apiGroups: [""]
+  resources: ["services", "pods", "nodes"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-ui-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-ui-reader
+subjects:
+- kind: ServiceAccount
+  name: platform-ui
+  namespace: platform-ui
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: platform-ui
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        
+        # Logging
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                       '$status $body_bytes_sent "$http_referer" '
+                       '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        error_log  /var/log/nginx/error.log warn;
+        
+        # Basic settings
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 10M;
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+        
+        # Upstream services
+        upstream argocd {
+            server argocd-server.argocd.svc.cluster.local:80;
+        }
+        
+        upstream argo_workflows {
+            server argo-server.argo.svc.cluster.local:2746;
+        }
+        
+        upstream vault {
+            server vault.vault.svc.cluster.local:8200;
+        }
+        
+        upstream kiali {
+            server kiali.istio-system.svc.cluster.local:20001;
+        }
+        
+        upstream kubeflow_ui {
+            server kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
+        }
+        
+        upstream kubeflow_api {
+            server kubeflow-pipelines-api-server.kubeflow.svc.cluster.local:8888;
+        }
+        
+        upstream seldon {
+            server seldon-controller-manager.seldon-system.svc.cluster.local:8080;
+        }
+        
+        upstream superset {
+            server apache-superset.superset.svc.cluster.local:8088;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            # Health check
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            # Main dashboard
+            location / {
+                try_files $uri $uri/ /index.html;
+            }
+            
+            # ArgoCD proxy - fixed for proper routing
+            location /argocd {
+                return 301 /argocd/;
+            }
+            location /argocd/ {
+                proxy_pass http://argocd/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Accept-Encoding "";
+                proxy_redirect off;
+                proxy_buffering off;
+                proxy_read_timeout 86400;
+                proxy_send_timeout 86400;
+                
+                # WebSocket support for ArgoCD
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                
+                # Fix ArgoCD base URL issues
+                sub_filter_once off;
+                sub_filter_types text/html application/javascript text/css;
+                sub_filter 'href="/' 'href="/argocd/';
+                sub_filter 'src="/' 'src="/argocd/';
+                sub_filter '"/"' '"/argocd/"';
+                sub_filter "'/')" "'/argocd/')";
+            }
+            
+            # Argo Workflows proxy - fixed for assets and API calls
+            location /workflows {
+                return 301 /workflows/;
+            }
+            location /workflows/ {
+                proxy_pass http://argo_workflows/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Accept-Encoding "";
+                proxy_redirect off;
+                proxy_buffering off;
+                proxy_read_timeout 86400;
+                proxy_send_timeout 86400;
+                
+                # WebSocket support
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+            }
+            
+            # Handle Argo Workflows API calls
+            location /workflows/api/ {
+                proxy_pass http://argo_workflows/api/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+            }
+            
+            # Vault UI proxy
+            location /vault {
+                return 301 /vault/;
+            }
+            location /vault/ {
+                proxy_pass http://vault/ui/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Accept-Encoding "";
+                proxy_redirect off;
+                proxy_buffering off;
+                
+                # Minimal essential rewrites only
+                sub_filter_once off;
+                sub_filter_types text/html;
+                sub_filter '"/ui/' '"/vault/';
+                sub_filter "'/ui/" "'/vault/";
+            }
+            
+            # Vault assets proxy - handle JS/CSS files
+            location ~ ^/vault/assets/(.*\.(js|css|png|jpg|gif|ico|woff|woff2|ttf|eot|svg))$ {
+                proxy_pass http://vault/ui/assets/$1;
+                proxy_set_header Host $host;
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+            
+            # Vault engines-dist assets
+            location ~ ^/vault/engines-dist/(.*)$ {
+                proxy_pass http://vault/ui/engines-dist/$1;
+                proxy_set_header Host $host;
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+            
+            # Vault API proxy - health endpoint
+            location /vault/v1/sys/health {
+                proxy_pass http://vault/v1/sys/health;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                add_header Access-Control-Allow-Origin *;
+            }
+            
+            # Vault API proxy - seal status endpoint
+            location /vault/v1/sys/seal-status {
+                proxy_pass http://vault/v1/sys/seal-status;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                add_header Access-Control-Allow-Origin *;
+            }
+            
+            # Additional Vault API endpoints for full functionality
+            location /vault/v1/sys/replication/status {
+                proxy_pass http://vault/v1/sys/replication/status;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                add_header Access-Control-Allow-Origin *;
+            }
+            
+            # Airflow proxy
+            location /airflow {
+                return 301 /airflow/;
+            }
+            location /airflow/ {
+                proxy_pass http://airflow.airflow.svc.cluster.local:8080/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Script-Name /airflow;
+                proxy_set_header X-Forwarded-Prefix /airflow;
+                proxy_redirect off;
+                proxy_buffering off;
+                proxy_read_timeout 86400;
+                proxy_send_timeout 86400;
+                
+                # WebSocket support for Airflow
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                
+                # URL rewriting for assets
+                sub_filter_once off;
+                sub_filter_types text/html text/css application/javascript;
+                sub_filter 'href="/' 'href="/airflow/';
+                sub_filter 'src="/' 'src="/airflow/';
+                sub_filter '"/"' '"/airflow/"';
+            }
+            
+            # MLflow proxy
+            location /mlflow {
+                return 301 /mlflow/;
+            }
+            location /mlflow/ {
+                proxy_pass http://mlflow.mlflow.svc.cluster.local:5000/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_redirect off;
+                proxy_buffering off;
+                proxy_read_timeout 86400;
+                proxy_send_timeout 86400;
+            }
+            
+            # Kiali proxy - already working
+            location /kiali {
+                return 301 /kiali/;
+            }
+            location /kiali/ {
+                proxy_pass http://kiali/kiali/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_redirect off;
+            }
+            
+            # Kubeflow UI proxy - API server still initializing
+            location /kubeflow {
+                return 200 "Kubeflow Pipelines is still initializing. The API server is connecting to MySQL and setting up the database.\n\nCurrent status: API Server starting (may take 5-10 minutes)\nUI Server: Running but waiting for API\n\nCheck status with:\nkubectl get pods -n kubeflow\n\nFor more info: https://kubeflow.org/";
+                add_header Content-Type text/plain;
+            }
+            
+            # Kubeflow API proxy
+            location /kubeflow-api/ {
+                proxy_pass http://kubeflow_api/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+            }
+            
+            # Seldon proxy - Note: Seldon Core is an operator, no web UI
+            location /seldon {
+                return 200 "Seldon Core is running as a Kubernetes operator. Use kubectl to manage Seldon deployments.\n\nExample:\nkubectl get seldondeployments -A\n\nFor more info: https://docs.seldon.io/";
+                add_header Content-Type text/plain;
+            }
+            
+            # Superset proxy - strip /superset and proxy to root
+            location /superset {
+                return 301 /superset/;
+            }
+            location /superset/ {
+                proxy_pass http://superset/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                proxy_read_timeout 86400;
+                proxy_send_timeout 86400;
+                
+                # WebSocket support for Superset
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                
+                # Fix redirects from Superset to include /superset prefix
+                proxy_redirect ~^/(.*)$ /superset/$1;
+            }
+        }
+    }
+  
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Platform UI - Service Management Console</title>
+        <style>
+            :root {
+                --primary: #2563eb;
+                --primary-dark: #1d4ed8;
+                --secondary: #64748b;
+                --success: #059669;
+                --warning: #d97706;
+                --danger: #dc2626;
+                --info: #0891b2;
+                
+                --bg-primary: #ffffff;
+                --bg-secondary: #f8fafc;
+                --bg-tertiary: #f1f5f9;
+                --text-primary: #0f172a;
+                --text-secondary: #475569;
+                --text-muted: #64748b;
+                --border: #e2e8f0;
+                --border-light: #f1f5f9;
+                
+                --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            }
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                line-height: 1.5;
+            }
+            
+            .header {
+                background: var(--bg-primary);
+                border-bottom: 1px solid var(--border);
+                padding: 1rem 0;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                box-shadow: var(--shadow);
+            }
+            
+            .header-content {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 1.5rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .logo-section h1 {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            
+            .nav-tabs {
+                display: flex;
+                gap: 2rem;
+            }
+            
+            .nav-tab {
+                padding: 0.5rem 1rem;
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                font-weight: 500;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                transition: all 0.2s;
+            }
+            
+            .nav-tab:hover, .nav-tab.active {
+                color: var(--primary);
+                border-bottom-color: var(--primary);
+            }
+            
+            .main-content {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 2rem 1.5rem;
+            }
+            
+            .tab-content {
+                display: none;
+            }
+            
+            .tab-content.active {
+                display: block;
+            }
+            
+            .services-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1.5rem;
+            }
+            
+            .service-card {
+                background: var(--bg-primary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.5rem;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .service-card:hover {
+                border-color: var(--primary);
+                box-shadow: var(--shadow-md);
+            }
+            
+            .service-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 1rem;
+            }
+            
+            .service-info h3 {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.25rem;
+            }
+            
+            .service-category {
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+                font-weight: 500;
+            }
+            
+            .service-status {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+            
+            .status-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--success);
+            }
+            
+            .status-dot.warning { background: var(--warning); }
+            .status-dot.danger { background: var(--danger); }
+            
+            .service-description {
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                line-height: 1.5;
+                margin-bottom: 1rem;
+            }
+            
+            .service-url {
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                background: var(--bg-tertiary);
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+            }
+            
+            .api-table {
+                width: 100%;
+                border-collapse: collapse;
+                background: var(--bg-primary);
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: var(--shadow);
+            }
+            
+            .api-table th,
+            .api-table td {
+                padding: 1rem;
+                text-align: left;
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .api-table th {
+                background: var(--bg-tertiary);
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            
+            .api-table td {
+                color: var(--text-secondary);
+            }
+            
+            .api-endpoint {
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: 0.875rem;
+                background: var(--bg-tertiary);
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+            }
+            
+            .health-status {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.25rem 0.75rem;
+                border-radius: 20px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+            
+            .health-status.healthy {
+                background: #dcfce7;
+                color: var(--success);
+            }
+            
+            .health-status.unhealthy {
+                background: #fecaca;
+                color: var(--danger);
+            }
+            
+            .health-status.initializing {
+                background: #fef3c7;
+                color: var(--warning);
+            }
+            
+            .health-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 1rem;
+            }
+            
+            .health-card {
+                background: var(--bg-primary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1rem;
+            }
+            
+            .health-card h4 {
+                font-size: 1rem;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+            
+            .health-metric {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 0.5rem;
+            }
+            
+            .metric-label {
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+            }
+            
+            .metric-value {
+                font-weight: 600;
+            }
+            
+            @media (max-width: 768px) {
+                .header-content {
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+                
+                .nav-tabs {
+                    gap: 1rem;
+                }
+                
+                .services-grid, .health-grid {
+                    grid-template-columns: 1fr;
+                }
+                
+                .api-table {
+                    font-size: 0.875rem;
+                }
+                
+                .api-table th,
+                .api-table td {
+                    padding: 0.75rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>Platform UI</h1>
+                </div>
+                <nav class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchTab('applications')">Applications</button>
+                    <button class="nav-tab" onclick="switchTab('apis')">API Status</button>
+                    <button class="nav-tab" onclick="switchTab('health')">Health Monitoring</button>
+                </nav>
+            </div>
+        </header>
+        
+        <main class="main-content">
+            <!-- Applications Tab -->
+            <div id="applications" class="tab-content active">
+                <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 600;">Application Gallery</h2>
+                <div class="services-grid">
+                    <div class="service-card" onclick="openApplication('/argocd/', 'ArgoCD')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>ArgoCD</h3>
+                                <div class="service-category">GitOps Platform</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Declarative GitOps continuous delivery platform for Kubernetes
+                        </div>
+                        <div class="service-url">/argocd/</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/workflows/', 'Argo Workflows')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>Argo Workflows</h3>
+                                <div class="service-category">Workflow Engine</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Container-native workflow engine for orchestrating parallel jobs
+                        </div>
+                        <div class="service-url">/workflows/</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/vault/', 'HashiCorp Vault')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>HashiCorp Vault</h3>
+                                <div class="service-category">Secrets Management</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot warning"></span>
+                                Sealed
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Secure secrets management and data protection platform
+                        </div>
+                        <div class="service-url">/vault/</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/kiali/', 'Kiali')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>Kiali</h3>
+                                <div class="service-category">Service Mesh</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Service mesh observability and configuration management
+                        </div>
+                        <div class="service-url">/kiali/</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/airflow/', 'Apache Airflow')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>Apache Airflow</h3>
+                                <div class="service-category">Workflow Orchestration</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Platform for developing, scheduling and monitoring workflows
+                        </div>
+                        <div class="service-url">/airflow/</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/mlflow/', 'MLflow')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>MLflow</h3>
+                                <div class="service-category">ML Lifecycle</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Machine learning lifecycle management platform
+                        </div>
+                        <div class="service-url">/mlflow/</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/kubeflow', 'Kubeflow')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>Kubeflow</h3>
+                                <div class="service-category">ML Platform</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot warning"></span>
+                                Initializing
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Machine learning platform for Kubernetes (API server starting up)
+                        </div>
+                        <div class="service-url">/kubeflow</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/seldon', 'Seldon Core')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>Seldon Core</h3>
+                                <div class="service-category">ML Serving</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Kubernetes operator for model serving (CLI management)
+                        </div>
+                        <div class="service-url">/seldon</div>
+                    </div>
+    
+                    <div class="service-card" onclick="openApplication('/superset/', 'Apache Superset')">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <h3>Apache Superset</h3>
+                                <div class="service-category">Business Intelligence</div>
+                            </div>
+                            <div class="service-status">
+                                <span class="status-dot"></span>
+                                Online
+                            </div>
+                        </div>
+                        <div class="service-description">
+                            Modern business intelligence web application
+                        </div>
+                        <div class="service-url">/superset/</div>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- API Status Tab -->
+            <div id="apis" class="tab-content">
+                <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 600;">API Status</h2>
+                <table class="api-table">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Endpoint</th>
+                            <th>Status</th>
+                            <th>Response Time</th>
+                            <th>Last Check</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>ArgoCD</td>
+                            <td><code class="api-endpoint">/argocd/api/v1/version</code></td>
+                            <td><span class="health-status healthy">Healthy</span></td>
+                            <td>45ms</td>
+                            <td>30s ago</td>
+                        </tr>
+                        <tr>
+                            <td>Argo Workflows</td>
+                            <td><code class="api-endpoint">/workflows/api/v1/info</code></td>
+                            <td><span class="health-status healthy">Healthy</span></td>
+                            <td>32ms</td>
+                            <td>30s ago</td>
+                        </tr>
+                        <tr>
+                            <td>HashiCorp Vault</td>
+                            <td><code class="api-endpoint">/vault/v1/sys/health</code></td>
+                            <td><span class="health-status initializing">Sealed</span></td>
+                            <td>12ms</td>
+                            <td>30s ago</td>
+                        </tr>
+                        <tr>
+                            <td>Apache Airflow</td>
+                            <td><code class="api-endpoint">/airflow/api/v1/health</code></td>
+                            <td><span class="health-status healthy">Healthy</span></td>
+                            <td>78ms</td>
+                            <td>30s ago</td>
+                        </tr>
+                        <tr>
+                            <td>MLflow</td>
+                            <td><code class="api-endpoint">/mlflow/api/2.0/mlflow/experiments/list</code></td>
+                            <td><span class="health-status healthy">Healthy</span></td>
+                            <td>156ms</td>
+                            <td>30s ago</td>
+                        </tr>
+                        <tr>
+                            <td>Kubeflow</td>
+                            <td><code class="api-endpoint">/kubeflow-api/apis/v1beta1/healthz</code></td>
+                            <td><span class="health-status initializing">Starting</span></td>
+                            <td>-</td>
+                            <td>30s ago</td>
+                        </tr>
+                        <tr>
+                            <td>Apache Superset</td>
+                            <td><code class="api-endpoint">/superset/api/v1/security/login</code></td>
+                            <td><span class="health-status healthy">Healthy</span></td>
+                            <td>89ms</td>
+                            <td>30s ago</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+    
+            <!-- Health Monitoring Tab -->
+            <div id="health" class="tab-content">
+                <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 600;">Health Monitoring</h2>
+                <div class="health-grid">
+                    <div class="health-card">
+                        <h4>System Resources</h4>
+                        <div class="health-metric">
+                            <span class="metric-label">CPU Usage</span>
+                            <span class="metric-value">23%</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Memory Usage</span>
+                            <span class="metric-value">67%</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Disk Usage</span>
+                            <span class="metric-value">45%</span>
+                        </div>
+                    </div>
+    
+                    <div class="health-card">
+                        <h4>Platform Services</h4>
+                        <div class="health-metric">
+                            <span class="metric-label">Total Services</span>
+                            <span class="metric-value">9</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Healthy</span>
+                            <span class="metric-value" style="color: var(--success)">7</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Issues</span>
+                            <span class="metric-value" style="color: var(--warning)">2</span>
+                        </div>
+                    </div>
+    
+                    <div class="health-card">
+                        <h4>Kubernetes Cluster</h4>
+                        <div class="health-metric">
+                            <span class="metric-label">Nodes</span>
+                            <span class="metric-value">3</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Pods</span>
+                            <span class="metric-value">47</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Namespaces</span>
+                            <span class="metric-value">12</span>
+                        </div>
+                    </div>
+    
+                    <div class="health-card">
+                        <h4>Network</h4>
+                        <div class="health-metric">
+                            <span class="metric-label">Ingress Status</span>
+                            <span class="metric-value" style="color: var(--success)">Healthy</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">Load Balancer</span>
+                            <span class="metric-value" style="color: var(--success)">Online</span>
+                        </div>
+                        <div class="health-metric">
+                            <span class="metric-label">SSL Certificates</span>
+                            <span class="metric-value" style="color: var(--success)">Valid</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    
+        <script>
+            function switchTab(tabName) {
+                // Hide all tabs
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                // Remove active class from all nav tabs
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                // Show selected tab
+                document.getElementById(tabName).classList.add('active');
+                
+                // Add active class to clicked nav tab
+                event.target.classList.add('active');
+            }
+            
+            function openApplication(url, name) {
+                window.open(url, '_blank');
+            }
+            
+            // Update timestamps
+            function updateTimestamp() {
+                const now = new Date();
+                const formatted = now.toLocaleString();
+                document.querySelectorAll('.timestamp').forEach(el => {
+                    el.textContent = formatted;
+                });
+            }
+            
+            // Initialize
+            updateTimestamp();
+            setInterval(updateTimestamp, 60000); // Update every minute
+        </script>
+    </body>
+    </html>---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui
+  namespace: platform-ui
+  labels:
+    app: platform-ui
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-ui
+  template:
+    metadata:
+      labels:
+        app: platform-ui
+        version: v1
+    spec:
+      serviceAccountName: platform-ui
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_system
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: nginx-html
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: platform-ui-config
+      - name: nginx-html
+        configMap:
+          name: platform-ui-html-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-ui
+  namespace: platform-ui
+  labels:
+    app: platform-ui
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  selector:
+    app: platform-ui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-ui-alb
+  namespace: platform-ui
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+    alb.ingress.kubernetes.io/whitelist-source-range: "72.79.77.223/32"
+    alb.ingress.kubernetes.io/tags: Environment=dev,Project=base-app-layer,Owner=platform-engineering
+spec:
+  rules:
+  - host: platform.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui
+            port:
+              number: 80
+  - host: k8s-platform-platform-909bd21b57-121932925.us-east-1.elb.amazonaws.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui
+            port:
+              number: 80

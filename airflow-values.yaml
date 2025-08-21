@@ -48,7 +48,7 @@ config:
   kubernetes:
     namespace: airflow
     worker_container_repository: apache/airflow
-    worker_container_tag: 2.7.2
+    worker_container_tag: 3.0.5
 
 dags:
   persistence:
@@ -65,4 +65,4 @@ serviceAccount:
   create: true
   name: airflow
 
-defaultAirflowTag: "2.7.2"
+defaultAirflowTag: "3.0.5"

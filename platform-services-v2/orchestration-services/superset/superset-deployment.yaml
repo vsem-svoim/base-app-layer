@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apache-superset
+  namespace: superset
+  labels:
+    app.kubernetes.io/name: apache-superset
+    app.kubernetes.io/component: bi-analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apache-superset
+      app.kubernetes.io/component: bi-analytics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: apache-superset
+        app.kubernetes.io/component: bi-analytics
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: apache-superset
+      containers:
+      - name: superset
+        image: apache/superset:3.0.4
+        ports:
+        - containerPort: 8088
+          name: http
+        env:
+        - name: SUPERSET_SECRET_KEY
+          value: "your-secret-key-change-this"
+        - name: SUPERSET_CONFIG_PATH
+          value: "/etc/superset/superset_config.py"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pip install psycopg2-binary
+          superset db upgrade
+          superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin123 || true
+          superset init
+          superset run --host 0.0.0.0 --port 8088
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        volumeMounts:
+        - name: superset-config
+          mountPath: /etc/superset
+      volumes:
+      - name: superset-config
+        configMap:
+          name: superset-config

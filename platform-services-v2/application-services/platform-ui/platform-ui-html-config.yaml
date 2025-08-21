@@ -1,0 +1,1543 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-html-config
+  namespace: platform-ui
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Platform UI - Service Management Console</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            :root {
+                --primary: #2563eb;
+                --primary-dark: #1d4ed8;
+                --secondary: #64748b;
+                --success: #059669;
+                --warning: #d97706;
+                --danger: #dc2626;
+                --info: #0891b2;
+                
+                --bg-primary: #ffffff;
+                --bg-secondary: #f8fafc;
+                --bg-tertiary: #f1f5f9;
+                --text-primary: #0f172a;
+                --text-secondary: #475569;
+                --text-muted: #64748b;
+                --border: #e2e8f0;
+                --border-light: #f1f5f9;
+                
+                --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            }
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                line-height: 1.5;
+            }
+            
+            .header {
+                background: var(--bg-primary);
+                border-bottom: 1px solid var(--border);
+                padding: 1rem 0;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                box-shadow: var(--shadow);
+            }
+            
+            .header-content {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 0 2rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .logo-section h1 {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin: 0;
+            }
+            
+            .nav-tabs {
+                display: flex;
+                gap: 0.5rem;
+            }
+            
+            .nav-tab {
+                padding: 0.5rem 1rem;
+                border: none;
+                background: transparent;
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                font-weight: 500;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .nav-tab:hover {
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+            }
+            
+            .nav-tab.active {
+                background: var(--primary);
+                color: white;
+            }
+            
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 2rem;
+            }
+            
+            .tab-content {
+                display: none;
+            }
+            
+            .tab-content.active {
+                display: block;
+            }
+            
+            .services-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1.5rem;
+                margin-top: 1.5rem;
+            }
+            
+            .service-card {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                padding: 1.5rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                transition: all 0.2s;
+            }
+            
+            .service-card:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-md);
+            }
+            
+            .service-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 1rem;
+            }
+            
+            .service-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.25rem;
+            }
+            
+            .service-description {
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                margin-bottom: 1rem;
+                line-height: 1.4;
+            }
+            
+            .service-status {
+                display: inline-flex;
+                align-items: center;
+                padding: 0.25rem 0.5rem;
+                border-radius: 0.25rem;
+                font-size: 0.75rem;
+                font-weight: 500;
+                text-transform: uppercase;
+            }
+            
+            .status-running {
+                background: #dcfce7;
+                color: #166534;
+            }
+            
+            .status-pending {
+                background: #fef3c7;
+                color: #92400e;
+            }
+            
+            .status-error {
+                background: #fecaca;
+                color: #991b1b;
+            }
+            
+            .service-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+            
+            .btn {
+                padding: 0.5rem 1rem;
+                border-radius: 0.375rem;
+                border: 1px solid var(--border);
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                text-decoration: none;
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .btn:hover {
+                background: var(--bg-tertiary);
+            }
+            
+            .btn-primary {
+                background: var(--primary);
+                color: white;
+                border-color: var(--primary);
+            }
+            
+            .btn-primary:hover {
+                background: var(--primary-dark);
+            }
+            
+            .api-table {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                overflow: hidden;
+                margin-top: 1.5rem;
+            }
+            
+            .api-table table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            
+            .api-table th {
+                background: var(--bg-tertiary);
+                padding: 1rem;
+                text-align: left;
+                font-weight: 600;
+                color: var(--text-primary);
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .api-table td {
+                padding: 1rem;
+                border-bottom: 1px solid var(--border-light);
+                color: var(--text-secondary);
+            }
+            
+            .api-table tr:hover {
+                background: var(--bg-secondary);
+            }
+            
+            .health-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+                margin-top: 1.5rem;
+            }
+            
+            .health-card {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                padding: 1.5rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+            }
+            
+            .health-card h3 {
+                font-size: 0.875rem;
+                font-weight: 600;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.5rem;
+            }
+            
+            .health-value {
+                font-size: 2rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                margin-bottom: 0.25rem;
+            }
+            
+            .health-change {
+                font-size: 0.875rem;
+                color: var(--text-muted);
+            }
+            
+            .section-title {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+            
+            .section-subtitle {
+                color: var(--text-secondary);
+                margin-bottom: 1.5rem;
+            }
+            
+            /* Enhanced Application Gallery Styles */
+            .service-metrics {
+                display: flex;
+                gap: 1rem;
+                margin-bottom: 1rem;
+                flex-wrap: wrap;
+            }
+            
+            .metric-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 0.5rem;
+                background: var(--bg-tertiary);
+                border-radius: 0.375rem;
+                min-width: 80px;
+            }
+            
+            .metric-value {
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--primary);
+            }
+            
+            .metric-label {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            
+            .service-health-indicator {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                margin-right: 0.5rem;
+                animation: pulse 2s infinite;
+            }
+            
+            .health-green { background-color: #10b981; }
+            .health-yellow { background-color: #f59e0b; }
+            .health-red { background-color: #ef4444; }
+            
+            @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+                70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+            }
+            
+            .quick-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+            
+            .action-btn {
+                padding: 0.5rem 1rem;
+                border-radius: 0.375rem;
+                border: none;
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.25rem;
+            }
+            
+            .action-btn-primary {
+                background: var(--primary);
+                color: white;
+            }
+            
+            .action-btn-primary:hover {
+                background: var(--primary-dark);
+                transform: translateY(-1px);
+            }
+            
+            .action-btn-secondary {
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+            }
+            
+            .action-btn-secondary:hover {
+                background: var(--bg-secondary);
+                transform: translateY(-1px);
+            }
+            
+            /* API Health History Charts */
+            .chart-container {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                padding: 1.5rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                margin-bottom: 1.5rem;
+            }
+            
+            .chart-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1rem;
+            }
+            
+            .chart-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            
+            .time-range-selector {
+                display: flex;
+                gap: 0.5rem;
+            }
+            
+            .time-btn {
+                padding: 0.25rem 0.75rem;
+                border-radius: 0.25rem;
+                border: 1px solid var(--border);
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .time-btn:hover, .time-btn.active {
+                background: var(--primary);
+                color: white;
+                border-color: var(--primary);
+            }
+            
+            .chart-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                gap: 1.5rem;
+                margin-top: 1.5rem;
+            }
+            
+            .service-chart {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                padding: 1rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+            }
+            
+            .service-chart h4 {
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+                display: flex;
+                align-items: center;
+            }
+            
+            .chart-canvas {
+                width: 100%;
+                height: 200px;
+            }
+            
+            /* Status Overview */
+            .status-overview {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+            
+            .status-item {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                padding: 1.5rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                text-align: center;
+            }
+            
+            .status-number {
+                font-size: 2rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+            }
+            
+            .status-healthy { color: var(--success); }
+            .status-warning { color: var(--warning); }
+            .status-error { color: var(--danger); }
+            
+            .status-label {
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            
+            /* Enhanced API Table */
+            .api-table-enhanced {
+                background: var(--bg-primary);
+                border-radius: 0.5rem;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                overflow: hidden;
+                margin-top: 1.5rem;
+            }
+            
+            .api-table-enhanced table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            
+            .api-table-enhanced th {
+                background: var(--bg-tertiary);
+                padding: 1rem;
+                text-align: left;
+                font-weight: 600;
+                color: var(--text-primary);
+                border-bottom: 1px solid var(--border);
+                position: sticky;
+                top: 0;
+            }
+            
+            .api-table-enhanced td {
+                padding: 1rem;
+                border-bottom: 1px solid var(--border-light);
+                color: var(--text-secondary);
+            }
+            
+            .api-table-enhanced tr:hover {
+                background: var(--bg-secondary);
+            }
+            
+            .response-time-chart {
+                width: 100px;
+                height: 30px;
+                background: var(--bg-tertiary);
+                border-radius: 0.25rem;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .response-time-bar {
+                height: 100%;
+                background: linear-gradient(90deg, var(--success), var(--warning));
+                border-radius: 0.25rem;
+                transition: width 0.3s ease;
+            }
+            
+            /* Loading and Error States */
+            .loading-spinner {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 2px solid var(--border);
+                border-radius: 50%;
+                border-top-color: var(--primary);
+                animation: spin 1s ease-in-out infinite;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            
+            .error-state {
+                color: var(--danger);
+                background: #fef2f2;
+                padding: 0.5rem;
+                border-radius: 0.25rem;
+                border: 1px solid #fecaca;
+                margin: 1rem 0;
+            }
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>Platform UI</h1>
+                </div>
+                <nav class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchTab('applications')">Applications</button>
+                    <button class="nav-tab" onclick="switchTab('apis')">API Status</button>
+                    <button class="nav-tab" onclick="switchTab('health')">Health Monitoring</button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="container">
+            <!-- Applications Tab -->
+            <div id="applications" class="tab-content active">
+                <h2 class="section-title">Application Gallery</h2>
+                <p class="section-subtitle">Access and manage your platform services with real-time monitoring</p>
+                
+                <!-- Status Overview -->
+                <div class="status-overview">
+                    <div class="status-item">
+                        <div class="status-number status-healthy" id="healthy-services">-</div>
+                        <div class="status-label">Healthy Services</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-number status-warning" id="warning-services">-</div>
+                        <div class="status-label">Services Initializing</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-number status-error" id="error-services">-</div>
+                        <div class="status-label">Services Down</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-number status-healthy" id="avg-response-time">-</div>
+                        <div class="status-label">Avg Response Time</div>
+                    </div>
+                </div>
+                
+                <div class="services-grid">
+                    <div class="service-card" data-service="argocd">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">ArgoCD</h3>
+                                </div>
+                                <p class="service-description">GitOps continuous delivery platform for Kubernetes applications</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="argocd-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="argocd-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="argocd-apps">-</div>
+                                <div class="metric-label">Apps</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/argocd/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('argocd')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="workflows">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">Argo Workflows</h3>
+                                </div>
+                                <p class="service-description">Kubernetes-native workflow execution engine</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="workflows-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="workflows-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="workflows-count">-</div>
+                                <div class="metric-label">Workflows</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/workflows/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('workflows')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="airflow">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">Apache Airflow</h3>
+                                </div>
+                                <p class="service-description">Workflow orchestration and scheduling platform</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="airflow-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="airflow-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="airflow-dags">-</div>
+                                <div class="metric-label">DAGs</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/airflow/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('airflow')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="vault">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">HashiCorp Vault</h3>
+                                </div>
+                                <p class="service-description">Secrets management and data protection service</p>
+                            </div>
+                            <span class="service-status status-running">Unsealed</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="vault-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="vault-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="vault-secrets">-</div>
+                                <div class="metric-label">Secrets</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/vault/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('vault')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="mlflow">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">MLflow</h3>
+                                </div>
+                                <p class="service-description">Machine learning lifecycle management platform</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="mlflow-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="mlflow-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="mlflow-models">-</div>
+                                <div class="metric-label">Models</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/mlflow/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('mlflow')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="superset">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">Apache Superset</h3>
+                                </div>
+                                <p class="service-description">Business intelligence web application</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="superset-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="superset-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="superset-dashboards">-</div>
+                                <div class="metric-label">Dashboards</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/superset/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('superset')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="kubeflow">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-yellow"></span>
+                                    <h3 class="service-title">Kubeflow</h3>
+                                </div>
+                                <p class="service-description">Machine learning workflows on Kubernetes</p>
+                            </div>
+                            <span class="service-status status-pending">Initializing</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="kubeflow-status">-</div>
+                                <div class="metric-label">Status</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="kubeflow-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="kubeflow-pipelines">-</div>
+                                <div class="metric-label">Pipelines</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/kubeflow/" class="action-btn action-btn-secondary">View Status</a>
+                            <button onclick="checkServiceHealth('kubeflow')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="kiali">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">Kiali</h3>
+                                </div>
+                                <p class="service-description">Istio service mesh observability</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="kiali-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="kiali-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="kiali-services">-</div>
+                                <div class="metric-label">Services</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/kiali/" class="action-btn action-btn-primary">Open Console</a>
+                            <button onclick="checkServiceHealth('kiali')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card" data-service="seldon">
+                        <div class="service-header">
+                            <div>
+                                <div style="display: flex; align-items: center;">
+                                    <span class="service-health-indicator health-green"></span>
+                                    <h3 class="service-title">Seldon Core</h3>
+                                </div>
+                                <p class="service-description">ML model deployment and monitoring</p>
+                            </div>
+                            <span class="service-status status-running">Running</span>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="seldon-uptime">-</div>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="seldon-response">-</div>
+                                <div class="metric-label">Response</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="seldon-models">-</div>
+                                <div class="metric-label">Models</div>
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <a href="/seldon/" class="action-btn action-btn-secondary">View Models</a>
+                            <button onclick="checkServiceHealth('seldon')" class="action-btn action-btn-secondary">Health Check</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Status Tab -->
+            <div id="apis" class="tab-content">
+                <h2 class="section-title">API Health History</h2>
+                <p class="section-subtitle">Comprehensive monitoring with historical data and real-time metrics</p>
+                
+                <!-- Time Range Selector -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Response Time Overview</h3>
+                        <div class="time-range-selector">
+                            <button class="time-btn active" onclick="updateTimeRange('1h')">1 Hour</button>
+                            <button class="time-btn" onclick="updateTimeRange('6h')">6 Hours</button>
+                            <button class="time-btn" onclick="updateTimeRange('24h')">24 Hours</button>
+                            <button class="time-btn" onclick="updateTimeRange('7d')">7 Days</button>
+                        </div>
+                    </div>
+                    <canvas id="overallResponseChart" class="chart-canvas"></canvas>
+                </div>
+                
+                <!-- Individual Service Charts -->
+                <div class="chart-grid">
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>ArgoCD API</h4>
+                        <canvas id="argocdChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>Argo Workflows API</h4>
+                        <canvas id="workflowsChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>Vault API</h4>
+                        <canvas id="vaultChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>MLflow API</h4>
+                        <canvas id="mlflowChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>Airflow API</h4>
+                        <canvas id="airflowChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>Superset API</h4>
+                        <canvas id="supersetChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-yellow"></span>Kubeflow API</h4>
+                        <canvas id="kubeflowChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="service-chart">
+                        <h4><span class="service-health-indicator health-green"></span>Kiali API</h4>
+                        <canvas id="kialiChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Enhanced API Status Table -->
+                <div class="api-table-enhanced">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Endpoint</th>
+                                <th>Status</th>
+                                <th>Response Time</th>
+                                <th>Success Rate</th>
+                                <th>Last 24h Avg</th>
+                                <th>Trend</th>
+                                <th>Last Check</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="api-status-table-body">
+                            <!-- API status data will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Health Monitoring Tab -->
+            <div id="health" class="tab-content">
+                <h2 class="section-title">Health Monitoring</h2>
+                <p class="section-subtitle">System health and resource utilization</p>
+                
+                <div class="health-grid">
+                    <div class="health-card">
+                        <h3>CPU Usage</h3>
+                        <div class="health-value">34%</div>
+                        <div class="health-change">+2% from last hour</div>
+                    </div>
+                    
+                    <div class="health-card">
+                        <h3>Memory Usage</h3>
+                        <div class="health-value">67%</div>
+                        <div class="health-change">-5% from last hour</div>
+                    </div>
+                    
+                    <div class="health-card">
+                        <h3>Active Pods</h3>
+                        <div class="health-value">142</div>
+                        <div class="health-change">+3 from yesterday</div>
+                    </div>
+                    
+                    <div class="health-card">
+                        <h3>Service Uptime</h3>
+                        <div class="health-value">99.8%</div>
+                        <div class="health-change">Last 30 days</div>
+                    </div>
+                    
+                    <div class="health-card">
+                        <h3>Network I/O</h3>
+                        <div class="health-value">1.2GB/s</div>
+                        <div class="health-change">Peak: 2.1GB/s</div>
+                    </div>
+                    
+                    <div class="health-card">
+                        <h3>Storage Usage</h3>
+                        <div class="health-value">428GB</div>
+                        <div class="health-change">78% of 550GB</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script>
+            let currentTimeRange = '1h';
+            let charts = {};
+            let healthHistory = {};
+            
+            // Service endpoints configuration
+            const serviceEndpoints = {
+                argocd: { 
+                    health: '/argocd/api/v1/version',
+                    namespace: 'argocd',
+                    service: 'argocd-server'
+                },
+                workflows: { 
+                    health: '/workflows/api/v1/info',
+                    namespace: 'argo',
+                    service: 'argo-server'
+                },
+                airflow: { 
+                    health: '/airflow/api/v1/health',
+                    namespace: 'airflow',
+                    service: 'airflow'
+                },
+                vault: { 
+                    health: '/vault/v1/sys/health',
+                    namespace: 'vault',
+                    service: 'vault'
+                },
+                mlflow: { 
+                    health: '/mlflow/api/2.0/mlflow/experiments/list',
+                    namespace: 'mlflow',
+                    service: 'mlflow'
+                },
+                superset: { 
+                    health: '/superset/api/v1/security/csrf_token',
+                    namespace: 'superset',
+                    service: 'apache-superset'
+                },
+                kubeflow: { 
+                    health: '/kubeflow-api/apis/v1beta1/healthz',
+                    namespace: 'kubeflow',
+                    service: 'kubeflow-pipelines-api-server'
+                },
+                kiali: { 
+                    health: '/kiali/api/status',
+                    namespace: 'istio-system',
+                    service: 'kiali'
+                }
+            };
+            
+            function switchTab(tabName) {
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                const tabs = document.querySelectorAll('.nav-tab');
+                tabs.forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                const selectedContent = document.getElementById(tabName);
+                if (selectedContent) {
+                    selectedContent.classList.add('active');
+                }
+                
+                event.target.classList.add('active');
+                
+                // Initialize charts when API tab is opened
+                if (tabName === 'apis') {
+                    setTimeout(() => initializeCharts(), 100);
+                }
+            }
+            
+            function updateTimeRange(range) {
+                currentTimeRange = range;
+                document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                updateAllCharts();
+            }
+            
+            // Real API health check function
+            async function checkServiceHealth(serviceName) {
+                const button = event.target;
+                const originalText = button.innerHTML;
+                button.innerHTML = '<span class="loading-spinner"></span> Checking...';
+                button.disabled = true;
+                
+                try {
+                    const endpoint = serviceEndpoints[serviceName];
+                    if (!endpoint) {
+                        throw new Error('Service endpoint not configured');
+                    }
+                    
+                    const startTime = Date.now();
+                    const response = await fetch(endpoint.health, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        timeout: 10000
+                    });
+                    
+                    const responseTime = Date.now() - startTime;
+                    const isHealthy = response.ok;
+                    
+                    // Update health history
+                    if (!healthHistory[serviceName]) {
+                        healthHistory[serviceName] = [];
+                    }
+                    healthHistory[serviceName].push({
+                        timestamp: new Date(),
+                        responseTime: responseTime,
+                        status: isHealthy ? 'healthy' : 'unhealthy',
+                        statusCode: response.status
+                    });
+                    
+                    // Keep only last 100 entries
+                    if (healthHistory[serviceName].length > 100) {
+                        healthHistory[serviceName] = healthHistory[serviceName].slice(-100);
+                    }
+                    
+                    // Update UI
+                    button.innerHTML = isHealthy ? 'Healthy' : 'Unhealthy';
+                    button.style.background = isHealthy ? '#10b981' : '#ef4444';
+                    button.style.color = 'white';
+                    
+                    // Update response time in metrics
+                    const responseElement = document.getElementById(`${serviceName}-response`);
+                    if (responseElement) {
+                        responseElement.textContent = responseTime + 'ms';
+                    }
+                    
+                } catch (error) {
+                    console.error(`Health check failed for ${serviceName}:`, error);
+                    button.innerHTML = 'Error';
+                    button.style.background = '#ef4444';
+                    button.style.color = 'white';
+                    
+                    // Record error in history
+                    if (!healthHistory[serviceName]) {
+                        healthHistory[serviceName] = [];
+                    }
+                    healthHistory[serviceName].push({
+                        timestamp: new Date(),
+                        responseTime: null,
+                        status: 'error',
+                        error: error.message
+                    });
+                }
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                    button.style.color = '';
+                    button.disabled = false;
+                }, 2000);
+            }
+            
+            // Real endpoint testing function using backend API
+            async function testEndpoint(serviceName) {
+                const button = event.target;
+                button.innerHTML = '<span class="loading-spinner"></span>';
+                button.disabled = true;
+                
+                try {
+                    const response = await fetch(`/api/services/${serviceName}/health`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const healthData = await response.json();
+                    const health = healthData.health;
+                    
+                    if (health.status === 'healthy') {
+                        button.innerHTML = `OK (${health.response_time}ms)`;
+                        button.style.background = '#10b981';
+                    } else if (health.status === 'warning') {
+                        button.innerHTML = `Warning (${health.response_time}ms)`;
+                        button.style.background = '#f59e0b';
+                    } else {
+                        button.innerHTML = `Failed (${health.error || 'Unknown error'})`;
+                        button.style.background = '#ef4444';
+                    }
+                    button.style.color = 'white';
+                    
+                } catch (error) {
+                    button.innerHTML = 'Error';
+                    button.style.background = '#ef4444';
+                    button.style.color = 'white';
+                }
+                
+                setTimeout(() => {
+                    button.innerHTML = 'Test';
+                    button.style.background = '';
+                    button.style.color = '';
+                    button.disabled = false;
+                }, 2000);
+            }
+            
+            // Load real data from backend API
+            async function loadServiceData() {
+                try {
+                    const response = await fetch('/api/services/status');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const servicesData = await response.json();
+                    
+                    let healthyCount = 0;
+                    let warningCount = 0;
+                    let errorCount = 0;
+                    let totalResponseTime = 0;
+                    let responseCount = 0;
+                    
+                    // Clear API table
+                    const tableBody = document.getElementById('api-status-table-body');
+                    if (tableBody) {
+                        tableBody.innerHTML = '';
+                    }
+                    
+                    // Process each service
+                    Object.keys(servicesData).forEach(serviceName => {
+                        const serviceData = servicesData[serviceName];
+                        const health = serviceData.health;
+                        const metrics = serviceData.metrics;
+                        const history = serviceData.history;
+                        
+                        // Update health history for charts
+                        healthHistory[serviceName] = history.map(entry => ({
+                            timestamp: new Date(entry.timestamp),
+                            responseTime: entry.response_time,
+                            status: entry.status
+                        }));
+                        
+                        // Count service states
+                        if (health.status === 'healthy') {
+                            healthyCount++;
+                            if (health.response_time > 0) {
+                                totalResponseTime += health.response_time;
+                                responseCount++;
+                            }
+                        } else if (health.status === 'warning') {
+                            warningCount++;
+                        } else {
+                            errorCount++;
+                        }
+                        
+                        // Determine UI classes
+                        let statusText = 'Error';
+                        let statusClass = 'status-error';
+                        let healthIndicatorClass = 'health-red';
+                        
+                        if (health.status === 'healthy') {
+                            statusText = 'Healthy';
+                            statusClass = 'status-running';
+                            healthIndicatorClass = 'health-green';
+                        } else if (health.status === 'warning') {
+                            statusText = 'Warning';
+                            statusClass = 'status-pending';
+                            healthIndicatorClass = 'health-yellow';
+                        }
+                        
+                        // Update service health indicator in application gallery
+                        const healthIndicator = document.querySelector(`[data-service="${serviceName}"] .service-health-indicator`);
+                        if (healthIndicator) {
+                            healthIndicator.className = `service-health-indicator ${healthIndicatorClass}`;
+                        }
+                        
+                        // Update response time in application gallery
+                        const responseElement = document.getElementById(`${serviceName}-response`);
+                        if (responseElement) {
+                            responseElement.textContent = health.response_time > 0 ? health.response_time + 'ms' : '-';
+                        }
+                        
+                        // Update status in application gallery
+                        const statusElement = document.querySelector(`[data-service="${serviceName}"] .service-status`);
+                        if (statusElement) {
+                            statusElement.textContent = statusText;
+                            statusElement.className = `service-status ${statusClass}`;
+                        }
+                        
+                        // Update service-specific metrics
+                        if (metrics.apps !== undefined) {
+                            const appsElement = document.getElementById(`${serviceName}-apps`);
+                            if (appsElement) appsElement.textContent = metrics.apps;
+                        }
+                        if (metrics.workflows !== undefined) {
+                            const workflowsElement = document.getElementById(`${serviceName}-count`);
+                            if (workflowsElement) workflowsElement.textContent = metrics.workflows;
+                        }
+                        if (metrics.secrets !== undefined) {
+                            const secretsElement = document.getElementById(`${serviceName}-secrets`);
+                            if (secretsElement) secretsElement.textContent = metrics.secrets;
+                        }
+                        
+                        // Calculate success rate from history
+                        const successfulChecks = history.filter(h => h.status === 'healthy').length;
+                        const successRate = history.length > 0 ? Math.round((successfulChecks / history.length) * 100) : 0;
+                        
+                        // Calculate average response time from history
+                        const avgResponseTime = history.length > 0 ? 
+                            Math.round(history.reduce((sum, h) => sum + (h.response_time || 0), 0) / history.length) : 0;
+                        
+                        // Get endpoint from serviceEndpoints config
+                        const endpoint = serviceEndpoints[serviceName];
+                        
+                        // Add row to API status table
+                        if (tableBody && endpoint) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td><span class="service-health-indicator ${healthIndicatorClass}"></span>${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}</td>
+                                <td>${endpoint.health}</td>
+                                <td><span class="service-status ${statusClass}">${statusText}</span></td>
+                                <td>${health.response_time > 0 ? health.response_time + 'ms' : '-'}</td>
+                                <td>${successRate}%</td>
+                                <td>${avgResponseTime > 0 ? avgResponseTime + 'ms' : '-'}</td>
+                                <td>
+                                    <div class="response-time-chart">
+                                        <div class="response-time-bar" style="width: ${Math.min(100, (health.response_time / 200) * 100)}%;"></div>
+                                    </div>
+                                </td>
+                                <td>Just now</td>
+                                <td><button onclick="testEndpoint('${serviceName}')" class="action-btn action-btn-secondary">Test</button></td>
+                            `;
+                            tableBody.appendChild(row);
+                        }
+                    });
+                    
+                    // Update overview counters
+                    document.getElementById('healthy-services').textContent = healthyCount;
+                    document.getElementById('warning-services').textContent = warningCount; 
+                    document.getElementById('error-services').textContent = errorCount;
+                    
+                    if (responseCount > 0) {
+                        const avgResponseTime = Math.round(totalResponseTime / responseCount);
+                        document.getElementById('avg-response-time').textContent = avgResponseTime + 'ms';
+                    } else {
+                        document.getElementById('avg-response-time').textContent = '-';
+                    }
+                    
+                    // Update charts with new data if they exist
+                    updateChartsWithNewData();
+                    
+                } catch (error) {
+                    console.error('Failed to load service data:', error);
+                    
+                    // Show error state
+                    document.getElementById('healthy-services').textContent = 'Error';
+                    document.getElementById('warning-services').textContent = 'Error';
+                    document.getElementById('error-services').textContent = 'Error';
+                    document.getElementById('avg-response-time').textContent = 'Error';
+                }
+            }
+            
+            function updateChartsWithNewData() {
+                // Update overall chart
+                if (charts.overall) {
+                    const allData = [];
+                    Object.keys(serviceEndpoints).forEach(serviceName => {
+                        const history = healthHistory[serviceName] || [];
+                        history.forEach(entry => {
+                            if (entry.responseTime && entry.responseTime > 0) {
+                                allData.push({
+                                    x: entry.timestamp,
+                                    y: entry.responseTime
+                                });
+                            }
+                        });
+                    });
+                    
+                    allData.sort((a, b) => a.x - b.x);
+                    charts.overall.data.datasets[0].data = allData;
+                    charts.overall.update('none');
+                }
+                
+                // Update individual service charts
+                Object.keys(serviceEndpoints).forEach(serviceName => {
+                    const chartId = serviceName + 'Chart';
+                    if (charts[chartId]) {
+                        const history = healthHistory[serviceName] || [];
+                        const data = history.filter(entry => entry.responseTime && entry.responseTime > 0)
+                            .map(entry => ({
+                                x: entry.timestamp,
+                                y: entry.responseTime
+                            }));
+                        
+                        charts[chartId].data.datasets[0].data = data;
+                        charts[chartId].update('none');
+                    }
+                });
+            }
+            
+            function initializeCharts() {
+                const chartConfig = {
+                    type: 'line',
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: currentTimeRange === '1h' ? 'minute' : 'hour'
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Response Time (ms)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                };
+                
+                // Overall Response Chart
+                const overallCtx = document.getElementById('overallResponseChart');
+                if (overallCtx && !charts.overall) {
+                    // Calculate overall average from all services
+                    const allData = [];
+                    Object.keys(serviceEndpoints).forEach(serviceName => {
+                        const history = healthHistory[serviceName] || [];
+                        history.forEach(entry => {
+                            if (entry.responseTime && entry.responseTime > 0) {
+                                allData.push({
+                                    x: entry.timestamp,
+                                    y: entry.responseTime
+                                });
+                            }
+                        });
+                    });
+                    
+                    // Sort by timestamp
+                    allData.sort((a, b) => a.x - b.x);
+                    
+                    charts.overall = new Chart(overallCtx, {
+                        ...chartConfig,
+                        data: {
+                            datasets: [{
+                                label: 'Average Response Time',
+                                data: allData,
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        }
+                    });
+                }
+                
+                // Individual service charts
+                Object.keys(serviceEndpoints).forEach(serviceName => {
+                    const chartId = serviceName + 'Chart';
+                    const ctx = document.getElementById(chartId);
+                    if (ctx && !charts[chartId]) {
+                        const history = healthHistory[serviceName] || [];
+                        const data = history.filter(entry => entry.responseTime && entry.responseTime > 0)
+                            .map(entry => ({
+                                x: entry.timestamp,
+                                y: entry.responseTime
+                            }));
+                        
+                        // Define service-specific colors
+                        const serviceColors = {
+                            argocd: '#10b981',
+                            workflows: '#3b82f6', 
+                            airflow: '#f59e0b',
+                            vault: '#8b5cf6',
+                            mlflow: '#ef4444',
+                            superset: '#06b6d4',
+                            kubeflow: '#64748b',
+                            kiali: '#84cc16'
+                        };
+                        
+                        const color = serviceColors[serviceName] || '#2563eb';
+                        
+                        charts[chartId] = new Chart(ctx, {
+                            ...chartConfig,
+                            data: {
+                                datasets: [{
+                                    label: serviceName,
+                                    data: data,
+                                    borderColor: color,
+                                    backgroundColor: color + '20',
+                                    tension: 0.4,
+                                    fill: true
+                                }]
+                            }
+                        });
+                    }
+                });
+            }
+            
+            function updateAllCharts() {
+                Object.keys(charts).forEach(chartKey => {
+                    if (charts[chartKey]) {
+                        charts[chartKey].destroy();
+                        delete charts[chartKey];
+                    }
+                });
+                setTimeout(() => initializeCharts(), 100);
+            }
+            
+            // Initialize data loading on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                // Initialize empty charts first
+                initializeCharts();
+                
+                // Load real service data
+                loadServiceData();
+                
+                // Refresh data every 30 seconds
+                setInterval(loadServiceData, 30000);
+            });
+        </script>
+    </body>
+    </html>

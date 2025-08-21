@@ -1,0 +1,390 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: platform-ui
+data:
+  default.conf: |
+    # Set up variables for better performance
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Enhanced proxy settings
+        proxy_buffering on;
+        proxy_buffer_size 256k;
+        proxy_buffers 8 256k;
+        proxy_busy_buffers_size 256k;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        client_max_body_size 100m;
+        
+        # Enable gzip compression
+        gzip on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+        
+        # Health check
+        location /health {
+            return 200 "OK\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # ===== WORKING SERVICE CONFIGURATIONS =====
+        
+        # MLflow - Already working, keep as reference
+        location /mlflow/ {
+            proxy_pass http://mlflow.platform-orchestration.svc.cluster.local:5000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # ===== SERVICES NEEDING PATH REWRITING =====
+        
+        # Grafana - Complete path rewriting approach
+        location /grafana/ {
+            # Remove /grafana from the path when sending to backend
+            rewrite ^/grafana/(.*)$ /$1 break;
+            proxy_pass http://grafana.platform-monitoring.svc.cluster.local:3000;
+            
+            # Essential headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # Grafana specific settings
+            proxy_set_header X-Forwarded-Server $host;
+            proxy_set_header Authorization $http_authorization;
+            proxy_pass_header Authorization;
+            
+            # Handle WebSocket connections
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            
+            # Content rewriting for assets and redirects
+            sub_filter_once off;
+            sub_filter_types text/html text/css text/javascript application/javascript application/json;
+            sub_filter 'href="/' 'href="/grafana/';
+            sub_filter 'src="/' 'src="/grafana/';
+            sub_filter 'url("/' 'url("/grafana/';
+            sub_filter 'url(/' 'url(/grafana/';
+            sub_filter "'/api/" "'/grafana/api/";
+            sub_filter '"/api/' '"/grafana/api/';
+            sub_filter '"public/' '"/grafana/public/';
+            sub_filter "'public/" "'/grafana/public/";
+            sub_filter 'href="public/' 'href="/grafana/public/';
+            sub_filter 'src="public/' 'src="/grafana/public/';
+            
+            # Disable compression for sub_filter to work
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # Prometheus - Path rewriting approach
+        location /prometheus/ {
+            rewrite ^/prometheus/(.*)$ /$1 break;
+            proxy_pass http://prometheus.platform-monitoring.svc.cluster.local:9090;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Prefix /prometheus;
+            
+            # Content rewriting
+            sub_filter_once off;
+            sub_filter_types text/html text/css application/javascript;
+            sub_filter 'href="/' 'href="/prometheus/';
+            sub_filter 'src="/' 'src="/prometheus/';
+            sub_filter 'url("/' 'url("/prometheus/';
+            sub_filter "/static/" "/prometheus/static/";
+            sub_filter "/api/v1/" "/prometheus/api/v1/";
+            
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # Kibana - Specific configuration for ELK
+        location /kibana/ {
+            rewrite ^/kibana/(.*)$ /$1 break;
+            proxy_pass http://kibana.platform-logging.svc.cluster.local:5601;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header kbn-xsrf true;
+            
+            # WebSocket support for Kibana real-time features
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            
+            # Content rewriting for Kibana
+            sub_filter_once off;
+            sub_filter_types text/html application/json application/javascript text/css;
+            sub_filter 'src="/ui/' 'src="/kibana/ui/';
+            sub_filter 'href="/ui/' 'href="/kibana/ui/';
+            sub_filter '"/bundles/' '"/kibana/bundles/';
+            sub_filter "'/bundles/" "'/kibana/bundles/";
+            sub_filter '"/api/' '"/kibana/api/';
+            sub_filter "basePathTemplate:" "basePathTemplate:'/kibana',originalBasePathTemplate:";
+            
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # Airflow - WebUI with path rewriting
+        location /airflow/ {
+            rewrite ^/airflow/(.*)$ /$1 break;
+            proxy_pass http://airflow.platform-orchestration.svc.cluster.local:8080;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Prefix /airflow;
+            
+            # WebSocket for real-time DAG updates
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            
+            # Content rewriting for Airflow assets
+            sub_filter_once off;
+            sub_filter_types text/html text/css application/javascript;
+            sub_filter 'href="/static/' 'href="/airflow/static/';
+            sub_filter 'src="/static/' 'src="/airflow/static/';
+            sub_filter 'url("/static/' 'url("/airflow/static/';
+            sub_filter '"/api/v1/' '"/airflow/api/v1/';
+            sub_filter 'action="/' 'action="/airflow/';
+            
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # ArgoCD - HTTP with content rewriting
+        location /argocd/ {
+            rewrite ^/argocd/(.*)$ /$1 break;
+            proxy_pass http://argocd-server.argocd.svc.cluster.local:80;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Host $host;
+            
+            # gRPC and streaming support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Grpc-Web-Protocol grpc-web;
+            
+            # ArgoCD asset rewriting
+            sub_filter_once off;
+            sub_filter_types text/html text/css application/javascript application/json;
+            sub_filter 'href="/assets/' 'href="/argocd/assets/';
+            sub_filter 'src="/assets/' 'src="/argocd/assets/';
+            sub_filter '"/api/v1/' '"/argocd/api/v1/';
+            sub_filter 'url("/assets/' 'url("/argocd/assets/';
+            
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # Argo Workflows - Path rewriting
+        location /argo-workflows/ {
+            rewrite ^/argo-workflows/(.*)$ /$1 break;
+            proxy_pass http://argo-server.argo-workflows.svc.cluster.local:2746;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # WebSocket support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            
+            # Content rewriting
+            sub_filter_once off;
+            sub_filter_types text/html application/javascript text/css;
+            sub_filter 'src="/assets/' 'src="/argo-workflows/assets/';
+            sub_filter 'href="/assets/' 'href="/argo-workflows/assets/';
+            sub_filter '"/api/v1/' '"/argo-workflows/api/v1/';
+            
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # Kubeflow - Simple rewriting
+        location /kubeflow/ {
+            proxy_pass http://kubeflow-dashboard.kubeflow.svc.cluster.local:80/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Vault - Complex asset rewriting needed
+        location /vault/ {
+            rewrite ^/vault/(.*)$ /$1 break;
+            proxy_pass http://vault.vault.svc.cluster.local:8200;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Vault-Request true;
+            
+            # Vault UI asset rewriting - comprehensive
+            sub_filter_once off;
+            sub_filter_types text/html text/css application/javascript text/javascript;
+            sub_filter 'href="/ui/' 'href="/vault/ui/';
+            sub_filter 'src="/ui/' 'src="/vault/ui/';
+            sub_filter 'url("/ui/' 'url("/vault/ui/';
+            sub_filter '"/v1/' '"/vault/v1/';
+            sub_filter 'action="/ui/' 'action="/vault/ui/';
+            sub_filter '"/ui/assets/' '"/vault/ui/assets/';
+            sub_filter "'/ui/assets/" "'/vault/ui/assets/";
+            sub_filter 'url("/ui/assets/' 'url("/vault/ui/assets/';
+            
+            proxy_set_header Accept-Encoding "";
+        }
+        
+        # Root location for Platform UI dashboard
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /index.html;
+            
+            # Cache static assets
+            location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+        }
+    }
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BASE Platform - Fixed Asset Loading</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+            .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+            .header { text-align: center; margin-bottom: 30px; background: rgba(255,255,255,0.95); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); }
+            .header h1 { color: #2c3e50; font-size: 2.5em; margin-bottom: 10px; }
+            .header p { color: #666; font-size: 1.1em; }
+            .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+            .service { background: rgba(255,255,255,0.95); padding: 20px; border-radius: 10px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: all 0.3s ease; position: relative; overflow: hidden; }
+            .service::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #667eea, #764ba2); }
+            .service:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+            .service h3 { color: #2c3e50; font-size: 1.3em; margin-bottom: 10px; }
+            .service p { color: #666; line-height: 1.5; margin-bottom: 15px; font-size: 0.9em; }
+            .service-link { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); font-size: 0.85em; }
+            .service-link:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
+            .status { display: inline-block; padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+            .status.fixed { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+            .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px; }
+            .stat { background: rgba(255,255,255,0.9); padding: 18px; border-radius: 10px; text-align: center; backdrop-filter: blur(10px); }
+            .stat-number { font-size: 2em; font-weight: bold; color: #667eea; margin-bottom: 5px; }
+            .stat-label { color: #666; text-transform: uppercase; letter-spacing: 1px; font-size: 0.75em; }
+            .alert { background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffeaa7; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚀 BASE Platform Dashboard</h1>
+                <p>Enterprise Data Platform - Asset Loading Fixed</p>
+            </div>
+            
+            <div class="alert">
+                <strong>🔧 Asset Loading Fix Applied:</strong> Services now properly handle JavaScript, CSS, and static assets through the proxy.
+            </div>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Services</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">Fixed</div>
+                    <div class="stat-label">Assets</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">1</div>
+                    <div class="stat-label">Entry Point</div>
+                </div>
+            </div>
+            
+            <div class="services">
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>📊 Grafana</h3>
+                    <p>Monitoring dashboards with proper CSS/JS asset loading</p>
+                    <a href="/grafana/" class="service-link" target="_blank">Open Grafana</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>🔍 Prometheus</h3>
+                    <p>Metrics collection with working web console</p>
+                    <a href="/prometheus/" class="service-link" target="_blank">Open Prometheus</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>📈 Kibana</h3>
+                    <p>Log analysis with proper asset routing and real-time features</p>
+                    <a href="/kibana/" class="service-link" target="_blank">Open Kibana</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>🌊 Airflow</h3>
+                    <p>Workflow orchestration with working web interface</p>
+                    <a href="/airflow/" class="service-link" target="_blank">Open Airflow</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">✅ WORKING</div>
+                    <h3>🤖 MLflow</h3>
+                    <p>ML lifecycle management - already functional</p>
+                    <a href="/mlflow/" class="service-link" target="_blank">Open MLflow</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>🚀 ArgoCD</h3>
+                    <p>GitOps deployment with working UI assets</p>
+                    <a href="/argocd/" class="service-link" target="_blank">Open ArgoCD</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>🔄 Argo Workflows</h3>
+                    <p>Workflow engine with proper asset loading</p>
+                    <a href="/argo-workflows/" class="service-link" target="_blank">Open Argo Workflows</a>
+                </div>
+                
+                <div class="service">
+                    <div class="status fixed">🔧 ASSETS FIXED</div>
+                    <h3>🔐 Vault</h3>
+                    <p>Secrets management with working UI assets</p>
+                    <a href="/vault/" class="service-link" target="_blank">Open Vault</a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>

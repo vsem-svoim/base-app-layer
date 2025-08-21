@@ -70,3 +70,21 @@ secrets/
 temp/.cadence/
 *.tmp
 *.temp
+
+# Istio binaries and downloads
+istio-*/
+*.tar.gz
+*.zip
+
+# Platform deployment artifacts
+.aws-config
+.platform-config
+.stage1-output
+*.backup
+
+# Vagrant
+.vagrant/
+*.box
+
+# Archive directories
+.archive/

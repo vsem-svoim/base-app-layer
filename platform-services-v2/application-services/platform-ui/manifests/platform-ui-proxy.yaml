@@ -65,26 +65,39 @@ data:
             add_header Content-Type text/plain;
         }
         
-        # Service proxies with upstream backends
+        # Service proxies with upstream backends and proper path handling
         location /grafana/ {
-            proxy_pass http://grafana_backend/;
+            proxy_pass http://grafana_backend/grafana/;
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter '<head>' '<head><base href="/grafana/">';
         }
         
         location /prometheus/ {
-            proxy_pass http://prometheus_backend/;
+            proxy_pass http://prometheus_backend/prometheus/;
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter 'href="/' 'href="/prometheus/';
+            sub_filter 'src="/' 'src="/prometheus/';
         }
         
         location /kibana/ {
-            proxy_pass http://kibana_backend/;
+            proxy_pass http://kibana_backend/kibana/;
             proxy_set_header kbn-xsrf true;
+            proxy_set_header Accept-Encoding "";
         }
         
         location /airflow/ {
-            proxy_pass http://airflow_backend/;
+            proxy_pass http://airflow_backend/airflow/;
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter 'href="/' 'href="/airflow/';
+            sub_filter 'src="/' 'src="/airflow/';
         }
         
         location /mlflow/ {
             proxy_pass http://mlflow_backend/;
+            proxy_set_header Accept-Encoding "";
         }
         
         location /argocd/ {
@@ -269,7 +282,7 @@ spec:
     spec:
       containers:
       - name: nginx-proxy
-        image: nginx:1.25-alpine
+        image: nginx:1.25
         ports:
         - containerPort: 80
           name: http

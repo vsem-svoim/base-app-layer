@@ -24,7 +24,7 @@ spec:
         eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: ui-server
-        image: gcr.io/ml-pipeline/frontend:2.14.0
+        image: gcr.io/ml-pipeline/frontend:2.2.0
         ports:
         - containerPort: 3000
           name: http

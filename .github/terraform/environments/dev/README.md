@@ -31,7 +31,7 @@ This directory contains a fully parameterized Terraform configuration for deploy
 
 ### 1. Basic Settings
 ```hcl
-project_name = "platform-services"
+project_name = ".platform-services"
 environment  = "dev"
 region      = "us-east-1"
 ```
@@ -166,10 +166,10 @@ terraform apply -var-file="terraform.tfvars"
 ### 4. Configure kubectl Access
 ```bash
 # BASE layer cluster
-aws eks update-kubeconfig --region us-east-1 --name platform-services-base-layer-dev --alias base-layer
+aws eks update-kubeconfig --region us-east-1 --name .platform-services-base-layer-dev --alias base-layer
 
 # Platform services cluster
-aws eks update-kubeconfig --region us-east-1 --name platform-services-platform-services-dev --alias platform-services
+aws eks update-kubeconfig --region us-east-1 --name .platform-services-.platform-services-dev --alias .platform-services
 ```
 
 ## 📊 Cost Optimization Tips

@@ -6,4 +6,4 @@ metadata:
     app.kubernetes.io/name: mlflow
     app.kubernetes.io/component: ml-lifecycle
     deployment.wave: "2"
-    istio-injection: enabled
+    istio-injection: disabled

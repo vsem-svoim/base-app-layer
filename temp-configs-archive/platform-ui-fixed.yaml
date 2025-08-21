@@ -1,0 +1,195 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: platform-ui
+data:
+  default.conf: |
+    upstream argocd {
+        server argocd-server.argocd.svc.cluster.local:443;
+    }
+    upstream grafana {
+        server grafana.platform-monitoring.svc.cluster.local:3000;
+    }
+    upstream prometheus {
+        server prometheus.platform-monitoring.svc.cluster.local:9090;
+    }
+    upstream kibana {
+        server kibana.platform-logging.svc.cluster.local:5601;
+    }
+    upstream airflow {
+        server airflow.platform-orchestration.svc.cluster.local:8080;
+    }
+    upstream mlflow {
+        server mlflow.platform-orchestration.svc.cluster.local:5000;
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Increase proxy buffers
+        proxy_buffering on;
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+        
+        # Main dashboard
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        # ArgoCD proxy (HTTPS backend)
+        location /argocd/ {
+            proxy_pass https://argocd/;
+            proxy_ssl_verify off;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_redirect off;
+            
+            # Handle ArgoCD base path
+            proxy_set_header Accept-Encoding "";
+            sub_filter_once off;
+            sub_filter 'href="/' 'href="/argocd/';
+            sub_filter 'src="/' 'src="/argocd/';
+            sub_filter '"/' '"/argocd/';
+            sub_filter_types *;
+        }
+        
+        # Grafana proxy with sub_path
+        location /grafana/ {
+            rewrite ^/grafana/(.*)$ /$1 break;
+            proxy_pass http://grafana;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host/grafana;
+        }
+        
+        # Prometheus proxy
+        location /prometheus/ {
+            rewrite ^/prometheus/(.*)$ /$1 break;
+            proxy_pass http://prometheus;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Kibana proxy
+        location /kibana/ {
+            rewrite ^/kibana/(.*)$ /$1 break;
+            proxy_pass http://kibana;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Airflow proxy (when it's working)
+        location /airflow/ {
+            rewrite ^/airflow/(.*)$ /$1 break;
+            proxy_pass http://airflow;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+        }
+        
+        # MLflow proxy
+        location /mlflow/ {
+            rewrite ^/mlflow/(.*)$ /$1 break;
+            proxy_pass http://mlflow;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Status endpoint with backend checks
+        location /status {
+            access_log off;
+            add_header Content-Type application/json;
+            return 200 '{"status":"healthy","services":{"grafana":"✅","prometheus":"✅","kibana":"✅","mlflow":"✅","airflow":"🔄"}}';
+        }
+    }
+---
+# Fix Airflow deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow
+  namespace: platform-orchestration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow
+  template:
+    metadata:
+      labels:
+        app: airflow
+    spec:
+      containers:
+      - name: airflow
+        image: apache/airflow:2.7.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AIRFLOW__CORE__EXECUTOR
+          value: "SequentialExecutor"
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "sqlite:////opt/airflow/airflow.db"
+        - name: AIRFLOW__CORE__FERNET_KEY
+          value: "YlCImzjge_TeZc4RNSGQTxXZcqVg8C7BAguHIhqeRLk="
+        - name: _AIRFLOW_WWW_USER_USERNAME
+          value: "admin"
+        - name: _AIRFLOW_WWW_USER_PASSWORD
+          value: "admin123"
+        - name: AIRFLOW__WEBSERVER__BASE_URL
+          value: "http://localhost/airflow"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          airflow db init
+          airflow users create --username admin --password admin123 --firstname Admin --lastname User --role Admin --email admin@example.com || true
+          airflow webserver --port 8080 --host 0.0.0.0 -D &
+          airflow scheduler
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10

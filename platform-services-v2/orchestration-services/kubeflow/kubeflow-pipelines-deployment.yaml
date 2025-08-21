@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: kubeflow-pipelines
     app.kubernetes.io/component: api-server
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: kubeflow-pipelines
@@ -24,7 +24,7 @@ spec:
         eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: api-server
-        image: gcr.io/ml-pipeline/api-server:2.14.0
+        image: gcr.io/ml-pipeline/api-server:2.2.0
         ports:
         - containerPort: 8888
           name: http

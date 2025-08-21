@@ -7,10 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 
 resources:
-- prometheus-stack.yaml
-- alertmanager.yaml
+- manifests/grafana-deployment.yaml
+- manifests/prometheus-deployment.yaml
 
-namespace: monitoring
+namespace: platform-monitoring
 
 commonLabels:
   app.kubernetes.io/name: monitoring

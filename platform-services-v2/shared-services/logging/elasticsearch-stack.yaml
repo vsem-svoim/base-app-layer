@@ -27,9 +27,11 @@ spec:
       labels:
         app.kubernetes.io/name: elasticsearch
         app.kubernetes.io/component: search-engine
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_memory
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: elasticsearch
         image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
@@ -178,9 +180,11 @@ spec:
       labels:
         app.kubernetes.io/name: logstash
         app.kubernetes.io/component: log-processor
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_general
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: logstash
         image: docker.elastic.co/logstash/logstash:8.8.0
@@ -264,9 +268,11 @@ spec:
       labels:
         app.kubernetes.io/name: kibana
         app.kubernetes.io/component: log-visualization
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_general
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: kibana
         image: docker.elastic.co/kibana/kibana:8.8.0

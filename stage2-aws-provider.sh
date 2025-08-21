@@ -2383,7 +2383,7 @@ create_aws_argocd_apps() {
     mkdir -p argocd/projects
     mkdir -p argocd/applications/infrastructure
     mkdir -p argocd/applications/base-layer
-    mkdir -p argocd/applications/platform-services
+    mkdir -p argocd/applications/.platform-services
     mkdir -p argocd/applications/ml-platform
 
     # Create infrastructure project
@@ -2597,7 +2597,7 @@ deploy_wave_1_infrastructure() {
     log_info "🌊 Wave 1: Infrastructure (Crossplane + AWS Provider)"
     
     # Deploy Crossplane infrastructure applications
-    kubectl apply -f platform-services/argocd/applications/infrastructure/ || log_warning "Some infrastructure apps may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/infrastructure/ || log_warning "Some infrastructure apps may not exist yet"
     
     # Wait for Crossplane to be ready
     log_info "Waiting for Crossplane to be ready..."
@@ -2610,11 +2610,11 @@ deploy_wave_2_platform_services() {
     log_info "🌊 Wave 2: Platform Services (Airflow + Monitoring)"
     
     # Deploy platform services using correct projects
-    kubectl apply -f platform-services/argocd/applications/platform-services/airflow-app.yaml || log_warning "Airflow app may not exist yet"
-    kubectl apply -f platform-services/argocd/applications/platform-services/monitoring-stack-app.yaml || log_warning "Monitoring app may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/.platform-services/airflow-app.yaml || log_warning "Airflow app may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/.platform-services/monitoring-stack-app.yaml || log_warning "Monitoring app may not exist yet"
     
     # Deploy Argo Workflows and Events
-    kubectl apply -f platform-services/argocd/applications/workflow-apps/ || log_warning "Some workflow apps may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/workflow-apps/ || log_warning "Some workflow apps may not exist yet"
     
     log "Wave 2 completed"
 }
@@ -2624,10 +2624,10 @@ deploy_wave_3_data_ingestion() {
     
     # Deploy data ingestion with AWS configurations
     # This references your data_ingestion/ folder configs with AWS overlays
-    kubectl apply -f platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml || log_warning "Data ingestion AWS app may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/base-layer/data-ingestion-aws.yaml || log_warning "Data ingestion AWS app may not exist yet"
     
     # Also deploy individual components that reference data_ingestion/ folders
-    kubectl apply -f platform-services/argocd/applications/base-layer/data-ingestion-app.yaml || log_warning "Data ingestion app may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/base-layer/data-ingestion-app.yaml || log_warning "Data ingestion app may not exist yet"
     
     log "Wave 3 completed"
 }
@@ -2636,7 +2636,7 @@ deploy_wave_4_ml_platform() {
     log_info "🌊 Wave 4: ML Platform (ml-apps project)"
     
     # Deploy ML applications using correct project
-    kubectl apply -f platform-services/argocd/applications/ml-platform/ || log_warning "Some ML apps may not exist yet"
+    kubectl apply -f .platform-services/argocd/applications/ml-platform/ || log_warning "Some ML apps may not exist yet"
     
     log "Wave 4 completed"
 }
@@ -2645,7 +2645,7 @@ deploy_automated_applicationsets() {
     log_info "🤖 Deploying Automated ApplicationSets"
     
     # Deploy the automated ApplicationSets for wave management
-    kubectl apply -f platform-services/argocd/applicationsets/automated-platform-deployment.yaml || log_warning "ApplicationSets may not exist yet"
+    kubectl apply -f .platform-services/argocd/applicationsets/automated-platform-deployment.yaml || log_warning "ApplicationSets may not exist yet"
     
     log "ApplicationSets deployed"
 }

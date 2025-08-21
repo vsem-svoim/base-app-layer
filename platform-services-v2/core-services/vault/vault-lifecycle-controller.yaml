@@ -1,0 +1,228 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-lifecycle-controller
+  namespace: vault
+  labels:
+    app: vault-lifecycle-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-lifecycle-controller
+  template:
+    metadata:
+      labels:
+        app: vault-lifecycle-controller
+    spec:
+      serviceAccountName: vault-init
+      containers:
+      - name: controller
+        image: alpine/k8s:1.28.4
+        command:
+        - sh
+        - -c
+        - |
+          # Install required tools
+          apk add --no-cache curl unzip jq
+          curl -fsSL https://releases.hashicorp.com/vault/1.15.2/vault_1.15.2_linux_amd64.zip -o vault.zip
+          unzip vault.zip && mv vault /usr/local/bin/ && rm vault.zip
+          
+          export VAULT_ADDR="http://vault.vault.svc.cluster.local:8200"
+          
+          echo "🚀 Vault Lifecycle Controller Started"
+          
+          # Function to send notification event
+          send_notification() {
+            local message="$1"
+            local reason="$2"
+            echo "📢 $message"
+            kubectl create event "vault-lifecycle-$reason" \
+              --type="Normal" \
+              --reason="$reason" \
+              --message="$message" \
+              --namespace=vault || true
+          }
+          
+          # Function to check if vault is ready
+          vault_ready() {
+            curl -s "$VAULT_ADDR/v1/sys/health" >/dev/null 2>&1
+          }
+          
+          # Function to check if vault is initialized
+          vault_initialized() {
+            vault status 2>/dev/null | grep -q "Initialized.*true"
+          }
+          
+          # Function to check if vault is unsealed
+          vault_unsealed() {
+            vault status 2>/dev/null | grep -q "Sealed.*false"
+          }
+          
+          # Function to initialize vault
+          initialize_vault() {
+            send_notification "Starting Vault initialization..." "VaultInitializing"
+            
+            local init_output=$(vault operator init -key-shares=5 -key-threshold=3 -format=json)
+            
+            # Extract keys and token
+            local key1=$(echo "$init_output" | jq -r '.unseal_keys_b64[0]')
+            local key2=$(echo "$init_output" | jq -r '.unseal_keys_b64[1]')
+            local key3=$(echo "$init_output" | jq -r '.unseal_keys_b64[2]')
+            local key4=$(echo "$init_output" | jq -r '.unseal_keys_b64[3]')
+            local key5=$(echo "$init_output" | jq -r '.unseal_keys_b64[4]')
+            local root_token=$(echo "$init_output" | jq -r '.root_token')
+            
+            # Store keys in Kubernetes secret
+            kubectl create secret generic vault-unseal-keys -n vault \
+              --from-literal=key1="$key1" \
+              --from-literal=key2="$key2" \
+              --from-literal=key3="$key3" \
+              --from-literal=key4="$key4" \
+              --from-literal=key5="$key5" \
+              --from-literal=root-token="$root_token"
+            
+            send_notification "✅ Vault initialized successfully. Keys stored in Kubernetes secret." "VaultInitialized"
+            return 0
+          }
+          
+          # Function to unseal vault
+          unseal_vault() {
+            send_notification "Starting Vault unsealing..." "VaultUnsealing"
+            
+            # Get unseal keys from secret
+            local key1=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key1}' | base64 -d)
+            local key2=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key2}' | base64 -d)
+            local key3=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.key3}' | base64 -d)
+            
+            # Unseal vault
+            vault operator unseal "$key1"
+            vault operator unseal "$key2"
+            vault operator unseal "$key3"
+            
+            send_notification "✅ Vault unsealed successfully." "VaultUnsealed"
+            return 0
+          }
+          
+          # Function to configure vault
+          configure_vault() {
+            send_notification "Starting Vault configuration..." "VaultConfiguring"
+            
+            # Authenticate
+            local root_token=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.root-token}' | base64 -d)
+            vault auth "$root_token"
+            
+            # Enable secrets engines
+            vault secrets enable -path=secret kv-v2 2>/dev/null || true
+            vault secrets enable -path=platform kv-v2 2>/dev/null || true
+            
+            # Create policies
+            echo 'path "*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }' | vault policy write platform-admin -
+            echo 'path "secret/data/platform/*" { capabilities = ["read", "list"] } path "platform/data/*" { capabilities = ["read", "list"] }' | vault policy write platform-services -
+            
+            # Enable Kubernetes auth
+            vault auth enable kubernetes 2>/dev/null || true
+            vault write auth/kubernetes/config \
+              token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+              kubernetes_host="https://kubernetes.default.svc:443" \
+              kubernetes_ca_cert="$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt)"
+            
+            # Create ArgoCD role
+            vault write auth/kubernetes/role/argocd \
+              bound_service_account_names=argocd-server,argocd-application-controller \
+              bound_service_account_namespaces=argocd \
+              policies=platform-services \
+              ttl=24h
+            
+            # Store ArgoCD credentials
+            local argocd_password=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d)
+            vault kv put platform/argocd \
+              username="admin" \
+              password="$argocd_password" \
+              url="http://argocd-server.argocd.svc.cluster.local"
+            
+            send_notification "✅ Vault configuration completed. ArgoCD credentials stored." "VaultConfigured"
+            return 0
+          }
+          
+          # Main lifecycle loop
+          while true; do
+            echo "🔍 Checking Vault status..."
+            
+            # Wait for Vault to be ready
+            if ! vault_ready; then
+              echo "⏳ Waiting for Vault to be ready..."
+              sleep 10
+              continue
+            fi
+            
+            # Check if initialized
+            if ! vault_initialized; then
+              send_notification "🔑 Vault detected as uninitialized. Starting initialization..." "VaultDetected"
+              if initialize_vault; then
+                sleep 5  # Give vault a moment after initialization
+              else
+                send_notification "❌ Failed to initialize Vault" "VaultInitError"
+                sleep 30
+                continue
+              fi
+            fi
+            
+            # Check if unsealed
+            if ! vault_unsealed; then
+              if kubectl get secret vault-unseal-keys -n vault >/dev/null 2>&1; then
+                if unseal_vault; then
+                  sleep 5  # Give vault a moment after unsealing
+                else
+                  send_notification "❌ Failed to unseal Vault" "VaultUnsealError"
+                  sleep 30
+                  continue
+                fi
+              else
+                send_notification "❌ Vault is sealed but no unseal keys found" "VaultKeysError"
+                sleep 30
+                continue
+              fi
+            fi
+            
+            # Check if configured (by checking if platform secrets engine exists)
+            if vault_unsealed; then
+              if ! vault secrets list | grep -q "platform/"; then
+                if configure_vault; then
+                  send_notification "🎉 Vault lifecycle completed successfully!" "VaultReady"
+                else
+                  send_notification "❌ Failed to configure Vault" "VaultConfigError"
+                fi
+              fi
+            fi
+            
+            # Check every 60 seconds for auto-unseal if needed
+            echo "✅ Vault is healthy. Next check in 60 seconds..."
+            sleep 60
+          done
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-lifecycle-controller
+  namespace: vault
+  labels:
+    app: vault-lifecycle-controller
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: vault-lifecycle-controller

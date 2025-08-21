@@ -89,6 +89,22 @@ variable "irsa_roles" {
   default = {}
 }
 
+variable "enable_pod_identity" {
+  description = "Enable EKS Pod Identity"
+  type        = bool
+  default     = false
+}
+
+variable "pod_identity_associations" {
+  description = "EKS Pod Identity associations"
+  type = map(object({
+    namespace       = string
+    service_account = string
+    policy_arns     = list(string)
+  }))
+  default = {}
+}
+
 variable "common_tags" {
   description = "Common tags for all resources"
   type        = map(string)

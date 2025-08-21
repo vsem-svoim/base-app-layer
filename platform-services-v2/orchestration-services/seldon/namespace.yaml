@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: seldon-system
+  labels:
+    app.kubernetes.io/name: seldon-core
+    app.kubernetes.io/component: ml-serving
+    deployment.wave: "2"
+    istio-injection: disabled

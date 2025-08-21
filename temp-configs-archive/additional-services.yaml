@@ -1,0 +1,178 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argo-workflows
+---
+# Argo Workflows Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-server
+  namespace: argo-workflows
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: argo-server
+  template:
+    metadata:
+      labels:
+        app: argo-server
+    spec:
+      serviceAccountName: argo-server
+      containers:
+      - name: argo-server
+        image: argoproj/argocli:v3.4.4
+        ports:
+        - containerPort: 2746
+        command: [argo]
+        args:
+        - server
+        - --auth-mode=server
+        - --secure=false
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-server
+  namespace: argo-workflows
+spec:
+  selector:
+    app: argo-server
+  ports:
+  - port: 2746
+    targetPort: 2746
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-server
+  namespace: argo-workflows
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-server-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "pods", "pods/exec", "pods/log", "events", "services", "serviceaccounts"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["argoproj.io"]
+  resources: ["workflows", "workflowtemplates", "cronworkflows", "clusterworkflowtemplates"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-server-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-server-role
+subjects:
+- kind: ServiceAccount
+  name: argo-server
+  namespace: argo-workflows
+---
+# Simple Kubeflow Central Dashboard
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubeflow
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeflow-dashboard
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeflow-dashboard
+  template:
+    metadata:
+      labels:
+        app: kubeflow-dashboard
+    spec:
+      containers:
+      - name: kubeflow-dashboard
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: dashboard-content
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: dashboard-content
+        configMap:
+          name: kubeflow-dashboard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeflow-dashboard
+  namespace: kubeflow
+spec:
+  selector:
+    app: kubeflow-dashboard
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeflow-dashboard-config
+  namespace: kubeflow
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Kubeflow Dashboard</title>
+        <style>
+            body { font-family: Arial; margin: 40px; background: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; }
+            h1 { color: #1976d2; }
+            .service { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🤖 Kubeflow Dashboard</h1>
+            <p>Machine Learning Platform - Simplified Interface</p>
+            <div class="service">
+                <h3>📊 ML Pipelines</h3>
+                <p>Status: Ready for configuration</p>
+            </div>
+            <div class="service">
+                <h3>🔬 Jupyter Notebooks</h3>
+                <p>Status: Available for deployment</p>
+            </div>
+            <div class="service">
+                <h3>🚀 Model Serving</h3>
+                <p>Status: KServe integration ready</p>
+            </div>
+            <p><em>This is a simplified Kubeflow interface. Full Kubeflow deployment requires additional configuration.</em></p>
+        </div>
+    </body>
+    </html>

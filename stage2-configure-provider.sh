@@ -124,11 +124,11 @@ parse_args() {
 validate_environment() {
     log "Validating environment..."
 
-    # Check if we're already in platform-services directory
+    # Check if we're already in .platform-services directory
     local required_dirs=("terraform" "crossplane" "helm-charts" "argocd" "kustomize")
     local all_dirs_exist=true
 
-    # First, check if we're already in the platform-services directory
+    # First, check if we're already in the .platform-services directory
     for dir in "${required_dirs[@]}"; do
         if [[ ! -d "$dir" ]]; then
             all_dirs_exist=false
@@ -140,10 +140,10 @@ validate_environment() {
         log "✅ Already in platform-services directory"
         PLATFORM_SERVICES_DIR="$(pwd)"
     else
-        # Check if we're in the project root (platform-services subdirectory exists)
+        # Check if we're in the project root (.platform-services subdirectory exists)
         if [[ -d "platform-services" ]]; then
             log "✅ Found platform-services directory, changing to it"
-            cd platform-services
+            cd .platform-services
             PLATFORM_SERVICES_DIR="$(pwd)"
 
             # Verify Stage 1 structure exists
@@ -176,7 +176,7 @@ check_provider_script() {
     # Check multiple possible locations for the provider script
     local possible_paths=(
         "${SCRIPT_DIR}/${provider_script}"           # Same directory as main script
-        "../${provider_script}"                      # Parent directory (if we're in platform-services)
+        "../${provider_script}"                      # Parent directory (if we're in .platform-services)
         "./${provider_script}"                       # Current directory
         "${SCRIPT_DIR}/../${provider_script}"        # Parent of script directory
     )

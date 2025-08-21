@@ -108,8 +108,8 @@ locals {
   region     = data.aws_region.current.name
   azs        = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
 
-  cluster_name_base     = "${var.project_name}-${var.environment}-base"
-  cluster_name_platform = "${var.project_name}-${var.environment}-platform"
+  cluster_name_base     = "base-app-layer-${var.environment}"
+  cluster_name_platform = "platform-app-layer-${var.environment}"
 }
 
 # ===================================================================
@@ -149,11 +149,13 @@ module "eks_base_cluster" {
   subnet_ids          = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
   
-  enable_irsa         = var.enable_irsa
-  irsa_roles          = var.irsa_roles
-  cluster_addons      = var.cluster_addons
+  enable_irsa                = var.enable_irsa
+  irsa_roles                 = var.irsa_roles
+  enable_pod_identity        = var.enable_pod_identity
+  pod_identity_associations  = var.pod_identity_associations
+  cluster_addons             = var.cluster_addons
   
-  common_tags         = var.common_tags
+  common_tags                = var.common_tags
 }
 
 # ===================================================================
@@ -171,11 +173,13 @@ module "eks_platform_cluster" {
   subnet_ids          = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
   
-  enable_irsa         = var.enable_irsa
-  irsa_roles          = var.irsa_roles
-  cluster_addons      = var.cluster_addons
+  enable_irsa                = var.enable_irsa
+  irsa_roles                 = var.irsa_roles
+  enable_pod_identity        = var.enable_pod_identity
+  pod_identity_associations  = var.pod_identity_associations
+  cluster_addons             = var.cluster_addons
   
-  common_tags         = var.common_tags
+  common_tags                = var.common_tags
 }
 
 # ===================================================================
@@ -308,6 +312,42 @@ module "crossplane" {
   oidc_issuer           = var.platform_cluster_enabled ? replace(module.eks_platform_cluster[0].cluster_oidc_issuer_url, "https://", "") : ""
   
   common_tags           = var.common_tags
+
+  depends_on = [module.eks_platform_cluster]
+}
+
+# ===================================================================
+# Automatic Kubeconfig Updates
+# ===================================================================
+
+# Update kubeconfig for base cluster
+resource "null_resource" "update_kubeconfig_base" {
+  count = var.base_cluster_enabled ? 1 : 0
+
+  triggers = {
+    cluster_name = module.eks_base_cluster[0].cluster_name
+    endpoint     = module.eks_base_cluster[0].cluster_endpoint
+  }
+
+  provisioner "local-exec" {
+    command = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks_base_cluster[0].cluster_name} --profile ${var.aws_profile}"
+  }
+
+  depends_on = [module.eks_base_cluster]
+}
+
+# Update kubeconfig for platform cluster
+resource "null_resource" "update_kubeconfig_platform" {
+  count = var.platform_cluster_enabled ? 1 : 0
+
+  triggers = {
+    cluster_name = module.eks_platform_cluster[0].cluster_name
+    endpoint     = module.eks_platform_cluster[0].cluster_endpoint
+  }
+
+  provisioner "local-exec" {
+    command = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks_platform_cluster[0].cluster_name} --profile ${var.aws_profile}"
+  }
 
   depends_on = [module.eks_platform_cluster]
 }

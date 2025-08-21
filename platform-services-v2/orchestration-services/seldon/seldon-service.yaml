@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seldon-controller-manager
+  namespace: seldon-system
+  labels:
+    app.kubernetes.io/name: seldon-core
+    app.kubernetes.io/component: ml-serving
+spec:
+  selector:
+    app.kubernetes.io/name: seldon-core
+    app.kubernetes.io/component: ml-serving
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 9443
+    targetPort: 9443
+    name: webhook
+  type: ClusterIP

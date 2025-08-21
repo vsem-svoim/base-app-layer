@@ -6,4 +6,4 @@ metadata:
     app.kubernetes.io/name: kubeflow-pipelines
     app.kubernetes.io/component: ml-workflows
     deployment.wave: "2"
-    istio-injection: enabled
+    istio-injection: disabled

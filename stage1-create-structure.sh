@@ -348,7 +348,7 @@ EOF
     done
 
     # Platform services applications
-    cat > argocd/applications/platform-services/monitoring-stack-app.yaml << 'EOF'
+    cat > argocd/applications/.platform-services/monitoring-stack-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -371,7 +371,7 @@ spec:
       - CreateNamespace=true
 EOF
 
-    cat > argocd/applications/platform-services/airflow-app.yaml << 'EOF'
+    cat > argocd/applications/.platform-services/airflow-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -631,7 +631,7 @@ create_helm_charts() {
     log "Creating Helm chart templates..."
 
     # Airflow chart
-    cat > helm-charts/platform-services/airflow/Chart.yaml << 'EOF'
+    cat > helm-charts/.platform-services/airflow/Chart.yaml << 'EOF'
 apiVersion: v2
 name: finportiq-airflow
 description: FinPortIQ Airflow deployment
@@ -645,7 +645,7 @@ dependencies:
   repository: https://airflow.apache.org
 EOF
 
-    cat > helm-charts/platform-services/airflow/values/values-dev.yaml << 'EOF'
+    cat > helm-charts/.platform-services/airflow/values/values-dev.yaml << 'EOF'
 airflow:
   executor: KubernetesExecutor
   webserver:
@@ -661,7 +661,7 @@ airflow:
 EOF
 
     # Monitoring chart
-    cat > helm-charts/platform-services/monitoring/Chart.yaml << 'EOF'
+    cat > helm-charts/.platform-services/monitoring/Chart.yaml << 'EOF'
 apiVersion: v2
 name: finportiq-monitoring
 description: FinPortIQ monitoring stack

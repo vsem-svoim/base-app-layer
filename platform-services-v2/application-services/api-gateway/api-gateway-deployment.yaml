@@ -66,17 +66,17 @@ data:
     
     upstream_services:
       airflow:
-        url: "http://airflow-webserver.airflow.svc.cluster.local:8080"
+        url: "http://airflow.airflow.svc.cluster.local:8080"
         health_check: "/health"
         timeout: 30s
         
       mlflow:
-        url: "http://mlflow-server.mlflow.svc.cluster.local:5000"
+        url: "http://mlflow.mlflow.svc.cluster.local:5000"
         health_check: "/health"
         timeout: 30s
         
       kubeflow:
-        url: "http://kubeflow-ui.kubeflow.svc.cluster.local:8080"
+        url: "http://kubeflow-ui-server.kubeflow.svc.cluster.local:3000"
         health_check: "/healthz"
         timeout: 30s
         
@@ -178,7 +178,7 @@ spec:
     spec:
       serviceAccountName: api-gateway
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_general
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: api-gateway
         image: nginx/nginx-prometheus-exporter:0.11.0
@@ -272,15 +272,15 @@ data:
         
         # Upstream services
         upstream airflow {
-            server airflow-webserver.airflow.svc.cluster.local:8080;
+            server airflow.airflow.svc.cluster.local:8080;
         }
         
         upstream mlflow {
-            server mlflow-server.mlflow.svc.cluster.local:5000;
+            server mlflow.mlflow.svc.cluster.local:5000;
         }
         
         upstream kubeflow {
-            server kubeflow-ui.kubeflow.svc.cluster.local:8080;
+            server kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
         }
         
         upstream grafana {

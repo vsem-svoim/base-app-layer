@@ -1,0 +1,119 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-orchestration
+---
+# Airflow deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow
+  namespace: platform-orchestration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow
+  template:
+    metadata:
+      labels:
+        app: airflow
+    spec:
+      containers:
+      - name: airflow
+        image: apache/airflow:2.7.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AIRFLOW__CORE__EXECUTOR
+          value: "LocalExecutor"
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "sqlite:////opt/airflow/airflow.db"
+        - name: AIRFLOW__CORE__FERNET_KEY
+          value: "YlCImzjge_TeZc4RNSGQTxXZcqVg8C7BAguHIhqeRLk="
+        - name: _AIRFLOW_WWW_USER_USERNAME
+          value: "admin"
+        - name: _AIRFLOW_WWW_USER_PASSWORD
+          value: "admin123"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          airflow db init
+          airflow users create --username admin --password admin123 --firstname Admin --lastname User --role Admin --email admin@example.com
+          airflow webserver
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow
+  namespace: platform-orchestration
+spec:
+  selector:
+    app: airflow
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+# MLflow deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: platform-orchestration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+      - name: mlflow
+        image: python:3.9-slim
+        ports:
+        - containerPort: 5000
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pip install mlflow boto3 psycopg2-binary
+          mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root /mlflow/artifacts
+        volumeMounts:
+        - name: artifacts
+          mountPath: /mlflow/artifacts
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: artifacts
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: platform-orchestration
+spec:
+  selector:
+    app: mlflow
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: ClusterIP

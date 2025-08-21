@@ -1,0 +1,70 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeflow-mysql
+  namespace: kubeflow
+  labels:
+    app: kubeflow-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeflow-mysql
+  template:
+    metadata:
+      labels:
+        app: kubeflow-mysql
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_system
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kubeflow-mysql
+              key: mysql-password
+        - name: MYSQL_DATABASE
+          value: kubeflow_pipelines
+        - name: MYSQL_USER
+          value: kubeflow
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kubeflow-mysql
+              key: mysql-password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+      volumes:
+      - name: mysql-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeflow-mysql
+  namespace: kubeflow
+  labels:
+    app: kubeflow-mysql
+spec:
+  selector:
+    app: kubeflow-mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  type: ClusterIP

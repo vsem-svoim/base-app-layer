@@ -26,31 +26,52 @@ spec:
         description: "HashiCorp Vault - Secrets management"
         path: platform-services-v2/core-services/vault
         
+      - service: cert-manager
+        namespace: cert-manager
+        wave: "0"
+        category: core
+        description: "Cert-Manager - TLS certificate management"
+        path: platform-services-v2/core-services/cert-manager
+        
+      - service: aws-load-balancer-controller
+        namespace: kube-system
+        wave: "0"
+        category: core
+        description: "AWS Load Balancer Controller"
+        path: platform-services-v2/core-services/aws-load-balancer-controller
+        
       # Shared Services - Wave 1
-      - service: monitoring-shared
-        namespace: platform-monitoring
+      - service: istio-system
+        namespace: istio-system
+        wave: "1"
+        category: shared
+        description: "Istio Service Mesh"
+        path: platform-services-v2/shared-services/istio
+        
+      - service: monitoring
+        namespace: monitoring
         wave: "1"
         category: shared
         description: "Prometheus & Grafana - Monitoring stack"
         path: platform-services-v2/shared-services/monitoring
         
-      - service: logging-shared
-        namespace: platform-logging
+      - service: logging
+        namespace: logging
         wave: "1"
         category: shared
         description: "ELK Stack - Centralized logging"
         path: platform-services-v2/shared-services/logging
         
-      # Orchestration Services - Wave 2
+      # Orchestration Services - Wave 2 (CURRENT DEPLOYED)
       - service: airflow
-        namespace: platform-orchestration
+        namespace: airflow
         wave: "2"
         category: orchestration
         description: "Apache Airflow - Workflow orchestration"
         path: platform-services-v2/orchestration-services/airflow
         
       - service: mlflow
-        namespace: platform-orchestration
+        namespace: mlflow
         wave: "2"
         category: orchestration
         description: "MLflow - ML lifecycle management"
@@ -64,14 +85,28 @@ spec:
         path: platform-services-v2/orchestration-services/kubeflow
         
       - service: argo-workflows
-        namespace: argo-workflows
+        namespace: argo
         wave: "2"
         category: orchestration
         description: "Argo Workflows - Kubernetes job orchestration"
         path: platform-services-v2/orchestration-services/argo-workflows
         
+      - service: superset
+        namespace: superset
+        wave: "2"
+        category: orchestration
+        description: "Apache Superset - Business Intelligence"
+        path: platform-services-v2/orchestration-services/superset
+        
+      - service: seldon
+        namespace: seldon-system
+        wave: "2"
+        category: orchestration
+        description: "Seldon Core - ML model deployment"
+        path: platform-services-v2/orchestration-services/seldon
+        
       - service: kiali
-        namespace: istio-mesh
+        namespace: istio-system
         wave: "2"
         category: orchestration
         description: "Kiali - Istio service mesh visualization"
@@ -84,6 +119,20 @@ spec:
         category: application
         description: "Platform UI - Unified dashboard"
         path: platform-services-v2/application-services/platform-ui
+        
+      - service: api-gateway
+        namespace: api-gateway
+        wave: "3"
+        category: application
+        description: "API Gateway - External access management"
+        path: platform-services-v2/application-services/api-gateway
+        
+      - service: data-services
+        namespace: data-services
+        wave: "3"
+        category: application
+        description: "Data Services - BASE module integration gateway"
+        path: platform-services-v2/application-services/data-services
         
   template:
     metadata:
@@ -105,7 +154,7 @@ spec:
       project: platform-v2
       
       source:
-        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        repoURL: https://github.com/your-org/base-app-layer
         path: '{{path}}'
         targetRevision: HEAD
         

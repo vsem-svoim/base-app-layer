@@ -64,6 +64,8 @@ spec:
       labels:
         app.kubernetes.io/name: alertmanager
         app.kubernetes.io/component: alerting
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       nodeSelector:
         eks.amazonaws.com/nodegroup: platform_system

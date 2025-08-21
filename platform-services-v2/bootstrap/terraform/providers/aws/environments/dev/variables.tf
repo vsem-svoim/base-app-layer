@@ -366,6 +366,38 @@ variable "irsa_roles" {
 }
 
 # ===================================================================
+# EKS Pod Identity Configuration
+# ===================================================================
+
+variable "enable_pod_identity" {
+  description = "Enable EKS Pod Identity"
+  type        = bool
+  default     = true
+}
+
+variable "pod_identity_associations" {
+  description = "EKS Pod Identity associations"
+  type = map(object({
+    namespace       = string
+    service_account = string
+    policy_arns     = list(string)
+  }))
+  
+  default = {
+    ebs_csi_driver = {
+      namespace       = "kube-system"
+      service_account = "ebs-csi-controller-sa"
+      policy_arns    = ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
+    }
+    aws_load_balancer_controller = {
+      namespace       = "kube-system" 
+      service_account = "aws-load-balancer-controller"
+      policy_arns    = ["arn:aws:iam::084129280818:policy/AWSLoadBalancerControllerIAMPolicy"]
+    }
+  }
+}
+
+# ===================================================================
 # Storage Configuration
 # ===================================================================
 

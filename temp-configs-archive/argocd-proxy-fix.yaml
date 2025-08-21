@@ -1,0 +1,30 @@
+apiVersion: v1
+data:
+  nginx.conf: "events {\n    worker_connections 1024;\n}\nhttp {\n    upstream argocd_backend
+    {\n        server argocd-server.argocd.svc.cluster.local:80;\n    }\n    server
+    {\n        listen 8080;\n        \n        # Strip /argocd prefix and proxy to
+    argocd backend\n        location /argocd/ {\n            proxy_pass http://argocd_backend/;\n
+    \           proxy_set_header Host $host;\n            proxy_set_header X-Real-IP
+    $remote_addr;\n            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n
+    \           proxy_set_header X-Forwarded-Proto $scheme;\n            proxy_set_header
+    X-Forwarded-Prefix /argocd;\n            \n            # Handle redirects properly\n
+    \           proxy_redirect http://argocd_backend/ /argocd/;\n            proxy_redirect
+    https://argocd_backend/ /argocd/;\n            \n            # Handle static assets\n
+    \           sub_filter 'href=\"/' 'href=\"/argocd/';\n            sub_filter 'src=\"/'
+    'src=\"/argocd/';\n            sub_filter 'action=\"/' 'action=\"/argocd/';\n
+    \           sub_filter '\"/\"' '\"/argocd/\"';\n            sub_filter_once off;\n
+    \           sub_filter_types *;\n            \n            proxy_connect_timeout
+    30s;\n            proxy_send_timeout 30s;\n            proxy_read_timeout 30s;\n
+    \           proxy_buffering off;\n        }\n        \n        # Catch-all for
+    root requests\n        location / {\n            return 301 /argocd/;\n        }\n
+    \   }\n}\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"nginx.conf":"events {\n    worker_connections 1024;\n}\nhttp {\n    upstream argocd_backend {\n        server argocd-server.argocd.svc.cluster.local:80;\n    }\n    server {\n        listen 8080;\n        \n        # Strip /argocd prefix and proxy to argocd backend\n        location /argocd/ {\n            proxy_pass http://argocd_backend/;\n            proxy_set_header Host $host;\n            proxy_set_header X-Real-IP $remote_addr;\n            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n            proxy_set_header X-Forwarded-Proto $scheme;\n            proxy_set_header X-Forwarded-Prefix /argocd;\n            \n            # Handle redirects properly\n            proxy_redirect http://argocd_backend/ /argocd/;\n            proxy_redirect https://argocd_backend/ /argocd/;\n            \n            # Handle static assets\n            sub_filter 'href=\"/' 'href=\"/argocd/';\n            sub_filter 'src=\"/' 'src=\"/argocd/';\n            sub_filter 'action=\"/' 'action=\"/argocd/';\n            sub_filter '\"/\"' '\"/argocd/\"';\n            sub_filter_once off;\n            sub_filter_types *;\n            \n            proxy_connect_timeout 30s;\n            proxy_send_timeout 30s;\n            proxy_read_timeout 30s;\n            proxy_buffering off;\n        }\n        \n        # Health check endpoint for ALB\n        location /healthz {\n            access_log off;\n            return 200 \"healthy\\n\";\n            add_header Content-Type text/plain;\n        }\n        \n        # Catch-all for root requests\n        location / {\n            return 301 /argocd/;\n        }\n    }\n}\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"argocd-proxy-config","namespace":"platform-ui"}}
+  creationTimestamp: "2025-08-17T06:49:03Z"
+  name: argocd-proxy-config
+  namespace: platform-ui
+  resourceVersion: "232801"
+  uid: 20b93e10-31ac-496f-ab44-a6b50921f32d

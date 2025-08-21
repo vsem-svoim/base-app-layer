@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-data-ingestion
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+
+namespace: base-data-ingestion
+
+resources:
+  - base-crds.yaml
+  - agents/
+  - models/
+  - orchestrators/
+  - workflows/
+  - configs/
+
+commonLabels:
+  app.kubernetes.io/name: base-data-ingestion
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: data-ingestion
+  deployment.wave: "4"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "4"
+  module.description: "Multi-protocol data acquisition and ingestion module"
