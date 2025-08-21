@@ -127,7 +127,7 @@ spec:
         targetRevision: main
         
       destination:
-        server: https://kubernetes.default.svc
+        server: https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com
         namespace: '{{namespace}}'
         
       syncPolicy:
@@ -180,9 +180,9 @@ spec:
   
   destinations:
   - namespace: 'base-*'
-    server: https://kubernetes.default.svc
+    server: https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com
   - namespace: 'kube-system'
-    server: https://kubernetes.default.svc
+    server: https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com
     
   clusterResourceWhitelist:
   - group: ''
@@ -216,6 +216,8 @@ spec:
   - group: monitoring.coreos.com
     kind: '*'
   - group: argoproj.io
+    kind: '*'
+  - group: base.io
     kind: '*'
     
   roles:

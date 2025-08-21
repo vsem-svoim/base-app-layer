@@ -8,9 +8,13 @@ This is the **BASE App Layer** - a comprehensive enterprise data platform with 1
 
 ## Architecture
 
+### Dual-Cluster Design
+- **Platform Cluster** (`platform-app-layer-dev`): GitOps infrastructure layer with ArgoCD, Airflow, MLflow, Kubeflow, Platform UI
+- **Base Cluster** (`base-app-layer-dev`): 14 BASE data processing modules with enterprise-grade isolation
+
 ### Core Structure
 - **14 BASE Modules**: Each implementing a specific data processing domain (ingestion, quality, security, etc.)
-- **Platform Services**: GitOps infrastructure layer with Terraform, ArgoCD, and Kubernetes orchestration
+- **Platform Services**: GitOps orchestration services running on Platform cluster
 - **Agent-Based Design**: Each module contains 6 specialized agents with ML models and orchestrators
 - **Microservices**: 12 microservices per module (168 total across all modules)
 
