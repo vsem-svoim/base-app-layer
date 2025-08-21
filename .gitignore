@@ -88,3 +88,10 @@ istio-*/
 
 # Archive directories
 .archive/
+
+# Development tools and binaries
+kustomize
+kubectl
+helm
+*.bak
+*.bak2
