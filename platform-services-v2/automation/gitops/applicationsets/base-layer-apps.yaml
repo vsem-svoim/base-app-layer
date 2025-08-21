@@ -127,7 +127,7 @@ spec:
         - resources-finalizer.argocd.argoproj.io
         
     spec:
-      project: base-layer
+      project: default
       
       source:
         repoURL: https://github.com/vsem-svoim/base-app-layer.git
