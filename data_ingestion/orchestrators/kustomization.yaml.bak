@@ -1,9 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-resources:
-  - base-data-ingestion-orchestrator-api-manager.yaml
-  - base-data-ingestion-orchestrator-batch-manager.yaml
-  - base-data-ingestion-orchestrator-file-manager.yaml
-  - base-data-ingestion-orchestrator-ingestion-manager.yaml
-  - base-data-ingestion-orchestrator-stream-manager.yaml
