@@ -40,6 +40,13 @@ spec:
         description: "AWS Load Balancer Controller"
         path: platform-services-v2/core-services/aws-load-balancer-controller
         
+      - service: platform-ui
+        namespace: platform-ui
+        wave: "0"
+        category: core
+        description: "Platform UI - Unified dashboard for monitoring"
+        path: platform-services-v2/application-services/platform-ui
+        
   template:
     metadata:
       name: '{{service}}'
