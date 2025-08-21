@@ -1,0 +1,236 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: base-data-processing
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: template
+spec:
+  entrypoint: base-data-pipeline
+  templates:
+  - name: base-data-pipeline
+    steps:
+    - - name: data-ingestion
+        template: base-module-task
+        arguments:
+          parameters:
+          - name: module
+            value: "data-ingestion"
+          - name: task
+            value: "ingest"
+    - - name: data-quality
+        template: base-module-task
+        arguments:
+          parameters:
+          - name: module
+            value: "data-quality"
+          - name: task
+            value: "validate"
+    - - name: data-processing
+        template: base-module-task
+        arguments:
+          parameters:
+          - name: module
+            value: "multimodal-processing"
+          - name: task
+            value: "process"
+    - - name: feature-engineering
+        template: base-module-task
+        arguments:
+          parameters:
+          - name: module
+            value: "feature-engineering"
+          - name: task
+            value: "extract"
+
+  - name: base-module-task
+    inputs:
+      parameters:
+      - name: module
+      - name: task
+    container:
+      image: python:3.11-slim
+      command: [python]
+      args: ["-c", "print('Processing {{inputs.parameters.module}} - {{inputs.parameters.task}}')"]
+      resources:
+        requests:
+          memory: 256Mi
+          cpu: 100m
+        limits:
+          memory: 512Mi
+          cpu: 500m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ml-model-training
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: template
+spec:
+  entrypoint: ml-training-pipeline
+  templates:
+  - name: ml-training-pipeline
+    steps:
+    - - name: data-preparation
+        template: ml-task
+        arguments:
+          parameters:
+          - name: task
+            value: "prepare-data"
+    - - name: model-training
+        template: ml-task
+        arguments:
+          parameters:
+          - name: task
+            value: "train-model"
+    - - name: model-evaluation
+        template: ml-task
+        arguments:
+          parameters:
+          - name: task
+            value: "evaluate-model"
+    - - name: model-registration
+        template: ml-task
+        arguments:
+          parameters:
+          - name: task
+            value: "register-model"
+
+  - name: ml-task
+    inputs:
+      parameters:
+      - name: task
+    container:
+      image: mlflow/mlflow:v3.2.0
+      command: [python]
+      args: ["-c", "print('ML Task: {{inputs.parameters.task}}')"]
+      env:
+      - name: MLFLOW_TRACKING_URI
+        value: "http://mlflow-service.mlflow.svc.cluster.local:5000"
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 2Gi
+          cpu: 1000m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: base-platform-deployment
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: template
+spec:
+  entrypoint: platform-deployment
+  templates:
+  - name: platform-deployment
+    steps:
+    - - name: validate-infrastructure
+        template: deployment-task
+        arguments:
+          parameters:
+          - name: task
+            value: "validate-infra"
+    - - name: deploy-core-services
+        template: deployment-task
+        arguments:
+          parameters:
+          - name: task
+            value: "deploy-core"
+    - - name: deploy-shared-services
+        template: deployment-task
+        arguments:
+          parameters:
+          - name: task
+            value: "deploy-shared"
+    - - name: deploy-orchestration
+        template: deployment-task
+        arguments:
+          parameters:
+          - name: task
+            value: "deploy-orchestration"
+    - - name: deploy-applications
+        template: deployment-task
+        arguments:
+          parameters:
+          - name: task
+            value: "deploy-apps"
+    - - name: validate-deployment
+        template: deployment-task
+        arguments:
+          parameters:
+          - name: task
+            value: "validate-deployment"
+
+  - name: deployment-task
+    inputs:
+      parameters:
+      - name: task
+    container:
+      image: bitnami/kubectl:latest
+      command: [sh, -c]
+      args: ["echo 'Deployment Task: {{inputs.parameters.task}}' && kubectl get pods -A"]
+      resources:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+          cpu: 200m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: base-platform-health-check
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: cron-workflow
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  workflowSpec:
+    entrypoint: health-check
+    templates:
+    - name: health-check
+      steps:
+      - - name: check-core-services
+          template: health-task
+          arguments:
+            parameters:
+            - name: service-group
+              value: "core"
+      - - name: check-shared-services
+          template: health-task
+          arguments:
+            parameters:
+            - name: service-group
+              value: "shared"
+      - - name: check-orchestration
+          template: health-task
+          arguments:
+            parameters:
+            - name: service-group
+              value: "orchestration"
+
+    - name: health-task
+      inputs:
+        parameters:
+        - name: service-group
+      container:
+        image: curlimages/curl:latest
+        command: [sh, -c]
+        args: ["echo 'Health check for {{inputs.parameters.service-group}} services completed'"]
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 50m
+          limits:
+            memory: 128Mi
+            cpu: 100m

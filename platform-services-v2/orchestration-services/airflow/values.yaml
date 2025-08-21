@@ -1,0 +1,128 @@
+# Apache Airflow 3.0.5 configuration for BASE Layer orchestration
+# Latest stable release with KubernetesExecutor
+
+executor: KubernetesExecutor
+
+airflow:
+  image:
+    repository: apache/airflow
+    tag: 3.0.5-python3.11
+  
+  config:
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/dags'
+    AIRFLOW__CORE__PLUGINS_FOLDER: '/opt/airflow/plugins'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'True'
+    
+    # Kubernetes Executor Configuration
+    AIRFLOW__KUBERNETES__NAMESPACE: 'airflow'
+    AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY: 'apache/airflow'
+    AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG: '3.0.5-python3.11'
+    AIRFLOW__KUBERNETES__DELETE_WORKER_PODS: 'True'
+    AIRFLOW__KUBERNETES__DELETE_WORKER_PODS_ON_SUCCESS: 'True'
+    
+    # BASE Layer Integration
+    AIRFLOW__KUBERNETES__DAGS_IN_IMAGE: 'False'
+    AIRFLOW__KUBERNETES__DAGS_VOLUME_CLAIM: 'airflow-dags-pvc'
+
+# Webserver Configuration
+webserver:
+  replicas: 2
+  service:
+    type: ClusterIP
+    ports:
+      - name: airflow-ui
+        port: 8080
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+  
+  # ALB Integration
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: alb
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    hosts:
+      - name: ""
+        paths:
+          - path: /airflow
+            pathType: Prefix
+
+# Scheduler Configuration  
+scheduler:
+  replicas: 2
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+
+# Worker Configuration (KubernetesExecutor)
+workers:
+  replicas: 0  # Dynamic pod creation via KubernetesExecutor
+  
+# PostgreSQL Backend
+postgresql:
+  enabled: true
+  auth:
+    database: airflow
+    username: airflow
+    existingSecret: airflow-postgresql
+  architecture: standalone
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: gp3
+
+# Redis (disabled for KubernetesExecutor)
+redis:
+  enabled: false
+
+# DAGs Configuration
+dags:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: gp3
+    accessMode: ReadWriteMany
+
+# Logs Configuration  
+logs:
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: gp3
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: airflow
+
+# RBAC
+rbac:
+  create: true
+
+# Metrics and monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /admin/metrics
+
+# Node selector for platform system nodes
+nodeSelector:
+  eks.amazonaws.com/nodegroup: platform_system
+
+# Default Airflow tag
+defaultAirflowTag: "3.0.5"

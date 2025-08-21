@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-orchestration
+  namespace: argocd
+spec:
+  description: "Orchestration platform services (Wave 2) - Airflow, MLflow, Kubeflow, Argo Workflows"
+  
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://airflow.apache.org'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://larribas.me/helm-charts'
+  - 'https://kubeflow.github.io/charts'
+  - 'https://argoproj.github.io/argo-helm'
+
+  destinations:
+  - namespace: 'airflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'mlflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'kubeflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'kubeflow-*'
+    server: https://kubernetes.default.svc
+  - namespace: 'argo'
+    server: https://kubernetes.default.svc
+  - namespace: 'argo-workflows'
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  roles:
+  - name: platform-orchestration-admin
+    description: "Orchestration platform services administrators"
+    policies:
+    - p, proj:platform-orchestration:platform-orchestration-admin, applications, *, platform-orchestration/*, allow
+    - p, proj:platform-orchestration:platform-orchestration-admin, clusters, get, *, allow
+    groups:
+    - platform-engineering
+    - data-engineering
+    - ml-engineering
+
+  - name: platform-orchestration-user
+    description: "Orchestration platform services users"
+    policies:
+    - p, proj:platform-orchestration:platform-orchestration-user, applications, get, platform-orchestration/*, allow
+    - p, proj:platform-orchestration:platform-orchestration-user, applications, sync, platform-orchestration/*, allow
+    groups:
+    - data-scientists
+    - ml-engineers
+
+  orphanedResources:
+    warn: true
+    ignore:
+    - group: v1
+      kind: Secret
+      name: "*-token-*"
+    - group: v1
+      kind: ConfigMap
+      name: "workflow-controller-configmap"

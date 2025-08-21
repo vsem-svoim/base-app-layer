@@ -1,0 +1,425 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault
+  namespace: vault
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:role/base-app-layer-dev-platform-vault-irsa
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list", "patch", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+subjects:
+- kind: ServiceAccount
+  name: vault-bootstrap
+  namespace: vault
+roleRef:
+  kind: Role
+  name: vault-bootstrap
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-config
+  namespace: vault
+data:
+  vault.hcl: |
+    ui = true
+    
+    listener "tcp" {
+      address = "0.0.0.0:8200"
+      tls_disable = 1
+    }
+    
+    storage "file" {
+      path = "/vault/data"
+    }
+    
+    # Cluster configuration
+    api_addr = "http://vault.vault.svc.cluster.local:8200"
+    cluster_addr = "http://vault.vault.svc.cluster.local:8201"
+    
+    # Disable mlock for container environments
+    disable_mlock = true
+    
+    # Log level
+    log_level = "INFO"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8200
+    targetPort: 8200
+    protocol: TCP
+  - name: cluster
+    port: 8201
+    targetPort: 8201
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-ui
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8200
+    targetPort: 8200
+    nodePort: 30200
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vault
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+spec:
+  serviceName: vault
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+      app.kubernetes.io/instance: vault
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault
+        app.kubernetes.io/instance: vault
+    spec:
+      serviceAccountName: vault
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_system
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        fsGroup: 1000
+      containers:
+      - name: vault
+        image: hashicorp/vault:1.20.2
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        args:
+        - |
+          cp /vault/config/vault.hcl /tmp/vault.hcl
+          vault server -config=/tmp/vault.hcl
+        ports:
+        - name: http
+          containerPort: 8200
+          protocol: TCP
+        - name: cluster
+          containerPort: 8201
+          protocol: TCP
+        env:
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        - name: VAULT_LOG_LEVEL
+          value: "INFO"
+        - name: VAULT_DISABLE_MLOCK
+          value: "true"
+        livenessProbe:
+          httpGet:
+            path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+            port: 8200
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+            port: 8200
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 500m
+        volumeMounts:
+        - name: vault-data
+          mountPath: /vault/data
+        - name: vault-config
+          mountPath: /vault/config
+          readOnly: true
+      volumes:
+      - name: vault-config
+        configMap:
+          name: vault-config
+  volumeClaimTemplates:
+  - metadata:
+      name: vault-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: gp3-immediate
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-bootstrap
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: vault-bootstrap
+    spec:
+      serviceAccountName: vault-bootstrap
+      restartPolicy: Never
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_system
+      containers:
+      - name: vault-bootstrap
+        image: hashicorp/vault:1.20.2
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "🔐 Starting Vault Bootstrap Automation..."
+          
+          # Install prerequisites
+          apk add --no-cache curl jq aws-cli
+          
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+          
+          # Wait for Vault pod to be ready
+          echo "⏳ Waiting for Vault pod to be ready..."
+          until curl -s http://vault:8200/v1/sys/health >/dev/null 2>&1; do
+            echo "Waiting for Vault..."
+            sleep 10
+          done
+          
+          export VAULT_ADDR="http://vault:8200"
+          
+          # Check if already initialized
+          if vault status | grep -q "Initialized.*true"; then
+            echo "✅ Vault already initialized"
+            exit 0
+          fi
+          
+          # Initialize Vault
+          echo "🔑 Initializing Vault with 5 key shares, threshold 3..."
+          INIT_OUTPUT=$(vault operator init -key-shares=5 -key-threshold=3 -format=json)
+          
+          # Extract keys and token
+          UNSEAL_KEY_1=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[0]')
+          UNSEAL_KEY_2=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[1]')
+          UNSEAL_KEY_3=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[2]')
+          UNSEAL_KEY_4=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[3]')
+          UNSEAL_KEY_5=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[4]')
+          ROOT_TOKEN=$(echo "$INIT_OUTPUT" | jq -r '.root_token')
+          
+          # Store all keys in Kubernetes secret
+          kubectl create secret generic vault-unseal-keys -n vault \
+            --from-literal=key1="$UNSEAL_KEY_1" \
+            --from-literal=key2="$UNSEAL_KEY_2" \
+            --from-literal=key3="$UNSEAL_KEY_3" \
+            --from-literal=key4="$UNSEAL_KEY_4" \
+            --from-literal=key5="$UNSEAL_KEY_5" \
+            --from-literal=root-token="$ROOT_TOKEN"
+          
+          # Unseal Vault
+          echo "🔓 Unsealing Vault..."
+          vault operator unseal "$UNSEAL_KEY_1"
+          vault operator unseal "$UNSEAL_KEY_2"
+          vault operator unseal "$UNSEAL_KEY_3"
+          
+          # Login with root token
+          vault login "$ROOT_TOKEN"
+          
+          # Enable secret engines
+          echo "🚀 Enabling secret engines..."
+          vault secrets enable -path=secret kv-v2 || echo "KV engine already enabled"
+          vault secrets enable aws || echo "AWS engine already enabled"
+          vault secrets enable database || echo "Database engine already enabled"
+          vault secrets enable pki || echo "PKI engine already enabled"
+          
+          # Configure PKI
+          vault secrets tune -max-lease-ttl=8760h pki
+          vault write pki/root/generate/internal common_name="base-app-layer.internal" ttl=8760h
+          vault write pki/config/urls issuing_certificates="http://vault.vault.svc.cluster.local:8200/v1/pki/ca" crl_distribution_points="http://vault.vault.svc.cluster.local:8200/v1/pki/crl"
+          vault write pki/roles/base-platform allowed_domains="base-app-layer.internal,svc.cluster.local" allow_subdomains=true max_ttl=72h
+          
+          # Enable auth methods
+          echo "🔐 Enabling authentication methods..."
+          vault auth enable kubernetes || echo "Kubernetes auth already enabled"
+          vault auth enable userpass || echo "Userpass auth already enabled"
+          vault auth enable oidc || echo "OIDC auth already enabled"
+          
+          # Configure Kubernetes auth
+          vault write auth/kubernetes/config \
+            token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+            kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT" \
+            kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          
+          # Create policies
+          echo "📋 Creating policies..."
+          vault policy write admin - << 'ADMIN_POLICY'
+          path "*" {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+          ADMIN_POLICY
+          
+          vault policy write platform-services - << 'PLATFORM_POLICY'
+          # KV v2 secrets access
+          path "secret/data/platform/*" {
+            capabilities = ["read", "list"]
+          }
+          
+          path "secret/metadata/platform/*" {
+            capabilities = ["read", "list"]
+          }
+          
+          # Database secrets
+          path "database/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          
+          # PKI certificates
+          path "pki/issue/base-platform" {
+            capabilities = ["create", "update"]
+          }
+          
+          # AWS credentials
+          path "aws/creds/platform-*" {
+            capabilities = ["read"]
+          }
+          PLATFORM_POLICY
+          
+          vault policy write base-modules - << 'BASE_POLICY'
+          # KV v2 secrets access for BASE modules
+          path "secret/data/base/*" {
+            capabilities = ["read", "list"]
+          }
+          
+          path "secret/metadata/base/*" {
+            capabilities = ["read", "list"]
+          }
+          
+          # Database credentials
+          path "database/creds/base-*" {
+            capabilities = ["read"]
+          }
+          
+          # PKI certificates for BASE modules
+          path "pki/issue/base-platform" {
+            capabilities = ["create", "update"]
+          }
+          BASE_POLICY
+          
+          # Create role bindings for service accounts
+          vault write auth/kubernetes/role/platform-services \
+            bound_service_account_names=default \
+            bound_service_account_namespaces=platform-ui,api-gateway,data-services,airflow,mlflow,kubeflow \
+            policies=platform-services \
+            ttl=1h
+          
+          vault write auth/kubernetes/role/base-modules \
+            bound_service_account_names=default \
+            bound_service_account_namespaces=base-data-ingestion,base-data-quality,base-data-storage,base-data-security,base-feature-engineering,base-multimodal-processing,base-data-streaming,base-quality-monitoring,base-pipeline-management,base-event-coordination,base-metadata-discovery,base-schema-contracts,base-data-distribution,base-data-control \
+            policies=base-modules \
+            ttl=1h
+          
+          # Create sample secrets for platform services
+          vault kv put secret/platform/database username=platform_user password=secure_platform_password
+          vault kv put secret/platform/aws access_key=AKIA... secret_key=secure_aws_key
+          vault kv put secret/platform/api-keys airflow_api_key=airflow_secret mlflow_key=mlflow_secret
+          
+          # Create sample secrets for BASE modules
+          vault kv put secret/base/data-ingestion db_connection="postgresql://user:pass@db:5432/ingestion"
+          vault kv put secret/base/data-quality validation_rules='{"max_errors": 100}'
+          vault kv put secret/base/ml-services model_registry_url="http://mlflow-server.mlflow:5000"
+          
+          echo ""
+          echo "✅ Vault Bootstrap Completed Successfully!"
+          echo "🔑 Root Token: $ROOT_TOKEN"
+          echo "🔐 Unseal Keys stored in vault-unseal-keys secret"
+          echo "📊 Web UI available at: http://vault.vault.svc.cluster.local:8200"
+          echo ""
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

@@ -1,0 +1,232 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: base-layer-applications
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: base-layer-applicationset
+    app.kubernetes.io/component: applicationset-controller
+spec:
+  generators:
+  - list:
+      elements:
+      - module: data_ingestion
+        name: data-ingestion
+        namespace: base-data-ingestion
+        wave: "1"
+        cluster: base
+        description: "Multi-protocol data acquisition with 100GB/hour throughput"
+      - module: data_quality
+        name: data-quality
+        namespace: base-data-quality
+        wave: "1"
+        cluster: base
+        description: "Validation, cleaning, and quality assurance"
+      - module: data_storage
+        name: data-storage
+        namespace: base-data-storage
+        wave: "1"
+        cluster: base
+        description: "Distributed storage with lifecycle management"
+      - module: data_security
+        name: data-security
+        namespace: base-data-security
+        wave: "1"
+        cluster: base
+        description: "Encryption, classification, and access control"
+      - module: feature_engineering
+        name: feature-engineering
+        namespace: base-feature-engineering
+        wave: "2"
+        cluster: base
+        description: "ML feature extraction and transformation"
+      - module: multimodal_processing
+        name: multimodal-processing
+        namespace: base-multimodal-processing
+        wave: "2"
+        cluster: base
+        description: "Text, image, geospatial, time-series processing"
+      - module: data_streaming
+        name: data-streaming
+        namespace: base-data-streaming
+        wave: "2"
+        cluster: base
+        description: "Real-time stream processing with Kafka"
+      - module: quality_monitoring
+        name: quality-monitoring
+        namespace: base-quality-monitoring
+        wave: "2"
+        cluster: base
+        description: "Continuous monitoring and anomaly detection"
+      - module: pipeline_management
+        name: pipeline-management
+        namespace: base-pipeline-management
+        wave: "3"
+        cluster: base
+        description: "Workflow orchestration and dependency management"
+      - module: event_coordination
+        name: event-coordination
+        namespace: base-event-coordination
+        wave: "3"
+        cluster: base
+        description: "Event-driven architecture and saga patterns"
+      - module: metadata_discovery
+        name: metadata-discovery
+        namespace: base-metadata-discovery
+        wave: "3"
+        cluster: base
+        description: "Data cataloging and lineage tracking"
+      - module: schema_contracts
+        name: schema-contracts
+        namespace: base-schema-contracts
+        wave: "3"
+        cluster: base
+        description: "Schema management and data contracts"
+      - module: data_distribution
+        name: data-distribution
+        namespace: base-data-distribution
+        wave: "4"
+        cluster: base
+        description: "API management and data delivery"
+      - module: data_control
+        name: data-control
+        namespace: base-data-control
+        wave: "4"
+        cluster: base
+        description: "Governance and control plane services"
+        
+  template:
+    metadata:
+      name: '{{name}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{module}}'
+        app.kubernetes.io/component: base-layer
+        deployment.wave: '{{wave}}'
+        target.cluster: '{{cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+        
+    spec:
+      project: base-layer
+      
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        path: '{{module}}'
+        targetRevision: main
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+            
+      revisionHistoryLimit: 3
+      
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
+      - group: ""
+        kind: Service
+        jsonPointers:
+        - /spec/clusterIP
+      - group: networking.k8s.io
+        kind: Ingress
+        jsonPointers:
+        - /status/loadBalancer/ingress
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: base-layer
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: base-layer-project
+spec:
+  description: BASE App Layer - Enterprise Data Platform
+  
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - '*'
+  
+  destinations:
+  - namespace: 'base-*'
+    server: https://kubernetes.default.svc
+  - namespace: 'kube-system'
+    server: https://kubernetes.default.svc
+    
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: '*'
+  - group: apps
+    kind: '*'
+  - group: networking.k8s.io
+    kind: '*'
+  - group: extensions
+    kind: '*'
+  - group: batch
+    kind: '*'
+  - group: autoscaling
+    kind: '*'
+  - group: policy
+    kind: '*'
+  - group: monitoring.coreos.com
+    kind: '*'
+  - group: argoproj.io
+    kind: '*'
+    
+  roles:
+  - name: admin
+    description: Admin access to BASE layer applications
+    policies:
+    - p, proj:base-layer:admin, applications, *, base-layer/*, allow
+    - p, proj:base-layer:admin, clusters, get, *, allow
+    - p, proj:base-layer:admin, repositories, *, *, allow
+    groups:
+    - base-layer:admin
+    
+  - name: developer
+    description: Developer access to BASE layer applications
+    policies:
+    - p, proj:base-layer:developer, applications, get, base-layer/*, allow
+    - p, proj:base-layer:developer, applications, sync, base-layer/*, allow
+    - p, proj:base-layer:developer, applications, action/*, base-layer/*, allow
+    - p, proj:base-layer:developer, logs, get, base-layer/*, allow
+    groups:
+    - base-layer:developer

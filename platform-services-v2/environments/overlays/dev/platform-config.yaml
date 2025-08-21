@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+  namespace: platform-system
+data:
+  # Environment configuration
+  environment: "dev"
+  region: "us-east-1"
+  cluster-name: "base-app-layer-dev"
+  domain: "base-app-layer.dev"
+  
+  # Feature flags
+  monitoring-enabled: "true"
+  vault-enabled: "true"
+  istio-enabled: "true"
+  crossplane-enabled: "false"
+  
+  # Resource configuration
+  default-storage-class: "gp3"
+  backup-enabled: "true"
+  disaster-recovery-enabled: "false"
+  
+  # Security configuration
+  network-policies-enabled: "true"
+  rbac-enabled: "true"
+  pod-security-standards: "restricted"
+  
+  # Observability
+  logging-level: "info"
+  metrics-retention: "15d"
+  tracing-enabled: "true"
+  
+  # Integration settings
+  aws-integration-enabled: "true"
+  github-integration-enabled: "true"
+  
+  # Component-specific settings
+  argocd-sync-policy: "automated"
+  vault-auto-unseal: "true"
+  airflow-executor: "kubernetes"
+  monitoring-storage-size: "50Gi"

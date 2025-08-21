@@ -1,0 +1,34 @@
+environment: dev
+cluster:
+  name: .platform-services-dev-dev
+  region: us-east-1
+
+base_layer:
+  repository: https://github.com/vsem-svoim/base-app-layer.git
+  branch: main
+  components:
+    - data_ingestion
+    - data_control
+    - data_distribution
+    - data_quality
+    - data_security
+    - data_storage
+    - data_streaming
+    - event_coordination
+    - feature_engineering
+    - metadata_discovery
+    - multimodal_processing
+    - pipeline_management
+    - quality_monitoring
+    - schema_contracts
+
+platform_services:
+  airflow:
+    enabled: true
+    replicas: 1
+  postgresql:
+    enabled: true
+    storage: 100Gi
+  kafka:
+    enabled: true
+    replicas: 3

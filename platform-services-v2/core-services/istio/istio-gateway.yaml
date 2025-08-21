@@ -1,0 +1,32 @@
+---
+# Istio Gateway for platform services
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: platform-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*.base-app-layer.dev"
+    - "argocd.base-app-layer.dev"
+    - "vault.base-app-layer.dev"
+    - "grafana.base-app-layer.dev"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: platform-tls-secret
+    hosts:
+    - "*.base-app-layer.dev"
+    - "argocd.base-app-layer.dev"
+    - "vault.base-app-layer.dev"
+    - "grafana.base-app-layer.dev"

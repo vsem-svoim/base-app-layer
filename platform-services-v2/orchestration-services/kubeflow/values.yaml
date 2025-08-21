@@ -1,0 +1,150 @@
+# Kubeflow Pipelines 2.14.0 configuration for ML workflows
+# Latest stable release with enhanced pipeline orchestration
+
+# Kubeflow Pipelines configuration
+pipelines:
+  image:
+    repository: gcr.io/ml-pipeline/api-server
+    tag: "2.14.0"
+  
+  # API Server configuration
+  apiServer:
+    replicaCount: 2
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+    
+    service:
+      type: ClusterIP
+      port: 8888
+      targetPort: 8888
+
+  # Pipeline Controller
+  controller:
+    replicaCount: 1
+    image:
+      repository: gcr.io/ml-pipeline/pipeline-runner
+      tag: "2.14.0"
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+
+  # Workflow Controller (Argo)
+  workflowController:
+    image:
+      repository: argoproj/workflow-controller
+      tag: "v3.5.4"
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+
+  # UI Server
+  uiServer:
+    replicaCount: 1
+    image:
+      repository: gcr.io/ml-pipeline/frontend
+      tag: "2.14.0"
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+    service:
+      type: ClusterIP
+      port: 3000
+      targetPort: 3000
+
+# Database configuration for pipeline metadata
+database:
+  type: mysql
+  mysql:
+    enabled: true
+    auth:
+      database: kubeflow_pipelines
+      username: kubeflow
+      existingSecret: kubeflow-mysql
+    architecture: standalone
+    primary:
+      persistence:
+        enabled: true
+        size: 20Gi
+        storageClass: gp3
+
+# Object storage for artifacts
+objectStorage:
+  type: minio
+  minio:
+    enabled: true
+    auth:
+      existingSecret: kubeflow-minio
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: gp3
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+
+# Ingress configuration for ALB
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  hosts:
+    - host: ""
+      paths:
+        - path: /kubeflow
+          pathType: Prefix
+          backend:
+            service:
+              name: kubeflow-ui-server
+              port:
+                number: 3000
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  name: kubeflow-pipelines
+
+# RBAC configuration
+rbac:
+  create: true
+
+# Node selector for platform system nodes
+nodeSelector:
+  eks.amazonaws.com/nodegroup: platform_system
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# Labels for service mesh integration
+commonLabels:
+  app.kubernetes.io/name: kubeflow-pipelines
+  app.kubernetes.io/component: ml-workflows
+  deployment.wave: "2"

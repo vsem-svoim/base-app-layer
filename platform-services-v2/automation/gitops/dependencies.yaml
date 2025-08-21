@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-dependencies
+  namespace: argocd
+data:
+  dependencies.yaml: |
+    # Platform Service Dependencies
+    dependencies:
+      # Wave 0: Core Services
+      argocd:
+        requires: []
+        provides: [gitops, automation]
+        health_check: "kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server"
+        
+      vault:
+        requires: []
+        provides: [secrets, authentication]
+        health_check: "kubectl get pods -n vault -l app.kubernetes.io/name=vault"
+        
+      cert-manager:
+        requires: []
+        provides: [certificates, tls]
+        health_check: "kubectl get pods -n cert-manager -l app.kubernetes.io/name=cert-manager"
+        
+      aws-load-balancer-controller:
+        requires: []
+        provides: [ingress, load-balancing]
+        health_check: "kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller"
+      
+      # Wave 1: Shared Services
+      monitoring:
+        requires: [vault, cert-manager]
+        provides: [metrics, alerting, dashboards]
+        health_check: "kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus"
+        
+      logging:
+        requires: [vault, monitoring]
+        provides: [log-aggregation, log-analysis]
+        health_check: "kubectl get pods -n logging -l app=elasticsearch"
+        
+      service-mesh:
+        requires: [cert-manager]
+        provides: [traffic-management, security-policies]
+        health_check: "kubectl get pods -n istio-system -l app=istiod"
+      
+      # Wave 2: Orchestration Services
+      airflow:
+        requires: [monitoring, vault, service-mesh]
+        provides: [workflow-orchestration, dag-management]
+        health_check: "kubectl get pods -n airflow -l app=airflow-scheduler"
+        
+      mlflow:
+        requires: [monitoring, vault]
+        provides: [ml-lifecycle, model-registry]
+        health_check: "kubectl get pods -n mlflow -l app.kubernetes.io/name=mlflow"
+        
+      kubeflow:
+        requires: [monitoring, vault, service-mesh]
+        provides: [ml-workflows, ml-pipelines]
+        health_check: "kubectl get pods -n kubeflow -l app.kubernetes.io/name=ml-pipeline"
+        
+      argo-workflows:
+        requires: [monitoring, vault]
+        provides: [ci-cd-workflows, batch-processing]
+        health_check: "kubectl get pods -n argo -l app=workflow-controller"
+      
+      # Wave 3: Application Services
+      platform-ui:
+        requires: [monitoring, airflow, vault, aws-load-balancer-controller]
+        provides: [dashboard, user-interface]
+        health_check: "kubectl get pods -n platform-ui -l app=platform-ui-dashboard"
+        
+      api-gateway:
+        requires: [monitoring, vault, service-mesh]
+        provides: [api-management, external-access]
+        health_check: "kubectl get pods -n api-gateway -l app=api-gateway"
+        
+      data-services:
+        requires: [monitoring, airflow, vault]
+        provides: [data-processing, base-modules]
+        health_check: "kubectl get pods -n base-data-ingestion -l app.kubernetes.io/component=base-layer"
+    
+    # Wave configuration
+    waves:
+      0:
+        name: "Core Services"
+        components: [argocd, vault, cert-manager, aws-load-balancer-controller]
+        parallel: false
+        timeout: 600
+        
+      1:
+        name: "Shared Services"
+        components: [monitoring, logging, service-mesh]
+        parallel: true
+        timeout: 600
+        
+      2:
+        name: "Orchestration Services"
+        components: [airflow, mlflow, kubeflow, argo-workflows]
+        parallel: true
+        timeout: 900
+        
+      3:
+        name: "Application Services"
+        components: [platform-ui, api-gateway, data-services]
+        parallel: true
+        timeout: 600

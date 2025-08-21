@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-shared
+  namespace: argocd
+spec:
+  description: "Shared platform services (Wave 1) - Monitoring, Logging, Service Mesh"
+  
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://prometheus-community.github.io/helm-charts'
+  - 'https://grafana.github.io/helm-charts'
+  - 'https://elastic.github.io/helm-charts'
+  - 'https://istio-release.storage.googleapis.com/charts'
+
+  destinations:
+  - namespace: 'monitoring'
+    server: https://kubernetes.default.svc
+  - namespace: 'logging'
+    server: https://kubernetes.default.svc
+  - namespace: 'istio-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'istio-ingress'
+    server: https://kubernetes.default.svc
+  - namespace: 'kube-system'
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  roles:
+  - name: platform-shared-admin
+    description: "Shared platform services administrators"
+    policies:
+    - p, proj:platform-shared:platform-shared-admin, applications, *, platform-shared/*, allow
+    - p, proj:platform-shared:platform-shared-admin, clusters, get, *, allow
+    groups:
+    - platform-engineering
+    - monitoring-team
+    - sre-team
+
+  orphanedResources:
+    warn: true
+    ignore:
+    - group: v1
+      kind: Secret
+      name: "*-token-*"
+    - group: v1
+      kind: ConfigMap
+      name: "istio-ca-root-cert"

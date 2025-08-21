@@ -1,0 +1,534 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-services
+  labels:
+    app.kubernetes.io/name: data-services
+    app.kubernetes.io/component: data-gateway
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-services
+  namespace: data-services
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:role/base-app-layer-dev-platform-data-services-irsa
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-services-config
+  namespace: data-services
+data:
+  config.yaml: |
+    server:
+      port: 8080
+      host: 0.0.0.0
+      
+    logging:
+      level: info
+      format: json
+      
+    base_modules:
+      data_ingestion:
+        enabled: true
+        endpoint: "http://base-data-ingestion-orchestrator.base-data-ingestion.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "multi-protocol-ingestion"
+          - "real-time-streaming"
+          - "batch-processing"
+          - "100gb-hour-throughput"
+      
+      data_quality:
+        enabled: true
+        endpoint: "http://base-data-quality-orchestrator.base-data-quality.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "data-validation"
+          - "quality-scoring"
+          - "anomaly-detection"
+          - "compliance-checking"
+          
+      data_storage:
+        enabled: true
+        endpoint: "http://base-data-storage-orchestrator.base-data-storage.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "distributed-storage"
+          - "lifecycle-management"
+          - "tiered-storage"
+          - "backup-recovery"
+          
+      data_security:
+        enabled: true
+        endpoint: "http://base-data-security-orchestrator.base-data-security.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "encryption-at-rest"
+          - "encryption-in-transit"
+          - "access-control"
+          - "classification"
+          
+      feature_engineering:
+        enabled: true
+        endpoint: "http://base-feature-engineering-orchestrator.base-feature-engineering.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "ml-feature-extraction"
+          - "transformation-pipelines"
+          - "feature-store"
+          - "automated-engineering"
+          
+      multimodal_processing:
+        enabled: true
+        endpoint: "http://base-multimodal-processing-orchestrator.base-multimodal-processing.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "text-processing"
+          - "image-processing"
+          - "time-series-analysis"
+          - "geospatial-processing"
+          
+      data_streaming:
+        enabled: true
+        endpoint: "http://base-data-streaming-orchestrator.base-data-streaming.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "kafka-integration"
+          - "real-time-processing"
+          - "stream-analytics"
+          - "event-sourcing"
+          
+      quality_monitoring:
+        enabled: true
+        endpoint: "http://base-quality-monitoring-orchestrator.base-quality-monitoring.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "continuous-monitoring"
+          - "quality-metrics"
+          - "alerting"
+          - "trend-analysis"
+          
+      pipeline_management:
+        enabled: true
+        endpoint: "http://base-pipeline-management-orchestrator.base-pipeline-management.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "workflow-orchestration"
+          - "dependency-management"
+          - "scheduling"
+          - "pipeline-optimization"
+          
+      event_coordination:
+        enabled: true
+        endpoint: "http://base-event-coordination-orchestrator.base-event-coordination.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "event-driven-architecture"
+          - "saga-patterns"
+          - "choreography"
+          - "event-sourcing"
+          
+      metadata_discovery:
+        enabled: true
+        endpoint: "http://base-metadata-discovery-orchestrator.base-metadata-discovery.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "data-cataloging"
+          - "lineage-tracking"
+          - "schema-discovery"
+          - "metadata-management"
+          
+      schema_contracts:
+        enabled: true
+        endpoint: "http://base-schema-contracts-orchestrator.base-schema-contracts.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "schema-evolution"
+          - "contract-validation"
+          - "compatibility-checking"
+          - "version-management"
+          
+      data_distribution:
+        enabled: true
+        endpoint: "http://base-data-distribution-orchestrator.base-data-distribution.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "api-management"
+          - "data-delivery"
+          - "content-distribution"
+          - "caching"
+          
+      data_control:
+        enabled: true
+        endpoint: "http://base-data-control-orchestrator.base-data-control.svc.cluster.local:8080"
+        health_check: "/health"
+        capabilities:
+          - "governance"
+          - "policy-enforcement"
+          - "compliance"
+          - "audit-trail"
+    
+    routes:
+      # Data Foundation Routes (Wave 4)
+      - path: "/data/v1/ingestion/*"
+        module: "data_ingestion"
+        strip_prefix: "/data/v1/ingestion"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/quality/*"
+        module: "data_quality"
+        strip_prefix: "/data/v1/quality"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/storage/*"
+        module: "data_storage"
+        strip_prefix: "/data/v1/storage"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/security/*"
+        module: "data_security"
+        strip_prefix: "/data/v1/security"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+      
+      # Processing & Analytics Routes (Wave 5)  
+      - path: "/data/v1/features/*"
+        module: "feature_engineering"
+        strip_prefix: "/data/v1/features"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/multimodal/*"
+        module: "multimodal_processing"
+        strip_prefix: "/data/v1/multimodal"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/streaming/*"
+        module: "data_streaming"
+        strip_prefix: "/data/v1/streaming"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/monitoring/*"
+        module: "quality_monitoring"
+        strip_prefix: "/data/v1/monitoring"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+      
+      # Orchestration & Management Routes (Wave 6)
+      - path: "/data/v1/pipelines/*"
+        module: "pipeline_management"
+        strip_prefix: "/data/v1/pipelines"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/events/*"
+        module: "event_coordination"
+        strip_prefix: "/data/v1/events"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/metadata/*"
+        module: "metadata_discovery"
+        strip_prefix: "/data/v1/metadata"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/schemas/*"
+        module: "schema_contracts"
+        strip_prefix: "/data/v1/schemas"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+      
+      # Distribution & Control Routes (Wave 7)
+      - path: "/data/v1/distribution/*"
+        module: "data_distribution"
+        strip_prefix: "/data/v1/distribution"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/data/v1/governance/*"
+        module: "data_control"
+        strip_prefix: "/data/v1/governance"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+      
+      # System Routes
+      - path: "/health"
+        handler: "health_check"
+        methods: ["GET"]
+        auth_required: false
+        
+      - path: "/metrics"
+        handler: "metrics"
+        methods: ["GET"]
+        auth_required: false
+        
+      - path: "/modules"
+        handler: "list_modules"
+        methods: ["GET"]
+        auth_required: false
+        
+      - path: "/capabilities"
+        handler: "list_capabilities"
+        methods: ["GET"]
+        auth_required: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-services-gateway
+  namespace: data-services
+  labels:
+    app.kubernetes.io/name: data-services-gateway
+    app.kubernetes.io/component: data-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: data-services-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: data-services-gateway
+        app.kubernetes.io/component: data-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-services
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_general
+      containers:
+      - name: data-gateway
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: data-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: data-nginx-config
+      - name: data-config
+        configMap:
+          name: data-services-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-nginx-config
+  namespace: data-services
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'rt=$request_time uct="$upstream_connect_time" '
+                        'uht="$upstream_header_time" urt="$upstream_response_time"';
+        
+        access_log /var/log/nginx/access.log main;
+        error_log /var/log/nginx/error.log;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        
+        # Rate limiting for data operations
+        limit_req_zone $binary_remote_addr zone=data_limit:10m rate=20r/s;
+        
+        # BASE module upstream services
+        upstream data_ingestion {
+            server base-data-ingestion-orchestrator.base-data-ingestion.svc.cluster.local:8080;
+        }
+        
+        upstream data_quality {
+            server base-data-quality-orchestrator.base-data-quality.svc.cluster.local:8080;
+        }
+        
+        upstream data_storage {
+            server base-data-storage-orchestrator.base-data-storage.svc.cluster.local:8080;
+        }
+        
+        upstream data_security {
+            server base-data-security-orchestrator.base-data-security.svc.cluster.local:8080;
+        }
+        
+        server {
+            listen 8080;
+            server_name data-services.base-app-layer.dev;
+            
+            # Health check endpoint
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            # Modules list endpoint
+            location /modules {
+                access_log off;
+                return 200 '{"modules":["data_ingestion","data_quality","data_storage","data_security","feature_engineering","multimodal_processing","data_streaming","quality_monitoring","pipeline_management","event_coordination","metadata_discovery","schema_contracts","data_distribution","data_control"]}\n';
+                add_header Content-Type application/json;
+            }
+            
+            # Data Foundation Routes (Wave 4)
+            location /data/v1/ingestion/ {
+                limit_req zone=data_limit burst=50 nodelay;
+                proxy_pass http://data_ingestion/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 60s;
+            }
+            
+            location /data/v1/quality/ {
+                limit_req zone=data_limit burst=30 nodelay;
+                proxy_pass http://data_quality/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 60s;
+            }
+            
+            location /data/v1/storage/ {
+                limit_req zone=data_limit burst=40 nodelay;
+                proxy_pass http://data_storage/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 60s;
+            }
+            
+            location /data/v1/security/ {
+                limit_req zone=data_limit burst=20 nodelay;
+                proxy_pass http://data_security/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 60s;
+            }
+            
+            # CORS headers for data APIs
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '$http_origin';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+                add_header 'Access-Control-Max-Age' 1728000;
+                add_header 'Content-Type' 'text/plain; charset=utf-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-services-gateway
+  namespace: data-services
+  labels:
+    app.kubernetes.io/name: data-services-gateway
+    app.kubernetes.io/component: data-gateway
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: data-services-gateway
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: data-services-vs
+  namespace: data-services
+spec:
+  hosts:
+  - data.base-app-layer.dev
+  gateways:
+  - istio-system/base-platform-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /data/v1/
+    route:
+    - destination:
+        host: data-services-gateway.data-services.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        exact: /modules
+    route:
+    - destination:
+        host: data-services-gateway.data-services.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        exact: /health
+    route:
+    - destination:
+        host: data-services-gateway.data-services.svc.cluster.local
+        port:
+          number: 80

@@ -1,0 +1,120 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-alb
+  namespace: argocd
+  annotations:
+    # AWS Load Balancer Controller annotations
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: base-platform-alb
+    
+    # SSL/TLS configuration - HTTP only for now
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    
+    # Health check configuration
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '5'
+    
+    # Security groups and subnets
+    alb.ingress.kubernetes.io/subnets: subnet-0a1b2c3d4e5f6g7h8,subnet-0i9j8k7l6m5n4o3p2
+    alb.ingress.kubernetes.io/security-groups: sg-0123456789abcdef0
+    
+    # Additional configurations
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      routing.http2.enabled=true,
+      idle_timeout.timeout_seconds=60,
+      deletion_protection.enabled=false
+spec:
+  ingressClassName: alb
+  rules:
+  # ArgoCD UI
+  - host: argocd.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+  
+  # Vault UI  
+  - host: vault.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vault
+            port:
+              number: 8200
+  
+  # Platform UI (when deployed)
+  - host: platform.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui
+            port:
+              number: 80
+  
+  # Grafana (when deployed)
+  - host: grafana.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 80
+  
+  # Airflow (when deployed)
+  - host: airflow.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: airflow-webserver
+            port:
+              number: 8080
+  
+  # MLflow (when deployed)
+  - host: mlflow.base-app-layer.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mlflow-tracking
+            port:
+              number: 5000
+---
+# Cross-namespace service for Vault (since ALB is in argocd namespace)
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-cross-ns
+  namespace: argocd
+spec:
+  type: ExternalName
+  externalName: vault.vault.svc.cluster.local
+  ports:
+  - port: 8200
+    targetPort: 8200

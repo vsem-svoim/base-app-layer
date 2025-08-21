@@ -1,0 +1,436 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: gateway
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-gateway
+  namespace: api-gateway
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:role/base-app-layer-dev-platform-api-gateway-irsa
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: api-gateway
+data:
+  config.yaml: |
+    server:
+      port: 8080
+      host: 0.0.0.0
+    
+    logging:
+      level: info
+      format: json
+    
+    cors:
+      enabled: true
+      allowed_origins:
+        - "https://platform.base-app-layer.dev"
+        - "https://localhost:3000"
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      allowed_headers:
+        - "*"
+      allow_credentials: true
+    
+    rate_limiting:
+      enabled: true
+      requests_per_minute: 1000
+      burst: 100
+    
+    authentication:
+      jwt:
+        enabled: true
+        secret_key: "base-platform-jwt-secret"
+        issuer: "base-app-layer"
+        audience: "base-platform-api"
+      
+      vault:
+        enabled: true
+        address: "http://vault.vault.svc.cluster.local:8200"
+        role: "api-gateway"
+    
+    upstream_services:
+      airflow:
+        url: "http://airflow-webserver.airflow.svc.cluster.local:8080"
+        health_check: "/health"
+        timeout: 30s
+        
+      mlflow:
+        url: "http://mlflow-server.mlflow.svc.cluster.local:5000"
+        health_check: "/health"
+        timeout: 30s
+        
+      kubeflow:
+        url: "http://kubeflow-ui.kubeflow.svc.cluster.local:8080"
+        health_check: "/healthz"
+        timeout: 30s
+        
+      grafana:
+        url: "http://grafana.monitoring.svc.cluster.local:3000"
+        health_check: "/api/health"
+        timeout: 30s
+        
+      vault:
+        url: "http://vault.vault.svc.cluster.local:8200"
+        health_check: "/v1/sys/health"
+        timeout: 30s
+      
+      base_data_ingestion:
+        url: "http://base-data-ingestion-orchestrator.base-data-ingestion.svc.cluster.local:8080"
+        health_check: "/health"
+        timeout: 30s
+        
+      base_data_quality:
+        url: "http://base-data-quality-orchestrator.base-data-quality.svc.cluster.local:8080"
+        health_check: "/health" 
+        timeout: 30s
+    
+    routes:
+      - path: "/api/v1/airflow/*"
+        service: "airflow"
+        strip_prefix: "/api/v1/airflow"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/api/v1/mlflow/*"
+        service: "mlflow"
+        strip_prefix: "/api/v1/mlflow"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/api/v1/kubeflow/*"
+        service: "kubeflow"
+        strip_prefix: "/api/v1/kubeflow"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/api/v1/monitoring/*"
+        service: "grafana"
+        strip_prefix: "/api/v1/monitoring"
+        methods: ["GET", "POST"]
+        auth_required: true
+        
+      - path: "/api/v1/secrets/*"
+        service: "vault"
+        strip_prefix: "/api/v1/secrets"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/api/v1/data/ingestion/*"
+        service: "base_data_ingestion"
+        strip_prefix: "/api/v1/data/ingestion"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/api/v1/data/quality/*"
+        service: "base_data_quality"
+        strip_prefix: "/api/v1/data/quality"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        auth_required: true
+        
+      - path: "/health"
+        handler: "health_check"
+        methods: ["GET"]
+        auth_required: false
+        
+      - path: "/metrics"
+        handler: "metrics"
+        methods: ["GET"]
+        auth_required: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/component: gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: api-gateway
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_general
+      containers:
+      - name: api-gateway
+        image: nginx/nginx-prometheus-exporter:0.11.0
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9113
+          name: metrics
+          protocol: TCP
+        env:
+        - name: NGINX_STATUS_URI
+          value: "http://localhost:8080/nginx_status"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        - containerPort: 8080
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: api-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+      - name: api-config
+        configMap:
+          name: api-gateway-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: api-gateway
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'rt=$request_time uct="$upstream_connect_time" '
+                        'uht="$upstream_header_time" urt="$upstream_response_time"';
+        
+        access_log /var/log/nginx/access.log main;
+        error_log /var/log/nginx/error.log;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+        
+        # Upstream services
+        upstream airflow {
+            server airflow-webserver.airflow.svc.cluster.local:8080;
+        }
+        
+        upstream mlflow {
+            server mlflow-server.mlflow.svc.cluster.local:5000;
+        }
+        
+        upstream kubeflow {
+            server kubeflow-ui.kubeflow.svc.cluster.local:8080;
+        }
+        
+        upstream grafana {
+            server grafana.monitoring.svc.cluster.local:3000;
+        }
+        
+        upstream vault {
+            server vault.vault.svc.cluster.local:8200;
+        }
+        
+        server {
+            listen 8080;
+            server_name api-gateway.base-app-layer.dev;
+            
+            # Health check endpoint
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            # Metrics endpoint for nginx-prometheus-exporter
+            location /nginx_status {
+                stub_status;
+                access_log off;
+                allow 127.0.0.1;
+                allow 10.0.0.0/8;
+                deny all;
+            }
+            
+            # API endpoints with rate limiting
+            location /api/v1/airflow/ {
+                limit_req zone=api_limit burst=20 nodelay;
+                proxy_pass http://airflow/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 30s;
+            }
+            
+            location /api/v1/mlflow/ {
+                limit_req zone=api_limit burst=20 nodelay;
+                proxy_pass http://mlflow/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 30s;
+            }
+            
+            location /api/v1/kubeflow/ {
+                limit_req zone=api_limit burst=20 nodelay;
+                proxy_pass http://kubeflow/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 30s;
+            }
+            
+            location /api/v1/monitoring/ {
+                limit_req zone=api_limit burst=20 nodelay;
+                proxy_pass http://grafana/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 30s;
+            }
+            
+            location /api/v1/secrets/ {
+                limit_req zone=api_limit burst=10 nodelay;
+                proxy_pass http://vault/v1/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_timeout 30s;
+            }
+            
+            # CORS headers
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '$http_origin';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+                add_header 'Access-Control-Max-Age' 1728000;
+                add_header 'Content-Type' 'text/plain; charset=utf-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: gateway
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9113"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9113
+    targetPort: 9113
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: api-gateway
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: api-gateway
+spec:
+  hosts:
+  - api.base-app-layer.dev
+  gateways:
+  - istio-system/base-platform-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/
+    route:
+    - destination:
+        host: api-gateway.api-gateway.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: /health
+    route:
+    - destination:
+        host: api-gateway.api-gateway.svc.cluster.local
+        port:
+          number: 80

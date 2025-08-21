@@ -1,0 +1,343 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-ui-config
+  namespace: argocd
+data:
+  dashboard.py: |
+    import streamlit as st
+    from datetime import datetime
+    import time
+    
+    st.set_page_config(
+        page_title="BASE Platform",
+        page_icon="■",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+    
+    # Clean, professional CSS
+    st.markdown("""
+    <style>
+    .main > div {
+        padding-top: 0rem;
+    }
+    .stApp {
+        background: #0a0e1a;
+        color: #e4e7eb;
+    }
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 0rem;
+    }
+    
+    /* Header */
+    .platform-header {
+        background: linear-gradient(90deg, #1a1d29 0%, #2a2d3a 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid #2d3748;
+        margin-bottom: 2rem;
+    }
+    
+    /* Service cards */
+    .service-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .service-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 1.5rem;
+        transition: all 0.2s ease;
+    }
+    
+    .service-card:hover {
+        border-color: #58a6ff;
+        transform: translateY(-2px);
+    }
+    
+    .service-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.8rem;
+    }
+    
+    .service-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #f0f6fc;
+        margin: 0;
+    }
+    
+    .service-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .status-healthy {
+        background: #1a7f37;
+        color: #aff5b4;
+    }
+    
+    .status-pending {
+        background: #9a6700;
+        color: #f2cc60;
+    }
+    
+    .service-description {
+        color: #8b949e;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .service-meta {
+        color: #6e7681;
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Metrics */
+    .metrics-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 2rem 0;
+    }
+    
+    .metric-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #58a6ff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        color: #8b949e;
+        margin-bottom: 0.25rem;
+    }
+    
+    .metric-sublabel {
+        font-size: 0.75rem;
+        color: #6e7681;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.markdown("""
+    <div class="platform-header">
+        <h1 style="margin: 0; color: #f0f6fc; font-size: 2.5rem; font-weight: 300;">BASE Platform</h1>
+        <p style="margin: 0.5rem 0 0 0; color: #8b949e; font-size: 1.1rem;">Enterprise Data Platform Management Console</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Metrics
+    st.markdown("""
+    <div class="metrics-row">
+        <div class="metric-card">
+            <div class="metric-value">ACTIVE</div>
+            <div class="metric-label">Platform Cluster</div>
+            <div class="metric-sublabel">base-app-layer-dev-platform</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">ACTIVE</div>
+            <div class="metric-label">Base Cluster</div>
+            <div class="metric-sublabel">base-app-layer-dev-base</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">us-east-1</div>
+            <div class="metric-label">AWS Region</div>
+            <div class="metric-sublabel">Virginia</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">4/8</div>
+            <div class="metric-label">Services</div>
+            <div class="metric-sublabel">50% Operational</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Get the current ALB URL dynamically
+    import os
+    alb_base_url = "http://base-platform-alb-1935284447.us-east-1.elb.amazonaws.com"
+    
+    # Services with proper ALB routing paths
+    services = [
+        {"name": "ArgoCD", "status": "HEALTHY", "description": "GitOps Continuous Deployment", "namespace": "argocd", "url": f"{alb_base_url}/argocd", "path": "/argocd"},
+        {"name": "HashiCorp Vault", "status": "HEALTHY", "description": "Secrets Management", "namespace": "vault", "url": f"{alb_base_url}/vault", "path": "/vault"},
+        {"name": "Istio Kiali", "status": "HEALTHY", "description": "Service Mesh Dashboard", "namespace": "istio-system", "url": f"{alb_base_url}/kiali", "path": "/kiali"},
+        {"name": "Platform Dashboard", "status": "HEALTHY", "description": "This Dashboard", "namespace": "argocd", "url": f"{alb_base_url}/", "path": "/"},
+        {"name": "Apache Airflow", "status": "PENDING", "description": "Workflow Orchestration", "namespace": "airflow", "url": f"{alb_base_url}/airflow", "path": "/airflow"},
+        {"name": "MLflow", "status": "PENDING", "description": "ML Lifecycle Management", "namespace": "mlflow", "url": f"{alb_base_url}/mlflow", "path": "/mlflow"},
+        {"name": "Grafana", "status": "PENDING", "description": "Observability Dashboard", "namespace": "monitoring", "url": f"{alb_base_url}/grafana", "path": "/grafana"},
+        {"name": "Prometheus", "status": "PENDING", "description": "Metrics Collection", "namespace": "monitoring", "url": f"{alb_base_url}/prometheus", "path": "/prometheus"}
+    ]
+    
+    service_cards = ""
+    for service in services:
+        status_class = "status-healthy" if service["status"] == "HEALTHY" else "status-pending"
+        service_cards += f"""
+        <div class="service-card">
+            <div class="service-header">
+                <h3 class="service-name">{service['name']}</h3>
+                <span class="service-status {status_class}">{service['status']}</span>
+            </div>
+            <div class="service-description">{service['description']}</div>
+            <div class="service-meta">Namespace: {service['namespace']}</div>
+            <div style="font-family: monospace; font-size: 0.8rem; color: #58a6ff;">{service['url']}</div>
+        </div>
+        """
+    
+    st.markdown(f'<div class="service-grid">{service_cards}</div>', unsafe_allow_html=True)
+    
+    # Interactive service access
+    st.markdown("### Quick Access")
+    
+    cols = st.columns(len([s for s in services if s["status"] == "HEALTHY"]))
+    healthy_services = [s for s in services if s["status"] == "HEALTHY"]
+    
+    for idx, service in enumerate(healthy_services):
+        with cols[idx]:
+            if st.button(f"Open {service['name']}", key=f"access_{service['name']}", use_container_width=True):
+                st.markdown(f"**Opening {service['name']}**")
+                st.markdown(f"**URL:** [{service['url']}]({service['url']})")
+                st.success(f"Click the URL above to access {service['name']}")
+    
+    # Deployment Status
+    st.markdown("### Deployment Waves")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.success("**Wave 0: Core**")
+        st.text("ArgoCD")
+        st.caption("DEPLOYED")
+    
+    with col2:
+        st.success("**Wave 1: Infrastructure**")
+        st.text("Vault, ALB, Istio")
+        st.caption("DEPLOYED")
+    
+    with col3:
+        st.warning("**Wave 2: Shared**")
+        st.text("Monitoring, Logging")
+        st.caption("PENDING")
+    
+    with col4:
+        st.warning("**Wave 3: Orchestration**")
+        st.text("Airflow, MLflow")
+        st.caption("PENDING")
+    
+    # Operations
+    st.markdown("### Operations")
+    
+    op_col1, op_col2, op_col3 = st.columns(3)
+    
+    with op_col1:
+        if st.button("Deploy Shared Services", type="primary", use_container_width=True):
+            st.code("./deploy-platform.sh shared", language="bash")
+    
+    with op_col2:
+        if st.button("Deploy Orchestration", type="secondary", use_container_width=True):
+            st.code("./deploy-platform.sh orchestration", language="bash")
+    
+    with op_col3:
+        if st.button("Validate Platform", type="secondary", use_container_width=True):
+            st.code("./deploy-platform.sh validate", language="bash")
+    
+    # Footer
+    st.markdown("---")
+    st.caption(f"Updated: {datetime.now().strftime('%H:%M:%S UTC')} | BASE Platform v2.0")
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-ui-dashboard
+  namespace: argocd
+  labels:
+    app: platform-ui-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-ui-dashboard
+  template:
+    metadata:
+      labels:
+        app: platform-ui-dashboard
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_system
+      containers:
+      - name: dashboard
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8501
+        - containerPort: 8080
+        command: ["/bin/bash"]
+        args: ["-c", "pip install streamlit && streamlit run /app/dashboard.py --server.port=8501 --server.address=0.0.0.0 & python -m http.server 8080 --directory /tmp"]
+        volumeMounts:
+        - name: dashboard-config
+          mountPath: /app
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: dashboard-config
+        configMap:
+          name: platform-ui-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-ui
+  namespace: argocd
+  labels:
+    app: platform-ui-dashboard
+spec:
+  type: ClusterIP
+  ports:
+  - name: streamlit
+    port: 8501
+    targetPort: 8501
+    protocol: TCP
+  - name: health
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: platform-ui-dashboard

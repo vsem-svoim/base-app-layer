@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-core
+  namespace: argocd
+spec:
+  description: "Core platform services (Wave 0) - ArgoCD, Vault, Cert-Manager, AWS LB Controller"
+  
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://charts.jetstack.io'
+  - 'https://kubernetes-sigs.github.io/aws-load-balancer-controller'
+  - 'https://helm.releases.hashicorp.com'
+
+  destinations:
+  - namespace: 'argocd'
+    server: https://kubernetes.default.svc
+  - namespace: 'cert-manager'
+    server: https://kubernetes.default.svc
+  - namespace: 'vault'
+    server: https://kubernetes.default.svc
+  - namespace: 'kube-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'istio-system'
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  roles:
+  - name: platform-core-admin
+    description: "Core platform services administrators"
+    policies:
+    - p, proj:platform-core:platform-core-admin, applications, *, platform-core/*, allow
+    - p, proj:platform-core:platform-core-admin, clusters, *, *, allow
+    - p, proj:platform-core:platform-core-admin, repositories, *, *, allow
+    groups:
+    - platform-engineering
+    - site-reliability
+
+  orphanedResources:
+    warn: true
+    ignore:
+    - group: v1
+      kind: Secret
+      name: "*-token-*"

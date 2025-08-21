@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airflow-helm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: airflow
+    app.kubernetes.io/component: helm-release
+spec:
+  project: platform-orchestration
+  source:
+    chart: airflow
+    repoURL: https://airflow.apache.org
+    targetRevision: 1.15.0  # Latest Helm chart version for Airflow 3.0.5
+    helm:
+      releaseName: airflow
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: airflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

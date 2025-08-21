@@ -1,0 +1,107 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-app-layer-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: https://github.com/vsem-svoim/base-app-layer.git
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: airflow
+  url: https://airflow.apache.org
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aws-eks-charts-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: eks
+  url: https://aws.github.io/eks-charts
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: grafana
+  url: https://grafana.github.io/helm-charts
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: istio-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: istio
+  url: https://istio-release.storage.googleapis.com/charts
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubeflow-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: kubeflow
+  url: https://kubeflow.github.io/pipelines
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bitnami-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: bitnami
+  url: https://charts.bitnami.com/bitnami
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: prometheus-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: prometheus-community
+  url: https://prometheus-community.github.io/helm-charts
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hashicorp-helm-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: hashicorp
+  url: https://helm.releases.hashicorp.com

@@ -1,0 +1,113 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    name: argocd
+    component: gitops
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: application-controller
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-cd
+    targetRevision: 5.51.6
+    helm:
+      values: |
+        global:
+          domain: argocd.base-app-layer.dev
+          
+        configs:
+          params:
+            server.insecure: true
+            server.grpc.web: true
+            application.instanceLabelKey: argocd.argoproj.io/instance
+            
+        controller:
+          replicas: 1
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+          
+        dex:
+          enabled: false
+          
+        redis:
+          enabled: true
+          
+        server:
+          replicas: 1
+          service:
+            type: ClusterIP
+            port: 80
+            portName: http
+          ingress:
+            enabled: true
+            ingressClassName: alb
+            annotations:
+              kubernetes.io/ingress.class: "alb"
+              alb.ingress.kubernetes.io/scheme: internet-facing
+              alb.ingress.kubernetes.io/target-type: ip
+              alb.ingress.kubernetes.io/load-balancer-name: base-platform-argocd
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+              alb.ingress.kubernetes.io/ssl-redirect: "443"
+            hosts:
+              - argocd.base-app-layer.dev
+            paths:
+              - /
+            pathType: Prefix
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              
+        repoServer:
+          replicas: 1
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              
+        applicationSet:
+          enabled: true
+          replicas: 1
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              
+        notifications:
+          enabled: false
+          
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+    
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+        
+  revisionHistoryLimit: 3

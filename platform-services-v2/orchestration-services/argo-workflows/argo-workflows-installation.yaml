@@ -1,0 +1,510 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: workflow-engine
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo
+  namespace: argo-workflows
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:role/base-app-layer-dev-platform-argo-workflows-irsa
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-server
+  namespace: argo-workflows
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:role/base-app-layer-dev-platform-argo-server-irsa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-workflows-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/exec
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - persistentvolumeclaims/finalizers
+  verbs:
+  - create
+  - update
+  - delete
+  - get
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflows
+  - workflows/finalizers
+  - workfloweventbindings
+  - workfloweventbindings/finalizers
+  - workflowtemplates
+  - workflowtemplates/finalizers
+  - cronworkflows
+  - cronworkflows/finalizers
+  - clusterworkflowtemplates
+  - clusterworkflowtemplates/finalizers
+  - workflowtasksets
+  - workflowtasksets/finalizers
+  - workflowtaskresults
+  - workflowtaskresults/finalizers
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-workflows-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-role
+subjects:
+- kind: ServiceAccount
+  name: argo
+  namespace: argo-workflows
+- kind: ServiceAccount
+  name: argo-server
+  namespace: argo-workflows
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-controller-configmap
+  namespace: argo-workflows
+data:
+  config: |
+    # Configuration for the Workflow Controller
+    namespace: argo-workflows
+    parallelism: 20
+    
+    # Executor configuration
+    executor: |
+      imagePullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    
+    # Container runtime configuration
+    containerRuntimeExecutor: k8sapi
+    kubeletPort: 10250
+    kubeletInsecure: false
+    
+    # Workflow defaults
+    workflowDefaults: |
+      spec:
+        # Default node selector for workflow pods
+        nodeSelector:
+          eks.amazonaws.com/nodegroup: platform_compute
+        
+        # Default resource limits
+        podSpecPatch: |
+          containers:
+          - name: main
+            resources:
+              requests:
+                memory: 256Mi
+                cpu: 200m
+              limits:
+                memory: 1Gi
+                cpu: 1000m
+        
+        # Default TTL for completed workflows
+        ttlStrategy:
+          secondsAfterCompletion: 3600
+          secondsAfterSuccess: 1800
+          secondsAfterFailure: 7200
+    
+    # Archive configuration  
+    persistence: |
+      connectionPool:
+        maxIdleConns: 2
+        maxOpenConns: 8
+        connMaxLifetime: 1h
+      nodeStatusOffLoad: true
+      archive: true
+      postgresql:
+        host: workflow-postgres.argo-workflows.svc.cluster.local
+        port: 5432
+        database: argo
+        tableName: argo_workflows
+        userNameSecret:
+          name: argo-postgres-config
+          key: username
+        passwordSecret:
+          name: argo-postgres-config
+          key: password
+    
+    # Links to external systems
+    links: |
+      - name: Airflow Integration
+        scope: workflow
+        url: "http://airflow-webserver.airflow.svc.cluster.local:8080/admin/airflow/graph?dag_id=${metadata.labels.airflow-dag-id}"
+      - name: MLflow Tracking
+        scope: workflow  
+        url: "http://mlflow-server.mlflow.svc.cluster.local:5000/#/experiments/${metadata.labels.mlflow-experiment-id}"
+      - name: Workflow Logs
+        scope: pod-logs
+        url: "http://kibana.logging.svc.cluster.local:5601/app/logs/stream?logFilter=(expression:'kubernetes.pod_name:${metadata.name}',kind:kuery)"
+    
+    # SSO and RBAC (disabled for simplicity)
+    auth: |
+      enabled: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-controller
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: workflow-controller
+    app.kubernetes.io/component: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workflow-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workflow-controller
+        app.kubernetes.io/component: controller
+    spec:
+      serviceAccountName: argo
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_system
+      containers:
+      - name: workflow-controller
+        image: quay.io/argoproj/workflow-controller:v3.5.11
+        command:
+        - workflow-controller
+        args:
+        - --configmap
+        - workflow-controller-configmap
+        - --executor-image
+        - quay.io/argoproj/argoexec:v3.5.11
+        - --loglevel
+        - info
+        - --gloglevel
+        - "6"
+        ports:
+        - containerPort: 9090
+          name: metrics
+        - containerPort: 6060
+          name: telemetry
+        env:
+        - name: LEADER_ELECTION_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            port: 6060
+            path: /healthz
+          initialDelaySeconds: 90
+          periodSeconds: 60
+          timeoutSeconds: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-server
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-server
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-server
+        app.kubernetes.io/component: server
+    spec:
+      serviceAccountName: argo-server
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_general
+      containers:
+      - name: argo-server
+        image: quay.io/argoproj/argocli:v3.5.11
+        command:
+        - argo
+        args:
+        - server
+        - --configmap
+        - workflow-controller-configmap
+        - --auth-mode
+        - server
+        - --secure
+        - "false"
+        - --loglevel
+        - info
+        - --gloglevel
+        - "6"
+        ports:
+        - containerPort: 2746
+          name: web
+        env:
+        - name: IN_CLUSTER
+          value: "true"
+        - name: ARGO_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: BASE_HREF
+          value: /
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            port: 2746
+            path: /
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            port: 2746
+            path: /
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 8737
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-controller-metrics
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: workflow-controller
+    app.kubernetes.io/component: controller
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app.kubernetes.io/name: workflow-controller
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-server
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: argo-server
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 2746
+    protocol: TCP
+    targetPort: 2746
+  selector:
+    app.kubernetes.io/name: argo-server
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-postgres-config
+  namespace: argo-workflows
+type: Opaque
+data:
+  username: YXJnbw==  # argo
+  password: YXJnb3BvcnQ=  # argopost
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: workflow-postgres
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: workflow-postgres
+    app.kubernetes.io/component: database
+spec:
+  serviceName: workflow-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workflow-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workflow-postgres
+        app.kubernetes.io/component: database
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: platform_memory
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: argo
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: argo-postgres-config
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: argo-postgres-config
+              key: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command:
+            - /usr/local/bin/pg_isready
+            - -U
+            - argo
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/pg_isready
+            - -U
+            - argo
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: gp3
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-postgres
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/name: workflow-postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP
+    targetPort: postgres
+  selector:
+    app.kubernetes.io/name: workflow-postgres
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: argo-workflows-vs
+  namespace: argo-workflows
+spec:
+  hosts:
+  - workflows.base-app-layer.dev
+  gateways:
+  - istio-system/base-platform-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: argo-server.argo-workflows.svc.cluster.local
+        port:
+          number: 2746

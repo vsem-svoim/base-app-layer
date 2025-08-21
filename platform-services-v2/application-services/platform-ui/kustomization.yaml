@@ -1,14 +1,22 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-- platform-ui-deployment.yaml
-- platform-ui-service.yaml
-- platform-ui-ingress.yaml
-- platform-ui-rbac.yaml
+metadata:
+  name: platform-ui
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 
-namespace: argocd
+namespace: platform-ui
+
+resources:
+- manifests/platform-ui-proxy.yaml
 
 commonLabels:
-  app: platform-ui
-  component: dashboard
+  app.kubernetes.io/name: platform-ui
+  app.kubernetes.io/component: dashboard
+  app.kubernetes.io/part-of: base-platform
+  deployment.wave: "3"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "3"
+  service.description: "Platform management dashboard and UI"

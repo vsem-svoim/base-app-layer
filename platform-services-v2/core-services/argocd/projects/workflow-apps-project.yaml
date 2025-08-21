@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: workflow-apps
+  namespace: argocd
+spec:
+  description: "Workflow orchestration and data pipeline applications"
+  sourceRepos:
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://airflow.apache.org/charts'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://prefecthq.github.io/prefect-helm'
+  - 'https://github.com/argoproj/argo-workflows'
+  - 'https://argoproj.github.io/argo-helm'
+  - 'https://github.com/your-org/finportiq'
+
+  destinations:
+  - namespace: 'airflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'prefect'
+    server: https://kubernetes.default.svc
+  - namespace: 'workflow-*'
+    server: https://kubernetes.default.svc
+  - namespace: 'argo-workflows'
+    server: https://kubernetes.default.svc
+  - namespace: 'argocd'
+    server: https://kubernetes.default.svc
+  - namespace: 'base-ingestion'
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  roles:
+  - name: workflow-admin
+    description: "Workflow platform administrators"
+    policies:
+    - p, proj:workflow-apps:workflow-admin, applications, *, workflow-apps/*, allow
+    groups:
+    - data-engineering
+    - platform-engineering

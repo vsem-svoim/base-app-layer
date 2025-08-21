@@ -1,0 +1,74 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: application-services
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: application-services-applicationset
+    app.kubernetes.io/component: applicationset-controller
+spec:
+  generators:
+  - list:
+      elements:
+      - service: platform-ui
+        name: platform-ui-app
+        namespace: platform-ui
+        wave: "3"
+        description: "Platform management dashboard and UI"
+      - service: api-gateway
+        name: api-gateway-app
+        namespace: api-gateway
+        wave: "3"
+        description: "API management and external access"
+      - service: data-services
+        name: data-services-gateway
+        namespace: data-services
+        wave: "3"
+        description: "BASE modules coordination and gateway"
+        
+  template:
+    metadata:
+      name: '{{name}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/component: application-service
+        deployment.wave: '{{wave}}'
+        service.tier: application
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+        
+    spec:
+      project: platform-applications
+      
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        path: 'platform-services-v2/application-services/{{service}}'
+        targetRevision: main
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 10m
+            
+      revisionHistoryLimit: 3

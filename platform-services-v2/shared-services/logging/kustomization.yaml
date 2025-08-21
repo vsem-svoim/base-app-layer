@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: logging-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+
+resources:
+- elasticsearch-stack.yaml
+- fluent-bit.yaml
+
+namespace: logging
+
+commonLabels:
+  app.kubernetes.io/name: logging
+  app.kubernetes.io/component: log-aggregation
+  app.kubernetes.io/part-of: base-platform
+  deployment.wave: "1"

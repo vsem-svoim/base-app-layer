@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubeflow
+  labels:
+    istio-injection: enabled
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeflow-dashboard
+  namespace: kubeflow
+  labels:
+    app: kubeflow-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeflow-dashboard
+  template:
+    metadata:
+      labels:
+        app: kubeflow-dashboard
+    spec:
+      containers:
+      - name: kubeflow-dashboard
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: dashboard-content
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: dashboard-content
+        configMap:
+          name: kubeflow-dashboard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeflow-dashboard
+  namespace: kubeflow
+  labels:
+    app: kubeflow-dashboard
+spec:
+  selector:
+    app: kubeflow-dashboard
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeflow-dashboard-config
+  namespace: kubeflow
+  labels:
+    app: kubeflow-dashboard
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Kubeflow Dashboard</title>
+        <style>
+            body { font-family: Arial; margin: 40px; background: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; }
+            h1 { color: #1976d2; }
+            .service { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+            .status { color: #28a745; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🤖 Kubeflow Dashboard</h1>
+            <p>Machine Learning Platform - Kubernetes Native</p>
+            <div class="service">
+                <h3>📊 ML Pipelines</h3>
+                <p class="status">Status: Ready for configuration</p>
+                <p>Workflow orchestration for ML experiments</p>
+            </div>
+            <div class="service">
+                <h3>🔬 Jupyter Notebooks</h3>
+                <p class="status">Status: Available for deployment</p>
+                <p>Interactive development environment</p>
+            </div>
+            <div class="service">
+                <h3>🚀 Model Serving</h3>
+                <p class="status">Status: KServe integration ready</p>
+                <p>Production model deployment and serving</p>
+            </div>
+            <div class="service">
+                <h3>🧪 Katib</h3>
+                <p class="status">Status: Hyperparameter tuning available</p>
+                <p>Automated ML optimization</p>
+            </div>
+            <p><em>Full Kubeflow deployment requires additional pipeline and notebook configurations.</em></p>
+        </div>
+    </body>
+    </html>

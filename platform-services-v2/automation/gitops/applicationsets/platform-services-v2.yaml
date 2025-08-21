@@ -1,0 +1,258 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-services-v2
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-services-v2
+    app.kubernetes.io/component: applicationset-controller
+spec:
+  generators:
+  - list:
+      elements:
+      # Core Services - Wave 0
+      - service: argocd-core
+        namespace: argocd
+        wave: "0"
+        category: core
+        description: "ArgoCD - GitOps continuous deployment"
+        path: platform-services-v2/core-services/argocd
+        
+      - service: vault-core
+        namespace: vault
+        wave: "0"
+        category: core
+        description: "HashiCorp Vault - Secrets management"
+        path: platform-services-v2/core-services/vault
+        
+      # Shared Services - Wave 1
+      - service: monitoring-shared
+        namespace: platform-monitoring
+        wave: "1"
+        category: shared
+        description: "Prometheus & Grafana - Monitoring stack"
+        path: platform-services-v2/shared-services/monitoring
+        
+      - service: logging-shared
+        namespace: platform-logging
+        wave: "1"
+        category: shared
+        description: "ELK Stack - Centralized logging"
+        path: platform-services-v2/shared-services/logging
+        
+      # Orchestration Services - Wave 2
+      - service: airflow
+        namespace: platform-orchestration
+        wave: "2"
+        category: orchestration
+        description: "Apache Airflow - Workflow orchestration"
+        path: platform-services-v2/orchestration-services/airflow
+        
+      - service: mlflow
+        namespace: platform-orchestration
+        wave: "2"
+        category: orchestration
+        description: "MLflow - ML lifecycle management"
+        path: platform-services-v2/orchestration-services/mlflow
+        
+      - service: kubeflow
+        namespace: kubeflow
+        wave: "2"
+        category: orchestration
+        description: "Kubeflow - ML toolkit for Kubernetes"
+        path: platform-services-v2/orchestration-services/kubeflow
+        
+      - service: argo-workflows
+        namespace: argo-workflows
+        wave: "2"
+        category: orchestration
+        description: "Argo Workflows - Kubernetes job orchestration"
+        path: platform-services-v2/orchestration-services/argo-workflows
+        
+      - service: kiali
+        namespace: istio-mesh
+        wave: "2"
+        category: orchestration
+        description: "Kiali - Istio service mesh visualization"
+        path: platform-services-v2/orchestration-services/kiali
+        
+      # Application Services - Wave 3
+      - service: platform-ui
+        namespace: platform-ui
+        wave: "3"
+        category: application
+        description: "Platform UI - Unified dashboard"
+        path: platform-services-v2/application-services/platform-ui
+        
+  template:
+    metadata:
+      name: '{{service}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/component: '{{category}}'
+        deployment.wave: '{{wave}}'
+        target.cluster: platform
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+        notifications.argoproj.io/subscribe.on-sync-succeeded.slack: base-platform
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+        
+    spec:
+      project: platform-v2
+      
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        path: '{{path}}'
+        targetRevision: HEAD
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m
+            
+      revisionHistoryLimit: 3
+      
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
+      - group: ""
+        kind: Service
+        jsonPointers:
+        - /spec/clusterIP
+      - group: networking.k8s.io
+        kind: Ingress
+        jsonPointers:
+        - /status/loadBalancer/ingress
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-v2
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-v2-project
+spec:
+  description: BASE Platform V2 - Complete Enterprise Data Platform
+  
+  sourceRepos:
+  - 'https://github.com/your-org/base-app-layer'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://prometheus-community.github.io/helm-charts'
+  - 'https://grafana.github.io/helm-charts'
+  - 'https://helm.releases.hashicorp.com'
+  - 'https://argoproj.github.io/argo-helm'
+  - '*'
+  
+  destinations:
+  # Core Services
+  - namespace: 'argocd'
+    server: https://kubernetes.default.svc
+  - namespace: 'vault'
+    server: https://kubernetes.default.svc
+  # Shared Services  
+  - namespace: 'platform-monitoring'
+    server: https://kubernetes.default.svc
+  - namespace: 'platform-logging'
+    server: https://kubernetes.default.svc
+  - namespace: 'istio-mesh'
+    server: https://kubernetes.default.svc
+  # Orchestration Services
+  - namespace: 'platform-orchestration'
+    server: https://kubernetes.default.svc
+  - namespace: 'kubeflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'argo-workflows'
+    server: https://kubernetes.default.svc
+  # Application Services
+  - namespace: 'platform-ui'
+    server: https://kubernetes.default.svc
+  - namespace: 'kube-system'
+    server: https://kubernetes.default.svc
+    
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+  - group: security.istio.io
+    kind: '*'
+  - group: networking.istio.io
+    kind: '*'
+    
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: '*'
+  - group: apps
+    kind: '*'
+  - group: networking.k8s.io
+    kind: '*'
+  - group: extensions
+    kind: '*'
+  - group: batch
+    kind: '*'
+  - group: autoscaling
+    kind: '*'
+  - group: policy
+    kind: '*'
+  - group: monitoring.coreos.com
+    kind: '*'
+  - group: argoproj.io
+    kind: '*'
+  - group: istio.io
+    kind: '*'
+  - group: security.istio.io
+    kind: '*'
+  - group: networking.istio.io
+    kind: '*'
+    
+  roles:
+  - name: platform-admin
+    description: Admin access to platform services
+    policies:
+    - p, proj:platform-v2:platform-admin, applications, *, platform-v2/*, allow
+    - p, proj:platform-v2:platform-admin, clusters, get, *, allow
+    - p, proj:platform-v2:platform-admin, repositories, *, *, allow
+    groups:
+    - platform:admin
+    
+  - name: platform-developer
+    description: Developer access to platform services
+    policies:
+    - p, proj:platform-v2:platform-developer, applications, get, platform-v2/*, allow
+    - p, proj:platform-v2:platform-developer, applications, sync, platform-v2/*, allow
+    - p, proj:platform-v2:platform-developer, applications, action/*, platform-v2/*, allow
+    - p, proj:platform-v2:platform-developer, logs, get, platform-v2/*, allow
+    groups:
+    - platform:developer

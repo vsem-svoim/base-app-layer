@@ -1,0 +1,112 @@
+# MLflow 3.2.0 configuration for ML lifecycle management
+# Latest stable release with enhanced model registry
+
+image:
+  repository: python
+  tag: "3.11-slim"
+  pullPolicy: IfNotPresent
+
+mlflow:
+  image:
+    repository: mlflow/mlflow
+    tag: "v3.2.0"
+  
+  # MLflow tracking server configuration
+  trackingServer:
+    enabled: true
+    replicaCount: 2
+    
+    # Resource allocation
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+    
+    # Service configuration
+    service:
+      type: ClusterIP
+      port: 5000
+      targetPort: 5000
+    
+    # Environment variables
+    env:
+      - name: MLFLOW_BACKEND_STORE_URI
+        value: "postgresql://mlflow:mlflow@mlflow-postgresql:5432/mlflow"
+      - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+        value: "s3://base-platform-mlflow-artifacts"
+      - name: MLFLOW_SERVE_ARTIFACTS
+        value: "true"
+      - name: MLFLOW_ARTIFACTS_DESTINATION
+        value: "s3://base-platform-mlflow-artifacts"
+
+  # Model registry configuration
+  modelRegistry:
+    enabled: true
+    
+  # Artifact storage configuration
+  artifactStore:
+    type: s3
+    s3:
+      bucket: base-platform-mlflow-artifacts
+      region: us-east-1
+
+# PostgreSQL database for metadata storage
+postgresql:
+  enabled: true
+  auth:
+    database: mlflow
+    username: mlflow
+    existingSecret: mlflow-postgresql
+  architecture: standalone
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: gp3
+
+# Ingress for ALB integration
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  hosts:
+    - host: ""
+      paths:
+        - path: /mlflow
+          pathType: Prefix
+          backend:
+            service:
+              name: mlflow-tracking-server
+              port:
+                number: 5000
+
+# ServiceAccount with IRSA for S3 access
+serviceAccount:
+  create: true
+  name: mlflow
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:role/base-app-layer-dev-platform-mlflow-irsa
+
+# Node selector for platform system nodes
+nodeSelector:
+  eks.amazonaws.com/nodegroup: platform_system
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# Labels for service mesh integration
+podLabels:
+  app.kubernetes.io/name: mlflow
+  app.kubernetes.io/component: ml-lifecycle
+  deployment.wave: "2"

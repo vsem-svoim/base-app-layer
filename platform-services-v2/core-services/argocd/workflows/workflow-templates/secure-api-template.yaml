@@ -1,0 +1,327 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: secure-api-ingestion
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: secure-api-template
+    app.kubernetes.io/component: workflow-template
+    base.io/category: data_ingestion
+    base.io/type: secure_workflow_template
+spec:
+  entrypoint: secure-api-pipeline
+  
+  arguments:
+    parameters:
+    - name: api-endpoint
+      description: "Secure API endpoint to ingest from"
+    - name: security-level
+      value: "high"
+      description: "Security level required (high, critical)"
+    - name: compliance-requirements
+      description: "Compliance requirements (finra, sox, gdpr)"
+    - name: encryption-required
+      value: "true"
+      description: "Whether encryption is required"
+      
+  templates:
+  - name: secure-api-pipeline
+    dag:
+      tasks:
+      - name: security-validation
+        template: validate-security
+        arguments:
+          parameters:
+          - name: api-endpoint
+            value: "{{workflow.parameters.api-endpoint}}"
+          - name: security-level
+            value: "{{workflow.parameters.security-level}}"
+            
+      - name: compliance-check
+        template: check-compliance
+        dependencies: [security-validation]
+        arguments:
+          parameters:
+          - name: compliance-requirements
+            value: "{{workflow.parameters.compliance-requirements}}"
+          - name: security-validation-result
+            value: "{{tasks.security-validation.outputs.parameters.validation-result}}"
+            
+      - name: authentication-verification
+        template: verify-authentication
+        dependencies: [compliance-check]
+        arguments:
+          parameters:
+          - name: api-endpoint
+            value: "{{workflow.parameters.api-endpoint}}"
+          - name: auth-config
+            value: "{{tasks.compliance-check.outputs.parameters.auth-config}}"
+            
+      - name: encrypted-connection
+        template: establish-encrypted-connection
+        dependencies: [authentication-verification]
+        arguments:
+          parameters:
+          - name: api-endpoint
+            value: "{{workflow.parameters.api-endpoint}}"
+          - name: auth-token
+            value: "{{tasks.authentication-verification.outputs.parameters.auth-token}}"
+            
+      - name: secure-data-collection
+        template: collect-secure-data
+        dependencies: [encrypted-connection]
+        arguments:
+          parameters:
+          - name: secure-connection-id
+            value: "{{tasks.encrypted-connection.outputs.parameters.connection-id}}"
+          - name: encryption-config
+            value: "{{tasks.encrypted-connection.outputs.parameters.encryption-config}}"
+            
+      - name: data-classification
+        template: classify-sensitive-data
+        dependencies: [secure-data-collection]
+        arguments:
+          parameters:
+          - name: collected-data-location
+            value: "{{tasks.secure-data-collection.outputs.parameters.data-location}}"
+          - name: classification-rules
+            value: "{{workflow.parameters.compliance-requirements}}"
+            
+      - name: encrypted-storage
+        template: store-encrypted-data
+        dependencies: [data-classification]
+        arguments:
+          parameters:
+          - name: classified-data-location
+            value: "{{tasks.data-classification.outputs.parameters.classified-location}}"
+          - name: encryption-level
+            value: "{{tasks.data-classification.outputs.parameters.required-encryption}}"
+
+  # Security validation template
+  - name: validate-security
+    inputs:
+      parameters:
+      - name: api-endpoint
+      - name: security-level
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call security validation service
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "security_validation",
+            "api_endpoint": "{{inputs.parameters.api-endpoint}}",
+            "security_level": "{{inputs.parameters.security-level}}",
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "security_audit": true
+            }
+          }' \
+          http://base-data-security-service.base-platform.svc.cluster.local:8080/api/v1/validate-security > /tmp/security_result.json
+          
+        cat /tmp/security_result.json | jq -r '.validation_result' > /tmp/validation_result.json
+        echo "Security validation completed"
+    outputs:
+      parameters:
+      - name: validation-result
+        valueFrom:
+          path: /tmp/validation_result.json
+          
+  - name: check-compliance
+    inputs:
+      parameters:
+      - name: compliance-requirements
+      - name: security-validation-result
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call compliance checking service
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "compliance_check",
+            "requirements": "{{inputs.parameters.compliance-requirements}}",
+            "security_validation": {{inputs.parameters.security-validation-result}},
+            "workflow_context": {
+              "workflow_id": "{{workflow.uid}}",
+              "audit_trail": true
+            }
+          }' \
+          http://base-compliance-service.base-platform.svc.cluster.local:8080/api/v1/check > /tmp/compliance_result.json
+          
+        cat /tmp/compliance_result.json | jq -r '.auth_config' > /tmp/auth_config.json
+        echo "Compliance check completed"
+    outputs:
+      parameters:
+      - name: auth-config
+        valueFrom:
+          path: /tmp/auth_config.json
+          
+  # Additional secure templates would follow similar pattern...
+  - name: verify-authentication
+    inputs:
+      parameters:
+      - name: api-endpoint
+      - name: auth-config
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        # Call enhanced connector with security focus
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "authentication_verification",
+            "api_endpoint": "{{inputs.parameters.api-endpoint}}",
+            "auth_config": {{inputs.parameters.auth-config}},
+            "security_mode": "strict"
+          }' \
+          http://base-data-connector-service.base-ingestion.svc.cluster.local:8080/api/v1/verify_auth > /tmp/auth_result.json
+          
+        cat /tmp/auth_result.json | jq -r '.auth_token' > /tmp/auth_token.txt
+        echo "Authentication verified"
+    outputs:
+      parameters:
+      - name: auth-token
+        valueFrom:
+          path: /tmp/auth_token.txt
+          
+  - name: establish-encrypted-connection
+    inputs:
+      parameters:
+      - name: api-endpoint
+      - name: auth-token
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer {{inputs.parameters.auth-token}}" \
+          -d '{
+            "action": "establish_encrypted_connection",
+            "api_endpoint": "{{inputs.parameters.api-endpoint}}",
+            "encryption_required": true,
+            "tls_version": "1.3"
+          }' \
+          http://base-data-connector-service.base-ingestion.svc.cluster.local:8080/api/v1/encrypted_connect > /tmp/encrypted_conn.json
+          
+        cat /tmp/encrypted_conn.json | jq -r '.connection_id' > /tmp/connection_id.txt
+        cat /tmp/encrypted_conn.json | jq -r '.encryption_config' > /tmp/encryption_config.json
+        echo "Encrypted connection established"
+    outputs:
+      parameters:
+      - name: connection-id
+        valueFrom:
+          path: /tmp/connection_id.txt
+      - name: encryption-config
+        valueFrom:
+          path: /tmp/encryption_config.json
+          
+  - name: collect-secure-data
+    inputs:
+      parameters:
+      - name: secure-connection-id
+      - name: encryption-config
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "secure_data_collection",
+            "connection_id": "{{inputs.parameters.secure-connection-id}}",
+            "encryption_config": {{inputs.parameters.encryption-config}},
+            "data_classification": "sensitive"
+          }' \
+          http://base-data-collector-service.base-ingestion.svc.cluster.local:8080/api/v1/secure_collect > /tmp/secure_collection.json
+          
+        cat /tmp/secure_collection.json | jq -r '.data_location' > /tmp/data_location.txt
+        echo "Secure data collection completed"
+    outputs:
+      parameters:
+      - name: data-location
+        valueFrom:
+          path: /tmp/data_location.txt
+          
+  - name: classify-sensitive-data
+    inputs:
+      parameters:
+      - name: collected-data-location
+      - name: classification-rules
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "classify_sensitive_data",
+            "data_location": "{{inputs.parameters.collected-data-location}}",
+            "classification_rules": "{{inputs.parameters.classification-rules}}",
+            "pii_detection": true,
+            "financial_data_detection": true
+          }' \
+          http://base-data-security-service.base-platform.svc.cluster.local:8080/api/v1/classify > /tmp/classification.json
+          
+        cat /tmp/classification.json | jq -r '.classified_location' > /tmp/classified_location.txt
+        cat /tmp/classification.json | jq -r '.required_encryption' > /tmp/required_encryption.txt
+        echo "Data classification completed"
+    outputs:
+      parameters:
+      - name: classified-location
+        valueFrom:
+          path: /tmp/classified_location.txt
+      - name: required-encryption
+        valueFrom:
+          path: /tmp/required_encryption.txt
+          
+  - name: store-encrypted-data
+    inputs:
+      parameters:
+      - name: classified-data-location
+      - name: encryption-level
+    container:
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args:
+      - -c
+      - |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{
+            "action": "store_encrypted_data",
+            "data_location": "{{inputs.parameters.classified-data-location}}",
+            "encryption_level": "{{inputs.parameters.encryption-level}}",
+            "compliance_audit": true,
+            "retention_policy": "financial_data"
+          }' \
+          http://base-data-storage-service.base-platform.svc.cluster.local:8080/api/v1/encrypted_store > /tmp/encrypted_storage.json
+          
+        cat /tmp/encrypted_storage.json | jq -r '.final_location' > /tmp/final_location.txt
+        cat /tmp/encrypted_storage.json | jq -r '.audit_trail' > /tmp/audit_trail.json
+        echo "Encrypted storage completed"
+    outputs:
+      parameters:
+      - name: final-location
+        valueFrom:
+          path: /tmp/final_location.txt
+      - name: audit-trail
+        valueFrom:
+          path: /tmp/audit_trail.json

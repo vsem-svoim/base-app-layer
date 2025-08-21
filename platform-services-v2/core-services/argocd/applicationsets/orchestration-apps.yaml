@@ -1,0 +1,265 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: orchestration-applications
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: orchestration-applicationset
+    app.kubernetes.io/component: applicationset-controller
+spec:
+  generators:
+  - list:
+      elements:
+      - service: istio
+        namespace: istio-system
+        wave: "1"
+        description: "Istio - Service mesh for microservices"
+        chart: istiod
+        repo: https://istio-release.storage.googleapis.com/charts
+        version: "1.27.0"
+      - service: vault
+        namespace: vault
+        wave: "2"
+        description: "HashiCorp Vault - Secrets management"
+        chart: vault
+        repo: https://helm.releases.hashicorp.com
+        version: "0.30.1"
+      - service: vault-secrets-operator
+        namespace: vault-secrets-operator-system
+        wave: "2"
+        description: "Vault Secrets Operator - Kubernetes secrets sync"
+        chart: vault-secrets-operator
+        repo: https://helm.releases.hashicorp.com
+        version: "0.9.0"
+      - service: prometheus
+        namespace: monitoring
+        wave: "3"
+        description: "Prometheus - Metrics collection and alerting"
+        chart: kube-prometheus-stack
+        repo: https://prometheus-community.github.io/helm-charts
+        version: "56.21.4"
+      - service: airflow
+        namespace: airflow
+        wave: "4"
+        description: "Apache Airflow - Workflow orchestration and scheduling"
+        chart: airflow
+        repo: https://airflow.apache.org
+        version: "1.14.0"
+      - service: mlflow
+        namespace: mlflow
+        wave: "4"
+        description: "MLflow - ML lifecycle management and experiment tracking"
+        chart: mlflow
+        repo: https://charts.bitnami.com/bitnami
+        version: "0.7.19"
+      - service: kubeflow
+        namespace: kubeflow
+        wave: "5"
+        description: "Kubeflow - ML workflows on Kubernetes"
+        chart: kubeflow-pipelines
+        repo: https://kubeflow.github.io/pipelines
+        version: "2.0.5"
+      - service: grafana
+        namespace: monitoring
+        wave: "5"
+        description: "Grafana - Visualization and dashboards"
+        chart: grafana
+        repo: https://grafana.github.io/helm-charts
+        version: "7.3.7"
+        
+  template:
+    metadata:
+      name: '{{service}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/component: orchestration
+        deployment.wave: '{{wave}}'
+        target.cluster: platform
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+        
+    spec:
+      project: orchestration
+      
+      source:
+        repoURL: '{{repo}}'
+        chart: '{{chart}}'
+        targetRevision: '{{version}}'
+        helm:
+          values: |
+            global:
+              domain: '{{service}}.base-app-layer.dev'
+              
+            serviceAccount:
+              create: true
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::084129280818:iam-role/base-app-layer-dev-platform-{{service}}-irsa-role
+                
+            ingress:
+              enabled: true
+              ingressClassName: alb
+              annotations:
+                kubernetes.io/ingress.class: "alb"
+                alb.ingress.kubernetes.io/scheme: internet-facing
+                alb.ingress.kubernetes.io/target-type: ip
+                alb.ingress.kubernetes.io/load-balancer-name: base-platform-{{service}}
+                alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+                alb.ingress.kubernetes.io/ssl-redirect: "443"
+              hosts:
+                - host: '{{service}}.base-app-layer.dev'
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+                
+            persistence:
+              enabled: true
+              storageClass: gp3
+              size: 20Gi
+              
+            metrics:
+              enabled: true
+              serviceMonitor:
+                enabled: true
+                
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m
+            
+      revisionHistoryLimit: 3
+      
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
+      - group: ""
+        kind: Service
+        jsonPointers:
+        - /spec/clusterIP
+      - group: networking.k8s.io
+        kind: Ingress
+        jsonPointers:
+        - /status/loadBalancer/ingress
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: orchestration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: orchestration-project
+spec:
+  description: Orchestration Layer - ML and Workflow Management
+  
+  sourceRepos:
+  - 'https://airflow.apache.org'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://kubeflow.github.io/pipelines'
+  - 'https://prometheus-community.github.io/helm-charts'
+  - 'https://grafana.github.io/helm-charts'
+  - 'https://jupyterhub.github.io/helm-chart'
+  - '*'
+  
+  destinations:
+  - namespace: 'airflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'mlflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'kubeflow'
+    server: https://kubernetes.default.svc
+  - namespace: 'monitoring'
+    server: https://kubernetes.default.svc
+  - namespace: 'istio-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'vault'
+    server: https://kubernetes.default.svc
+  - namespace: 'vault-secrets-operator-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'kube-system'
+    server: https://kubernetes.default.svc
+    
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: '*'
+  - group: apps
+    kind: '*'
+  - group: networking.k8s.io
+    kind: '*'
+  - group: extensions
+    kind: '*'
+  - group: batch
+    kind: '*'
+  - group: autoscaling
+    kind: '*'
+  - group: policy
+    kind: '*'
+  - group: monitoring.coreos.com
+    kind: '*'
+  - group: argoproj.io
+    kind: '*'
+    
+  roles:
+  - name: admin
+    description: Admin access to orchestration services
+    policies:
+    - p, proj:orchestration:admin, applications, *, orchestration/*, allow
+    - p, proj:orchestration:admin, clusters, get, *, allow
+    - p, proj:orchestration:admin, repositories, *, *, allow
+    groups:
+    - orchestration:admin
+    
+  - name: developer
+    description: Developer access to orchestration services
+    policies:
+    - p, proj:orchestration:developer, applications, get, orchestration/*, allow
+    - p, proj:orchestration:developer, applications, sync, orchestration/*, allow
+    - p, proj:orchestration:developer, applications, action/*, orchestration/*, allow
+    - p, proj:orchestration:developer, logs, get, orchestration/*, allow
+    groups:
+    - orchestration:developer
