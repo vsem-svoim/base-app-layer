@@ -17,10 +17,10 @@ nameSuffix: ""
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: airflow
-  app.kubernetes.io/component: orchestration
-  app.kubernetes.io/part-of: base-app-layer
-  deployment.wave: "2"
+    app.kubernetes.io/name: airflow
+    app.kubernetes.io/component: orchestration
+    app.kubernetes.io/part-of: base-app-layer
+    deployment.wave: "2"
 
 images:
 - name: apache/airflow

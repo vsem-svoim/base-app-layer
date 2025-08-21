@@ -18,10 +18,10 @@ nameSuffix: ""
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: mlflow
-  app.kubernetes.io/component: ml-lifecycle
-  app.kubernetes.io/part-of: base-app-layer
-  deployment.wave: "2"
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: ml-lifecycle
+    app.kubernetes.io/part-of: base-app-layer
+    deployment.wave: "2"
 
 images:
 - name: python

@@ -18,7 +18,7 @@ nameSuffix: ""
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: seldon-core
-  app.kubernetes.io/component: ml-serving
-  app.kubernetes.io/part-of: base-app-layer
-  deployment.wave: "2"
+    app.kubernetes.io/name: seldon-core
+    app.kubernetes.io/component: ml-serving
+    app.kubernetes.io/part-of: base-app-layer
+    deployment.wave: "2"
