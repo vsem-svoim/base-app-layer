@@ -40,6 +40,8 @@ spec:
         base.io/type: agent
     spec:
       serviceAccountName: base-data-collector-sa
+      nodeSelector:
+        NodeGroup: base-data-services
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
