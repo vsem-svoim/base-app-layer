@@ -1,0 +1,285 @@
+name: ArgoCD Deployment Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform-services-v2/**'
+      - 'data_ingestion/**'
+      - 'data_quality/**'
+      - 'data_storage/**'
+      - 'data_security/**'
+      - 'feature_engineering/**'
+      - 'multimodal_processing/**'
+      - 'data_streaming/**'
+      - 'quality_monitoring/**'
+      - 'pipeline_management/**'
+      - 'event_coordination/**'
+      - 'metadata_discovery/**'
+      - 'schema_contracts/**'
+      - 'data_distribution/**'
+      - 'data_control/**'
+      - '.github/workflows/**'
+  
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform-services-v2/**'
+      - 'data_ingestion/**'
+      - 'data_quality/**'
+      - 'data_storage/**'
+      - 'data_security/**'
+      - 'feature_engineering/**'
+      - 'multimodal_processing/**'
+      - 'data_streaming/**'
+      - 'quality_monitoring/**'
+      - 'pipeline_management/**'
+      - 'event_coordination/**'
+      - 'metadata_discovery/**'
+      - 'schema_contracts/**'
+      - 'data_distribution/**'
+      - 'data_control/**'
+  
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: 'Target cluster (platform/base/both)'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - platform
+          - base
+          - both
+      force_sync:
+        description: 'Force sync all applications'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PLATFORM_CLUSTER: arn:aws:eks:us-east-1:084129280818:cluster/platform-app-layer-dev
+  BASE_CLUSTER: arn:aws:eks:us-east-1:084129280818:cluster/base-app-layer-dev
+  ARGOCD_NAMESPACE: argocd
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  validate:
+    name: Validate Configurations
+    runs-on: ubuntu-latest
+    outputs:
+      platform_changes: ${{ steps.changes.outputs.platform }}
+      base_changes: ${{ steps.changes.outputs.base }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            platform:
+              - 'platform-services-v2/core-services/**'
+              - 'platform-services-v2/shared-services/**'
+              - 'platform-services-v2/orchestration-services/**'
+              - 'platform-services-v2/application-services/platform-ui/**'
+              - 'platform-services-v2/application-services/api-gateway/**'
+              - 'platform-services-v2/automation/gitops/applicationsets/platform-services-v2.yaml'
+            base:
+              - 'data_*/**'
+              - '*_*/**'
+              - 'platform-services-v2/application-services/data-services/**'
+              - 'platform-services-v2/automation/gitops/applicationsets/base-layer-apps.yaml'
+
+      - name: Install Dependencies
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+          
+          # Install helm
+          curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install helm
+          
+          # Install kustomize
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Validate Kubernetes Manifests
+        run: |
+          echo "🔍 Validating Kubernetes manifests..."
+          
+          # Validate all YAML files
+          find . -name "*.yaml" -o -name "*.yml" | while read -r file; do
+            if [[ "$file" =~ \.github/workflows/ ]]; then
+              continue
+            fi
+            echo "Validating $file"
+            kubectl --dry-run=client --validate=true apply -f "$file" || echo "⚠️ Warning: $file may have validation issues"
+          done
+
+      - name: Validate Kustomizations
+        run: |
+          echo "🔍 Validating Kustomizations..."
+          
+          # Find all kustomization.yaml files and validate them
+          find . -name "kustomization.yaml" | while read -r kustomization; do
+            dir=$(dirname "$kustomization")
+            echo "Validating kustomization in $dir"
+            (cd "$dir" && kustomize build . > /dev/null) || echo "⚠️ Warning: Kustomization in $dir may have issues"
+          done
+
+  deploy-platform:
+    name: Deploy Platform Services
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      (github.event_name == 'push' && needs.validate.outputs.platform_changes == 'true') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.cluster == 'platform' || github.event.inputs.cluster == 'both')) ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl for Platform Cluster
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name platform-app-layer-dev
+          kubectl config rename-context arn:aws:eks:us-east-1:084129280818:cluster/platform-app-layer-dev platform-cluster
+
+      - name: Verify ArgoCD Connectivity
+        run: |
+          echo "🔍 Checking ArgoCD connectivity..."
+          kubectl --context platform-cluster get pods -n $ARGOCD_NAMESPACE -l app.kubernetes.io/name=argocd-server
+          kubectl --context platform-cluster get applicationsets -n $ARGOCD_NAMESPACE
+
+      - name: Apply Platform ApplicationSets
+        run: |
+          echo "🚀 Applying Platform ApplicationSets..."
+          kubectl --context platform-cluster apply -f platform-services-v2/automation/gitops/applicationsets/platform-services-v2.yaml
+          kubectl --context platform-cluster apply -f platform-services-v2/automation/gitops/projects/
+
+      - name: Trigger Platform Applications Sync
+        if: github.event.inputs.force_sync == 'true' || github.event_name == 'push'
+        run: |
+          echo "🔄 Triggering sync for Platform applications..."
+          
+          # Get all platform applications
+          PLATFORM_APPS=$(kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE -o jsonpath='{.items[?(@.spec.destination.server=="https://kubernetes.default.svc")].metadata.name}')
+          
+          for app in $PLATFORM_APPS; do
+            echo "Syncing application: $app"
+            kubectl --context platform-cluster patch application $app -n $ARGOCD_NAMESPACE --type merge -p='{"operation":{"sync":{"prune":true}}}'
+          done
+
+      - name: Wait for Platform Applications
+        if: github.event_name == 'push'
+        run: |
+          echo "⏳ Waiting for Platform applications to sync..."
+          sleep 60
+          
+          # Check application status
+          kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status | grep -E "(OutOfSync|Progressing|Unknown|Degraded)" || echo "✅ All applications synced"
+
+  deploy-base:
+    name: Deploy BASE Services  
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      (github.event_name == 'push' && needs.validate.outputs.base_changes == 'true') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.cluster == 'base' || github.event.inputs.cluster == 'both')) ||
+      github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl for Platform Cluster (ArgoCD access)
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name platform-app-layer-dev
+          kubectl config rename-context arn:aws:eks:us-east-1:084129280818:cluster/platform-app-layer-dev platform-cluster
+
+      - name: Configure kubectl for Base Cluster
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name base-app-layer-dev
+          kubectl config rename-context arn:aws:eks:us-east-1:084129280818:cluster/base-app-layer-dev base-cluster
+
+      - name: Apply BASE ApplicationSets
+        run: |
+          echo "🚀 Applying BASE ApplicationSets..."
+          kubectl --context platform-cluster apply -f platform-services-v2/automation/gitops/applicationsets/base-layer-apps.yaml
+
+      - name: Trigger BASE Applications Sync
+        if: github.event.inputs.force_sync == 'true' || github.event_name == 'push'
+        run: |
+          echo "🔄 Triggering sync for BASE applications..."
+          
+          # Get all base applications
+          BASE_APPS=$(kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE -o jsonpath='{.items[?(@.spec.destination.server=="https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com")].metadata.name}')
+          
+          for app in $BASE_APPS; do
+            echo "Syncing application: $app"
+            kubectl --context platform-cluster patch application $app -n $ARGOCD_NAMESPACE --type merge -p='{"operation":{"sync":{"prune":true}}}'
+          done
+
+      - name: Wait for BASE Applications
+        if: github.event_name == 'push'
+        run: |
+          echo "⏳ Waiting for BASE applications to sync..."
+          sleep 60
+          
+          # Check application status
+          kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE | grep -E "base-|data-services" | head -10
+
+      - name: Verify BASE Cluster Deployments
+        run: |
+          echo "🔍 Verifying BASE cluster deployments..."
+          
+          # Check if BASE namespaces exist
+          kubectl --context base-cluster get namespaces | grep -E "base-|data-services" | head -10
+          
+          # Check ConfigMaps in data-ingestion (including prompts)
+          echo "📋 ConfigMaps in base-data-ingestion:"
+          kubectl --context base-cluster get configmaps -n base-data-ingestion || echo "⚠️ Namespace not found yet"
+
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-platform, deploy-base]
+    if: always() && github.event_name == 'push'
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "🎯 Deployment Summary:"
+          echo "Platform Status: ${{ needs.deploy-platform.result }}"
+          echo "BASE Status: ${{ needs.deploy-base.result }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"

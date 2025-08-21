@@ -1,0 +1,117 @@
+name: Platform Health Check
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: 'Target cluster to check'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - platform
+          - base
+          - both
+
+env:
+  PLATFORM_CLUSTER: arn:aws:eks:us-east-1:084129280818:cluster/platform-app-layer-dev
+  BASE_CLUSTER: arn:aws:eks:us-east-1:084129280818:cluster/base-app-layer-dev
+  ARGOCD_NAMESPACE: argocd
+
+jobs:
+  health-check:
+    name: Platform Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name platform-app-layer-dev
+          aws eks update-kubeconfig --region us-east-1 --name base-app-layer-dev
+          kubectl config rename-context arn:aws:eks:us-east-1:084129280818:cluster/platform-app-layer-dev platform-cluster
+          kubectl config rename-context arn:aws:eks:us-east-1:084129280818:cluster/base-app-layer-dev base-cluster
+
+      - name: Check Platform Cluster Health
+        if: github.event.inputs.cluster != 'base'
+        run: |
+          echo "🏥 Checking Platform Cluster Health..."
+          echo "===========================================" 
+          
+          # Check ArgoCD health
+          echo "🔧 ArgoCD Components:"
+          kubectl --context platform-cluster get pods -n $ARGOCD_NAMESPACE -l app.kubernetes.io/part-of=argocd
+          
+          # Check ApplicationSets
+          echo -e "\n📋 ApplicationSets:"
+          kubectl --context platform-cluster get applicationsets -n $ARGOCD_NAMESPACE
+          
+          # Check Platform Applications
+          echo -e "\n🚀 Platform Applications Status:"
+          kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status | grep -E "(kubernetes.default.svc|Unknown|OutOfSync|Degraded|Progressing)" || echo "✅ All Platform apps healthy"
+          
+          # Check key Platform services
+          echo -e "\n🔍 Key Platform Services:"
+          kubectl --context platform-cluster get pods -n platform-ui -l app=platform-ui 2>/dev/null || echo "⚠️ Platform UI not found"
+          kubectl --context platform-cluster get pods -n airflow -l app=airflow 2>/dev/null || echo "⚠️ Airflow not found"
+          kubectl --context platform-cluster get pods -n monitoring -l app.kubernetes.io/name=prometheus 2>/dev/null || echo "⚠️ Prometheus not found"
+
+      - name: Check Base Cluster Health
+        if: github.event.inputs.cluster != 'platform'
+        run: |
+          echo "🏥 Checking Base Cluster Health..."
+          echo "==========================================="
+          
+          # Check Base Applications from Platform ArgoCD
+          echo "🚀 BASE Applications Status:"
+          kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status | grep -E "(9A36FAEDB0D8596EE561CFD8B59E4645|base-)" | head -10
+          
+          # Check Base cluster namespaces
+          echo -e "\n📁 BASE Namespaces:"
+          kubectl --context base-cluster get namespaces | grep -E "base-|data-services" | head -10
+          
+          # Check data-ingestion specifically (with prompts)
+          echo -e "\n📋 Data Ingestion ConfigMaps:"
+          kubectl --context base-cluster get configmaps -n base-data-ingestion 2>/dev/null | head -10 || echo "⚠️ base-data-ingestion namespace not found"
+          
+          # Check for prompt ConfigMaps
+          echo -e "\n🤖 AI Prompts Status:"
+          kubectl --context base-cluster get configmaps -n base-data-ingestion | grep prompt | wc -l | xargs -I {} echo "{} prompt ConfigMaps found" 2>/dev/null || echo "⚠️ No prompt ConfigMaps found"
+
+      - name: Generate Health Report
+        run: |
+          echo "📊 Health Check Summary"
+          echo "======================="
+          echo "Timestamp: $(date)"
+          echo "Platform Applications: $(kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE | grep kubernetes.default.svc | wc -l 2>/dev/null || echo 'N/A')"
+          echo "BASE Applications: $(kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE | grep 9A36FAEDB0D8596EE561CFD8B59E4645 | wc -l 2>/dev/null || echo 'N/A')"
+          echo "BASE Namespaces: $(kubectl --context base-cluster get namespaces | grep -E 'base-|data-services' | wc -l 2>/dev/null || echo 'N/A')"
+
+      - name: Check for Failed Applications
+        run: |
+          echo "🚨 Checking for Failed Applications..."
+          
+          # Check for failed applications
+          FAILED_APPS=$(kubectl --context platform-cluster get applications -n $ARGOCD_NAMESPACE -o jsonpath='{range .items[?(@.status.health.status=="Degraded")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || echo "")
+          
+          if [ -n "$FAILED_APPS" ]; then
+            echo "❌ Failed Applications Found:"
+            echo "$FAILED_APPS"
+            exit 1
+          else
+            echo "✅ No failed applications detected"
+          fi

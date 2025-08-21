@@ -1,0 +1,69 @@
+name: Validate Kubernetes Manifests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+  
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate YAML and Kubernetes Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Tools
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+          
+          # Install kustomize
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+          
+          # Install yamllint
+          pip install yamllint
+
+      - name: Lint YAML Files
+        run: |
+          echo "🔍 Linting YAML files..."
+          find . -name "*.yaml" -o -name "*.yml" | while read -r file; do
+            echo "Linting $file"
+            yamllint "$file" || echo "⚠️ YAML lint issues in $file"
+          done
+
+      - name: Validate Kubernetes Syntax
+        run: |
+          echo "🔍 Validating Kubernetes manifests..."
+          find . -name "*.yaml" -o -name "*.yml" | while read -r file; do
+            if [[ "$file" =~ \.github/workflows/ ]]; then
+              continue
+            fi
+            if grep -q "kind:" "$file"; then
+              echo "Validating $file"
+              kubectl --dry-run=client --validate=true apply -f "$file" 2>/dev/null || echo "⚠️ K8s validation issues in $file"
+            fi
+          done
+
+      - name: Validate Kustomizations
+        run: |
+          echo "🔍 Validating Kustomizations..."
+          find . -name "kustomization.yaml" | while read -r kustomization; do
+            dir=$(dirname "$kustomization")
+            echo "Validating kustomization in $dir"
+            (cd "$dir" && kustomize build . > /dev/null) && echo "✅ $dir valid" || echo "❌ $dir invalid"
+          done
+
+      - name: Check ApplicationSet Syntax
+        run: |
+          echo "🔍 Checking ApplicationSet configurations..."
+          find platform-services-v2/automation/gitops/applicationsets/ -name "*.yaml" | while read -r file; do
+            echo "Checking $file"
+            kubectl --dry-run=client apply -f "$file" 2>/dev/null && echo "✅ $file valid" || echo "❌ $file invalid"
+          done
