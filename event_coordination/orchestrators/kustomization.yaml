@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-event-coordination-orchestrator-saga-manager.yaml
+  - base-event-coordination-orchestrator-event-manager.yaml
+  - base-event-coordination-orchestrator-transaction-manager.yaml
+  - base-event-coordination-orchestrator-compensation-manager.yaml
+  - base-event-coordination-orchestrator-coordination-manager.yaml

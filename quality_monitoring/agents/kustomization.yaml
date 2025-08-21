@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-quality-monitoring-agent-metrics-collector.yaml
+  - base-quality-monitoring-agent-anomaly-detector.yaml
+  - base-quality-monitoring-agent-alert-manager.yaml
+  - base-quality-monitoring-agent-threshold-monitor.yaml
+  - base-quality-monitoring-agent-trend-analyzer.yaml
+  - base-quality-monitoring-agent-report-generator.yaml

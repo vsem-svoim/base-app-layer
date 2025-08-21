@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-security-agent-encryption.yaml
+  - base-data-security-agent-classification.yaml
+  - base-data-security-agent-access-control.yaml
+  - base-data-security-agent-audit.yaml
+  - base-data-security-agent-compliance.yaml
+  - base-data-security-agent-threat-detection.yaml

@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-feature-engineering-orchestrator-pipeline-manager.yaml
+  - base-feature-engineering-orchestrator-transformation-manager.yaml
+  - base-feature-engineering-orchestrator-selection-manager.yaml
+  - base-feature-engineering-orchestrator-validation-manager.yaml
+  - base-feature-engineering-orchestrator-optimization-manager.yaml

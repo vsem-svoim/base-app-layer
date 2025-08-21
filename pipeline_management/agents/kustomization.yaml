@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-pipeline-management-agent-scheduler.yaml
+  - base-pipeline-management-agent-executor.yaml
+  - base-pipeline-management-agent-monitor.yaml
+  - base-pipeline-management-agent-dependency-resolver.yaml
+  - base-pipeline-management-agent-resource-manager.yaml
+  - base-pipeline-management-agent-failure-handler.yaml

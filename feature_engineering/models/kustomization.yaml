@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-feature-engineering-model-feature-importance.yaml
+  - base-feature-engineering-model-correlation-analysis.yaml
+  - base-feature-engineering-model-dimensionality-reduction.yaml
+  - base-feature-engineering-model-encoding-optimization.yaml
+  - base-feature-engineering-model-selection-strategy.yaml
+
+# Patch all models to use correct namespace and add Fargate labeling
+patches:
+  - target:
+      kind: Model
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: base-feature-engineering
+      - op: add
+        path: /metadata/labels/fargate-enabled
+        value: "true"
+      - op: add
+        path: /spec/deployment/labels
+        value:
+          fargate-enabled: "true"

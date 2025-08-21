@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-storage-agent-lifecycle.yaml
+  - base-data-storage-agent-replication.yaml
+  - base-data-storage-agent-compression.yaml
+  - base-data-storage-agent-archival.yaml
+  - base-data-storage-agent-retrieval.yaml
+  - base-data-storage-agent-indexing.yaml

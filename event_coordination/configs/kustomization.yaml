@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-event-coordination-config-saga-definitions.yaml
+  - base-event-coordination-config-event-schemas.yaml
+  - base-event-coordination-config-coordination-policies.yaml
+  - base-event-coordination-config-compensation-strategies.yaml

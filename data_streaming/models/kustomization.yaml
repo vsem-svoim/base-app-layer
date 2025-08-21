@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-streaming-model-throughput-optimization.yaml
+  - base-data-streaming-model-latency-prediction.yaml
+  - base-data-streaming-model-backpressure-management.yaml
+  - base-data-streaming-model-anomaly-detection.yaml
+  - base-data-streaming-model-pattern-recognition.yaml
+
+# Patch all models to use correct namespace and add Fargate labeling
+patches:
+  - target:
+      kind: Model
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: base-data-streaming
+      - op: add
+        path: /metadata/labels/fargate-enabled
+        value: "true"
+      - op: add
+        path: /spec/deployment/labels
+        value:
+          fargate-enabled: "true"

@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-event-coordination-workflow-saga-orchestration.yaml
+  - base-event-coordination-workflow-event-sourcing.yaml
+  - base-event-coordination-workflow-distributed-transaction.yaml
+  - base-event-coordination-workflow-compensation-handling.yaml
+  - base-event-coordination-workflow-choreography-coordination.yaml

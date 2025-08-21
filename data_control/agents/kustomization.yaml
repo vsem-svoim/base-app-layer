@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-control-agent-governance-enforcer.yaml
+  - base-data-control-agent-policy-manager.yaml
+  - base-data-control-agent-compliance-monitor.yaml
+  - base-data-control-agent-access-controller.yaml
+  - base-data-control-agent-audit-logger.yaml
+  - base-data-control-agent-lifecycle-manager.yaml

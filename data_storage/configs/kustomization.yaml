@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-storage-config-tier-policies.yaml
+  - base-data-storage-config-retention-rules.yaml
+  - base-data-storage-config-compression-settings.yaml
+  - base-data-storage-config-backup-schedules.yaml

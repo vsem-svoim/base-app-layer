@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-quality-monitoring-workflow-continuous-monitoring.yaml
+  - base-quality-monitoring-workflow-anomaly-detection.yaml
+  - base-quality-monitoring-workflow-quality-assessment.yaml
+  - base-quality-monitoring-workflow-compliance-reporting.yaml
+  - base-quality-monitoring-workflow-alert-processing.yaml

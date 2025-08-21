@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: wave6-orchestration-management
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  generators:
+  - list:
+      elements:
+      - name: pipeline-management
+        namespace: base-pipeline-management
+        path: pipeline_management
+        description: "Workflow orchestration and dependency management"
+      - name: event-coordination  
+        namespace: base-event-coordination
+        path: event_coordination
+        description: "Event-driven architecture and saga patterns"
+      - name: metadata-discovery
+        namespace: base-metadata-discovery  
+        path: metadata_discovery
+        description: "Data cataloging and lineage tracking"
+      - name: schema-contracts
+        namespace: base-schema-contracts
+        path: schema_contracts
+        description: "Schema management and data contracts"
+  template:
+    metadata:
+      name: '{{name}}'
+      namespace: argocd
+      labels:
+        wave: "6"
+        category: "orchestration-management"
+        module: '{{name}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: base-layer-project
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        - PruneLast=true
+        - RespectIgnoreDifferences=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      revisionHistoryLimit: 3

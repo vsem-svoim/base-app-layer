@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-quality-config-validation-rules.yaml
+  - base-data-quality-config-quality-thresholds.yaml
+  - base-data-quality-config-cleansing-policies.yaml
+  - base-data-quality-config-audit-specifications.yaml

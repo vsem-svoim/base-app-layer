@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: wave7-distribution-control
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  generators:
+  - list:
+      elements:
+      - name: data-distribution
+        namespace: base-data-distribution
+        path: data_distribution
+        description: "API management and data delivery"
+      - name: data-control  
+        namespace: base-data-control
+        path: data_control
+        description: "Governance and control plane services"
+  template:
+    metadata:
+      name: '{{name}}'
+      namespace: argocd
+      labels:
+        wave: "7"
+        category: "distribution-control"
+        module: '{{name}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "7"
+    spec:
+      project: base-layer-project
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        - PruneLast=true
+        - RespectIgnoreDifferences=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      revisionHistoryLimit: 3

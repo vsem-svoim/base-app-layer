@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-multimodal-processing-agent-text-processor.yaml
+  - base-multimodal-processing-agent-image-processor.yaml
+  - base-multimodal-processing-agent-audio-processor.yaml
+  - base-multimodal-processing-agent-video-processor.yaml
+  - base-multimodal-processing-agent-document-processor.yaml
+  - base-multimodal-processing-agent-fusion-processor.yaml

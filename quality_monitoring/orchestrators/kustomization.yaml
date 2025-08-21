@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-quality-monitoring-orchestrator-monitoring-manager.yaml
+  - base-quality-monitoring-orchestrator-alert-manager.yaml
+  - base-quality-monitoring-orchestrator-dashboard-manager.yaml
+  - base-quality-monitoring-orchestrator-compliance-manager.yaml
+  - base-quality-monitoring-orchestrator-reporting-manager.yaml

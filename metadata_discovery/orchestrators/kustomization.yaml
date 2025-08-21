@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-metadata-discovery-orchestrator-catalog-manager.yaml
+  - base-metadata-discovery-orchestrator-discovery-manager.yaml
+  - base-metadata-discovery-orchestrator-lineage-manager.yaml
+  - base-metadata-discovery-orchestrator-search-manager.yaml
+  - base-metadata-discovery-orchestrator-governance-manager.yaml

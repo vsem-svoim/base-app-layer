@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-event-coordination-agent-event-router.yaml
+  - base-event-coordination-agent-event-processor.yaml
+  - base-event-coordination-agent-saga-coordinator.yaml
+  - base-event-coordination-agent-event-publisher.yaml
+  - base-event-coordination-agent-event-subscriber.yaml
+  - base-event-coordination-agent-compensator.yaml

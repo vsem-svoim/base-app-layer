@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-distribution-agent-api-gateway.yaml
+  - base-data-distribution-agent-publisher.yaml
+  - base-data-distribution-agent-subscriber.yaml
+  - base-data-distribution-agent-transformer.yaml
+  - base-data-distribution-agent-router.yaml
+  - base-data-distribution-agent-load-balancer.yaml

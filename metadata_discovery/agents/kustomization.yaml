@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-metadata-discovery-agent-cataloger.yaml
+  - base-metadata-discovery-agent-lineage-tracer.yaml
+  - base-metadata-discovery-agent-schema-detector.yaml
+  - base-metadata-discovery-agent-profiler.yaml
+  - base-metadata-discovery-agent-tagger.yaml
+  - base-metadata-discovery-agent-indexer.yaml

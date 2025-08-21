@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-distribution-workflow-api-publishing.yaml
+  - base-data-distribution-workflow-data-delivery.yaml
+  - base-data-distribution-workflow-subscription-management.yaml
+  - base-data-distribution-workflow-content-syndication.yaml
+  - base-data-distribution-workflow-analytics-reporting.yaml

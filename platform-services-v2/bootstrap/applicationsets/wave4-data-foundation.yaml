@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: wave4-data-foundation
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  generators:
+  - list:
+      elements:
+      - name: data-ingestion
+        namespace: base-data-ingestion
+        path: data_ingestion
+        description: "Multi-protocol data acquisition (100GB/hour throughput)"
+      - name: data-quality  
+        namespace: base-data-quality
+        path: data_quality
+        description: "Validation, cleaning, and quality assurance"
+      - name: data-storage
+        namespace: base-data-storage  
+        path: data_storage
+        description: "Distributed storage with lifecycle management"
+      - name: data-security
+        namespace: base-data-security
+        path: data_security
+        description: "Encryption, classification, and access control"
+  template:
+    metadata:
+      name: '{{name}}'
+      namespace: argocd
+      labels:
+        wave: "4"
+        category: "data-foundation"
+        module: '{{name}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "4"
+    spec:
+      project: base-layer-project
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        - PruneLast=true
+        - RespectIgnoreDifferences=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      revisionHistoryLimit: 3

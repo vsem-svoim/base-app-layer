@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-data-storage-orchestrator-lifecycle-manager.yaml
+  - base-data-storage-orchestrator-tiering-manager.yaml
+  - base-data-storage-orchestrator-backup-manager.yaml
+  - base-data-storage-orchestrator-replication-manager.yaml
+  - base-data-storage-orchestrator-capacity-manager.yaml
