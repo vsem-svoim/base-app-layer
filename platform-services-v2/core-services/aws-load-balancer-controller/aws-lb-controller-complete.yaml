@@ -327,59 +327,12 @@ spec:
   scheme: internet-facing
   ipAddressType: ipv4
   tags:
-    - "Environment=dev"
-    - "Project=base-app-layer" 
-    - "Component=load-balancer"
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: platform-alb-ingress
-  namespace: istio-system
-  labels:
-    app.kubernetes.io/name: platform-ingress
-    app.kubernetes.io/component: gateway
-  annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:084129280818:certificate/base-platform-cert
-    alb.ingress.kubernetes.io/ssl-redirect: '443'
-    alb.ingress.kubernetes.io/healthcheck-path: /health
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
-    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
-    alb.ingress.kubernetes.io/tags: Environment=dev,Project=base-app-layer,Component=alb-ingress
-spec:
-  rules:
-  - host: platform.base-app-layer.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: istio-ingressgateway
-            port:
-              number: 80
-  - host: api.base-app-layer.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: istio-ingressgateway
-            port:
-              number: 80
-  - host: data.base-app-layer.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: istio-ingressgateway
-            port:
-              number: 80
+    - key: Environment
+      value: dev
+    - key: Project
+      value: base-app-layer
+    - key: Component
+      value: load-balancer
+# ---
+# Platform ALB Ingress will be deployed with Istio in later waves
+# Dependencies: istio-system namespace and istio-ingressgateway service
