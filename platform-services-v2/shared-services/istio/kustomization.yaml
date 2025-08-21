@@ -12,7 +12,9 @@ resources:
 
 namespace: istio-system
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: istio
   app.kubernetes.io/component: service-mesh
   app.kubernetes.io/part-of: base-platform

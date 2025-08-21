@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-data-control
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: data-control
-  deployment.wave: "4"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-data_control
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: data_control
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "4"
   module.description: "Data control and governance module"

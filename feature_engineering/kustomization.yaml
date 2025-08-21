@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-feature-engineering
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: feature-engineering
-  deployment.wave: "6"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-feature_engineering
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: feature_engineering
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "6"
   module.description: "ML feature extraction and transformation module"

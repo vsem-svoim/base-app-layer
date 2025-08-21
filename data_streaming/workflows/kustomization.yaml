@@ -1,9 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-data-streaming-workflow-realtime-processing.yaml
-  - base-data-streaming-workflow-batch-streaming.yaml
-  - base-data-streaming-workflow-event-processing.yaml
-  - base-data-streaming-workflow-stream-analytics.yaml
-  - base-data-streaming-workflow-windowed-aggregation.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

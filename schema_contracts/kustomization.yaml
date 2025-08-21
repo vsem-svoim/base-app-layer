@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-schema-contracts
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: schema-contracts
-  deployment.wave: "7"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-schema_contracts
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: schema_contracts
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "7"
   module.description: "Schema management and data contracts module"

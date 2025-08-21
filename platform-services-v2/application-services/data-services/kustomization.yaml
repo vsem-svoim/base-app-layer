@@ -11,7 +11,9 @@ resources:
 
 namespace: data-services
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: data-services
   app.kubernetes.io/component: data-gateway
   app.kubernetes.io/part-of: base-platform

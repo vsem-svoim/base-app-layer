@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: istio-service-mesh
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+
+resources:
+- istio-installation.yaml
+- observability.yaml
+
+namespace: istio-system
+
+commonLabels:
+  app.kubernetes.io/name: istio
+  app.kubernetes.io/component: service-mesh
+  app.kubernetes.io/part-of: base-platform
+  deployment.wave: "1"
+
+patches:
+- target:
+    kind: IstioOperator
+    name: control-plane
+  patch: |-
+    - op: replace
+      path: /spec/components/pilot/k8s/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_system

@@ -18,7 +18,9 @@ resources:
   - configs/
   - prompts/
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: base-data-ingestion
   app.kubernetes.io/component: data-platform
   app.kubernetes.io/part-of: base-layer

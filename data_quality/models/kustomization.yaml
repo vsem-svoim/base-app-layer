@@ -1,25 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-data-quality-model-outlier-detection.yaml
-  - base-data-quality-model-pattern-recognition.yaml
-  - base-data-quality-model-anomaly-detection.yaml
-  - base-data-quality-model-data-profiling.yaml
-  - base-data-quality-model-quality-scoring.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
 
-# Patch all models to use correct namespace and add Fargate labeling
-patches:
-  - target:
-      kind: Model
-    patch: |-
-      - op: replace
-        path: /metadata/namespace
-        value: base-data-quality
-      - op: add
-        path: /metadata/labels/fargate-enabled
-        value: "true"
-      - op: add
-        path: /spec/deployment/labels
-        value:
-          fargate-enabled: "true"
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

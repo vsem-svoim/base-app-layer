@@ -1,25 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-metadata-discovery-model-schema-inference.yaml
-  - base-metadata-discovery-model-semantic-tagging.yaml
-  - base-metadata-discovery-model-lineage-detection.yaml
-  - base-metadata-discovery-model-relationship-mapping.yaml
-  - base-metadata-discovery-model-similarity-analysis.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
 
-# Patch all models to use correct namespace and add Fargate labeling
-patches:
-  - target:
-      kind: Model
-    patch: |-
-      - op: replace
-        path: /metadata/namespace
-        value: base-metadata-discovery
-      - op: add
-        path: /metadata/labels/fargate-enabled
-        value: "true"
-      - op: add
-        path: /spec/deployment/labels
-        value:
-          fargate-enabled: "true"
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

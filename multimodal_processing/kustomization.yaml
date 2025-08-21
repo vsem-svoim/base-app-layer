@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-multimodal-processing
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: multimodal-processing
-  deployment.wave: "6"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-multimodal_processing
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: multimodal_processing
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "6"
   module.description: "Text, image, geospatial, and time-series processing module"

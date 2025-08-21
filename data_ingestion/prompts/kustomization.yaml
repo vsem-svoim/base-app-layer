@@ -16,7 +16,9 @@ resources:
   - base-data-ingestion-prompt-retry-configmap.yaml
   - base-data-ingestion-prompt-scheduler-configmap.yaml
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: base-data-ingestion
   app.kubernetes.io/component: prompts
   app.kubernetes.io/part-of: base-layer

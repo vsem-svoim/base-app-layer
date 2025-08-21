@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-pipeline-management
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: pipeline-management
-  deployment.wave: "5"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-pipeline_management
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: pipeline_management
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "5"
   module.description: "Workflow orchestration and pipeline management module"

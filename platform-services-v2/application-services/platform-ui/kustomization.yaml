@@ -11,7 +11,9 @@ namespace: platform-ui
 resources:
 - manifests/platform-ui-proxy.yaml
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: platform-ui
   app.kubernetes.io/component: dashboard
   app.kubernetes.io/part-of: base-platform

@@ -14,7 +14,9 @@ resources:
 namePrefix: ""
 nameSuffix: ""
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: airflow
   app.kubernetes.io/component: orchestration
   app.kubernetes.io/part-of: base-app-layer

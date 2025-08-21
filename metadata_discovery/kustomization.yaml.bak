@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-metadata-discovery
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+
+namespace: base-metadata-discovery
+
+resources:
+  - agents/
+  - models/
+  - orchestrators/
+  - workflows/
+  - configs/
+
+commonLabels:
+  app.kubernetes.io/name: base-metadata-discovery
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: metadata-discovery
+  deployment.wave: "6"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "6"
+  module.description: "Data cataloging and lineage tracking module"

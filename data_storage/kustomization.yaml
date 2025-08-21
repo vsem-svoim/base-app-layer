@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-data-storage
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: data-storage
-  deployment.wave: "4"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-data_storage
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: data_storage
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "4"
   module.description: "Data storage, lifecycle management, and archival module"

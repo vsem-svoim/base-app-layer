@@ -16,7 +16,9 @@ resources:
 namePrefix: ""
 nameSuffix: ""
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: apache-superset
   app.kubernetes.io/component: bi-analytics
   app.kubernetes.io/part-of: base-app-layer

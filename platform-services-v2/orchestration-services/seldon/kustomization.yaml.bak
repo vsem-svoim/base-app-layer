@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: seldon-core
+  namespace: seldon-system
+
+resources:
+- namespace.yaml
+- seldon-rbac.yaml
+- seldon-deployment.yaml
+- seldon-service.yaml
+- seldon-ingress.yaml
+
+namePrefix: ""
+nameSuffix: ""
+
+commonLabels:
+  app.kubernetes.io/name: seldon-core
+  app.kubernetes.io/component: ml-serving
+  app.kubernetes.io/part-of: base-app-layer
+  deployment.wave: "2"

@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-metadata-discovery
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: metadata-discovery
-  deployment.wave: "6"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-metadata_discovery
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: metadata_discovery
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "6"
   module.description: "Data cataloging and lineage tracking module"

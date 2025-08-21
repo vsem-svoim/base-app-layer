@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-data-security
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: data-security
-  deployment.wave: "4"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-data_security
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: data_security
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "4"
   module.description: "Data security, encryption, and access control module"

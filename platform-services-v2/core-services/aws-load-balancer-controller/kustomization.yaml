@@ -9,7 +9,9 @@ metadata:
 resources:
 - aws-lb-controller-complete.yaml
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: aws-load-balancer-controller
   app.kubernetes.io/component: controller
   app.kubernetes.io/part-of: base-platform

@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-quality-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+
+namespace: base-quality-monitoring
+
+resources:
+  - agents/
+  - models/
+  - orchestrators/
+  - workflows/
+  - configs/
+
+commonLabels:
+  app.kubernetes.io/name: base-quality-monitoring
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: quality-monitoring
+  deployment.wave: "6"
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "6"
+  module.description: "Continuous monitoring and anomaly detection module"

@@ -12,7 +12,9 @@ resources:
 
 namespace: platform-monitoring
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: monitoring
   app.kubernetes.io/component: observability
   app.kubernetes.io/part-of: base-platform

@@ -16,7 +16,9 @@ resources:
 
 namespace: kubeflow
 
-commonLabels:
+labels:
+- includeSelectors: true
+  pairs:
   app.kubernetes.io/name: kubeflow-pipelines
   app.kubernetes.io/component: ml-workflows
   app.kubernetes.io/part-of: base-platform

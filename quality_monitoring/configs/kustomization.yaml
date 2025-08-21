@@ -1,8 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-quality-monitoring-config-monitoring-rules.yaml
-  - base-quality-monitoring-config-alert-thresholds.yaml
-  - base-quality-monitoring-config-dashboard-templates.yaml
-  - base-quality-monitoring-config-reporting-schedules.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

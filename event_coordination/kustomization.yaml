@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-event-coordination
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: event-coordination
-  deployment.wave: "5"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-event_coordination
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: event_coordination
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "5"
   module.description: "Event-driven architecture and saga coordination module"

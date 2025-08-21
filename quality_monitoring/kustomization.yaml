@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-quality-monitoring
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: quality-monitoring
-  deployment.wave: "6"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-quality_monitoring
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: quality_monitoring
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "6"
   module.description: "Continuous monitoring and anomaly detection module"

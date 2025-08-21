@@ -15,13 +15,14 @@ resources:
   - workflows/
   - configs/
 
-commonLabels:
-  app.kubernetes.io/name: base-data-distribution
-  app.kubernetes.io/component: data-platform
-  app.kubernetes.io/part-of: base-layer
-  module.type: data-distribution
-  deployment.wave: "7"
-
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: base-data_distribution
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: data_distribution
+    deployment.wave: "7"
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "7"
   module.description: "Data distribution and API management module"

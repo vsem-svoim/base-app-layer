@@ -1,9 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-data-quality-workflow-validation-pipeline.yaml
-  - base-data-quality-workflow-cleansing-pipeline.yaml
-  - base-data-quality-workflow-profiling-analysis.yaml
-  - base-data-quality-workflow-audit-compliance.yaml
-  - base-data-quality-workflow-quality-assessment.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

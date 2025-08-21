@@ -1,9 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-metadata-discovery-workflow-catalog-discovery.yaml
-  - base-metadata-discovery-workflow-lineage-analysis.yaml
-  - base-metadata-discovery-workflow-schema-evolution.yaml
-  - base-metadata-discovery-workflow-metadata-synchronization.yaml
-  - base-metadata-discovery-workflow-data-profiling.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

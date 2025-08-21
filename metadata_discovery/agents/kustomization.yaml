@@ -1,10 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-metadata-discovery-agent-cataloger.yaml
-  - base-metadata-discovery-agent-lineage-tracer.yaml
-  - base-metadata-discovery-agent-schema-detector.yaml
-  - base-metadata-discovery-agent-profiler.yaml
-  - base-metadata-discovery-agent-tagger.yaml
-  - base-metadata-discovery-agent-indexer.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform

@@ -1,9 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - base-data-storage-workflow-lifecycle-automation.yaml
-  - base-data-storage-workflow-tiered-storage.yaml
-  - base-data-storage-workflow-backup-recovery.yaml
-  - base-data-storage-workflow-data-archival.yaml
-  - base-data-storage-workflow-capacity-scaling.yaml
+# Placeholder kustomization - actual resources will be added when manifests are implemented
+resources: []
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: base-platform
