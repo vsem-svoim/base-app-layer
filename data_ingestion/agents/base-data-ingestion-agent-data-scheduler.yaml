@@ -69,6 +69,8 @@ spec:
         base.io/type: agent
     spec:
       serviceAccountName: base-data-scheduler-sa
+      nodeSelector:
+        NodeGroup: base-data-services
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -106,6 +108,8 @@ spec:
           value: "true"
         - name: ENABLE_EVENT_DRIVEN
           value: "true"
+        - name: TZ
+          value: "UTC"
         resources:
           requests:
             cpu: "500m"
@@ -149,9 +153,6 @@ spec:
         - name: schedules-volume
           mountPath: /app/schedules
           readOnly: true
-        - name: timezone-config
-          mountPath: /etc/localtime
-          readOnly: true
       volumes:
       - name: config-volume
         configMap:
@@ -159,9 +160,6 @@ spec:
       - name: schedules-volume
         configMap:
           name: base-data-scheduler-schedules
-      - name: timezone-config
-        hostPath:
-          path: /usr/share/zoneinfo/UTC
 ---
 apiVersion: v1
 kind: Service
