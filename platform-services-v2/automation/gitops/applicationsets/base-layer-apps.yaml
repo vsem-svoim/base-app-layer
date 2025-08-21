@@ -11,6 +11,14 @@ spec:
   generators:
   - list:
       elements:
+      # Wave 3: Base Application Services
+      - module: data-services
+        name: data-services
+        namespace: data-services
+        wave: "3"
+        cluster: base
+        description: "Data Services - BASE module integration gateway"
+        
       # Wave 4: Data Foundation Modules
       - module: data_ingestion
         name: data-ingestion

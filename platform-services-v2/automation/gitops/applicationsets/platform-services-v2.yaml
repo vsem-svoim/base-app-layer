@@ -127,13 +127,6 @@ spec:
         description: "API Gateway - External access management"
         path: platform-services-v2/application-services/api-gateway
         
-      - service: data-services
-        namespace: data-services
-        wave: "3"
-        category: application
-        description: "Data Services - BASE module integration gateway"
-        path: platform-services-v2/application-services/data-services
-        
   template:
     metadata:
       name: '{{service}}'
