@@ -327,9 +327,9 @@ spec:
   scheme: internet-facing
   ipAddressType: ipv4
   tags:
-    Environment: dev
-    Project: base-app-layer
-    Component: load-balancer
+    - "Environment=dev"
+    - "Project=base-app-layer" 
+    - "Component=load-balancer"
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
