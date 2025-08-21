@@ -1,0 +1,102 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: wave0-core-services
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: wave0-core-services
+    app.kubernetes.io/component: applicationset-controller
+spec:
+  generators:
+  - list:
+      elements:
+      # Wave 0: Core Infrastructure Services
+      - service: argocd-core
+        namespace: argocd
+        wave: "0"
+        category: core
+        description: "ArgoCD - GitOps continuous deployment"
+        path: platform-services-v2/core-services/argocd
+        
+      - service: vault-core
+        namespace: vault
+        wave: "0"
+        category: core
+        description: "HashiCorp Vault - Secrets management"
+        path: platform-services-v2/core-services/vault
+        
+      - service: cert-manager
+        namespace: cert-manager
+        wave: "0"
+        category: core
+        description: "Cert-Manager - TLS certificate management"
+        path: platform-services-v2/core-services/cert-manager
+        
+      - service: aws-load-balancer-controller
+        namespace: kube-system
+        wave: "0"
+        category: core
+        description: "AWS Load Balancer Controller"
+        path: platform-services-v2/core-services/aws-load-balancer-controller
+        
+  template:
+    metadata:
+      name: '{{service}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/component: '{{category}}'
+        deployment.wave: '{{wave}}'
+        target.cluster: platform
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{wave}}'
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+        
+    spec:
+      project: default
+      
+      source:
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        path: '{{path}}'
+        targetRevision: main
+        
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+        
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m
+            
+      revisionHistoryLimit: 3
+      
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
+      - group: ""
+        kind: Service
+        jsonPointers:
+        - /spec/clusterIP
+      - group: networking.k8s.io
+        kind: Ingress
+        jsonPointers:
+        - /status/loadBalancer/ingress
