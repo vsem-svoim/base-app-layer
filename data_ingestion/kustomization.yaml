@@ -9,6 +9,7 @@ metadata:
 namespace: base-data-ingestion
 
 resources:
+  - namespace.yaml
   - base-crds.yaml
   - agents/
   - models/
