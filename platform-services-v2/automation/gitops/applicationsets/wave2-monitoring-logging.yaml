@@ -39,16 +39,22 @@ spec:
   template:
     metadata:
       name: '{{name}}'
+      labels:
+        app.kubernetes.io/name: '{{name}}'
+        app.kubernetes.io/component: orchestration
+        deployment.wave: "2"
+        target.cluster: platform
       annotations:
         argocd.argoproj.io/sync-wave: "2"
         argocd.argoproj.io/sync-options: CreateNamespace=true
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
       finalizers:
       - resources-finalizer.argocd.argoproj.io
       
     spec:
       project: default
       source:
-        repoURL: https://github.com/your-org/base-app-layer.git
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
         path: '{{path}}'
         targetRevision: main
         
@@ -60,13 +66,17 @@ spec:
         automated:
           prune: true
           selfHeal: true
+          allowEmpty: false
         syncOptions:
-        - CreateNamespace=true
-        - PrunePropagationPolicy=foreground
-        - PruneLast=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+          - Replace=true
         retry:
-          limit: 5
+          limit: 2
           backoff:
             duration: 5s
             factor: 2
-            maxDuration: 3m
+            maxDuration: 30s

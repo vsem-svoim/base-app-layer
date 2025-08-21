@@ -2,50 +2,31 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: wave0-core-services
+  name: wave3-application-services
   namespace: argocd
   labels:
-    app.kubernetes.io/name: wave0-core-services
+    app.kubernetes.io/name: wave3-application-services
     app.kubernetes.io/component: applicationset-controller
 spec:
   generators:
   - list:
       elements:
-      # Wave 0: Core Infrastructure Services
-      - service: argocd-core
-        namespace: argocd
-        wave: "0"
-        category: core
-        description: "ArgoCD - GitOps continuous deployment"
-        path: platform-services-v2/core-services/argocd
+      # Wave 3: Application Services
+      - service: api-gateway
+        namespace: api-gateway
+        wave: "3"
+        category: application
+        description: "API Gateway - External access management and routing"
+        path: platform-services-v2/application-services/api-gateway
+        server: https://kubernetes.default.svc
         
-      - service: vault-core
-        namespace: vault
-        wave: "0"
-        category: core
-        description: "HashiCorp Vault - Secrets management"
-        path: platform-services-v2/core-services/vault
-        
-      - service: cert-manager
-        namespace: cert-manager
-        wave: "0"
-        category: core
-        description: "Cert-Manager - TLS certificate management"
-        path: platform-services-v2/core-services/cert-manager
-        
-      - service: aws-load-balancer-controller
-        namespace: kube-system
-        wave: "0"
-        category: core
-        description: "AWS Load Balancer Controller"
-        path: platform-services-v2/core-services/aws-load-balancer-controller
-        
-      - service: platform-ui
-        namespace: platform-ui
-        wave: "0"
-        category: core
-        description: "Platform UI - Unified dashboard for monitoring"
-        path: platform-services-v2/application-services/platform-ui
+      - service: data-services
+        namespace: data-services
+        wave: "3"
+        category: application
+        description: "Data Services Gateway - BASE module integration layer"
+        path: platform-services-v2/application-services/data-services
+        server: https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com
         
   template:
     metadata:
@@ -55,7 +36,7 @@ spec:
         app.kubernetes.io/name: '{{service}}'
         app.kubernetes.io/component: '{{category}}'
         deployment.wave: '{{wave}}'
-        target.cluster: platform
+        target.cluster: '{{service}}'
       annotations:
         argocd.argoproj.io/sync-wave: '{{wave}}'
         argocd.argoproj.io/compare-options: ServerSideDiff=true
@@ -71,7 +52,7 @@ spec:
         targetRevision: main
         
       destination:
-        server: https://kubernetes.default.svc
+        server: '{{server}}'
         namespace: '{{namespace}}'
         
       syncPolicy:
