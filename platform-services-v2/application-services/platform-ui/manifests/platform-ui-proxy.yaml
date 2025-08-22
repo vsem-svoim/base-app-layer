@@ -35,7 +35,7 @@ data:
         }
         
         # Wave 0 Core Services (deploy first)
-        # ArgoCD main interface
+        # ArgoCD main interface and assets
         location /argocd/ {
             set $argocd_upstream argocd-server.argocd.svc.cluster.local:443;
             proxy_pass https://$argocd_upstream/argocd/;
@@ -54,6 +54,22 @@ data:
             proxy_redirect https://argocd-server.argocd.svc.cluster.local/argocd/ /argocd/;
         }
         
+        # ArgoCD static assets (JavaScript, CSS, etc.)
+        location ~* ^/(assets|extensions\.js|main\..+\.js|favicon\.ico)/? {
+            set $argocd_upstream argocd-server.argocd.svc.cluster.local:443;
+            proxy_pass https://$argocd_upstream/argocd/$1;
+            proxy_ssl_verify off;
+            proxy_ssl_server_name on;
+            proxy_ssl_name argocd-server.argocd.svc.cluster.local;
+            proxy_set_header Host argocd-server.argocd.svc.cluster.local;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding gzip;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
         location /vault/ {
             set $vault_upstream vault.vault.svc.cluster.local:8200;
             proxy_pass http://$vault_upstream/ui/;
@@ -62,6 +78,18 @@ data:
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_redirect http://vault.vault.svc.cluster.local:8200/ /vault/;
+        }
+        
+        # Vault static assets (JavaScript, CSS, etc.)
+        location ~* ^/(chunk\..+\.js|vendor-.+\.(js|css)|vault-.+\.(js|css)|sw-registration-.+\.js)/? {
+            set $vault_upstream vault.vault.svc.cluster.local:8200;
+            proxy_pass http://$vault_upstream/ui/$1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
         }
         
         # Wave 2+ Services - DISABLED until deployed
@@ -146,8 +174,8 @@ data:
         # }
         
         
-        # Static files should return 404 if not found
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        # Dashboard static files only (not service assets)
+        location ~* ^/dashboard\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
             root /usr/share/nginx/html;
             expires 1y;
             add_header Cache-Control "public, immutable";
