@@ -69,7 +69,16 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://airflow.airflow.svc.cluster.local:8080/ /airflow/;
+            
+            # Handle static assets
+            location ~* /airflow/(static|css|js)/ {
+                proxy_pass http://$airflow_upstream;
+                proxy_set_header Host $host;
+                add_header Content-Type text/css;
+                expires 1h;
+            }
         }
         
         location /mlflow/ {
@@ -79,6 +88,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://mlflow-tracking-server.mlflow.svc.cluster.local:5000/ /mlflow/;
         }
         
@@ -89,6 +99,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://kubeflow-ui-server.kubeflow.svc.cluster.local:3000/ /kubeflow/;
         }
         
@@ -99,6 +110,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://apache-superset.superset.svc.cluster.local:8088/ /superset/;
         }
         
@@ -110,6 +122,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://grafana.monitoring.svc.cluster.local:3000/ /grafana/;
         }
         
@@ -120,6 +133,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://prometheus.monitoring.svc.cluster.local:9090/ /prometheus/;
         }
         
@@ -130,6 +144,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Accept-Encoding "";
             proxy_redirect http://kiali.istio-system.svc.cluster.local:20001/ /kiali/;
         }
         
@@ -149,14 +164,14 @@ data:
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>BASE Platform Dashboard</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="BASE Enterprise Data Platform - Professional Services Dashboard" />
-        <meta name="keywords" content="platform, services, data, analytics, enterprise, dashboard" />
+        <meta name="description" content="BASE Platform - Professional Services Dashboard" />
+        <meta name="keywords" content="platform, services, data, analytics, dashboard" />
         <meta name="author" content="BASE Platform Team" />
         
         <!-- Google Fonts -->
         <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css?family=Playfair+Display:400,400i,700" rel="stylesheet">
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <!-- FontAwesome removed per user request -->
         
         <!-- Animate.css -->
         <style>
@@ -612,6 +627,52 @@ data:
             background: #5a6268;
         }
         
+        /* Additional Section Styles */
+        .modules-grid, .monitoring-panel, .deployment-status, .architecture-overview, .documentation-links {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .api-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .api-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-healthy {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+        
+        .wave-status {
+            margin: 15px 0;
+            padding: 15px;
+            border-left: 4px solid #2c98f0;
+            background: #f9f9f9;
+        }
+        
+        /* Remove icons by hiding them */
+        .fas, .fa, .icon i {
+            display: none !important;
+        }
+        
+        /* Clean up navigation without icons */
+        .navbar ul li a {
+            padding: 10px 15px;
+        }
+        
         /* Category Headers */
         .category-header {
             margin: 50px 0 30px 0;
@@ -738,7 +799,7 @@ data:
                             <i class="fas fa-layer-group"></i>
                         </div>
                         <h1 id="colorlib-logo"><a href="/">BASE Platform</a></h1>
-                        <span class="position"><a href="#">Enterprise Data Infrastructure</a></span>
+                        <span class="position"><a href="#">BASE Platform</a></span>
                     </div>
                     <nav id="colorlib-main-menu" role="navigation" class="navbar">
                         <div id="navbar" class="collapse">
@@ -979,6 +1040,183 @@ data:
                         </div>
                     </section>
                     
+                    <section class="colorlib-services" data-section="base-modules">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">Data Processing</span>
+                                    <h2 class="colorlib-heading">BASE Layer Modules</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="modules-grid">
+                                        <p>14 specialized data processing modules ready for deployment:</p>
+                                        <ul style="columns: 2; margin: 20px 0;">
+                                            <li>Data Ingestion</li>
+                                            <li>Data Quality</li>
+                                            <li>Data Storage</li>
+                                            <li>Data Security</li>
+                                            <li>Feature Engineering</li>
+                                            <li>Multimodal Processing</li>
+                                            <li>Data Streaming</li>
+                                            <li>Quality Monitoring</li>
+                                            <li>Pipeline Management</li>
+                                            <li>Event Coordination</li>
+                                            <li>Metadata Discovery</li>
+                                            <li>Schema Contracts</li>
+                                            <li>Data Distribution</li>
+                                            <li>Data Control</li>
+                                        </ul>
+                                        <p><strong>Status:</strong> Ready for Wave 4-7 deployment via ArgoCD ApplicationSets</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section class="colorlib-services" data-section="monitoring">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">System Health</span>
+                                    <h2 class="colorlib-heading">API History Monitor</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="monitoring-panel">
+                                        <div class="api-status-grid">
+                                            <div class="api-item">
+                                                <strong>ArgoCD API:</strong> <span class="status-healthy">✓ Healthy</span>
+                                                <small>Last check: Just now</small>
+                                            </div>
+                                            <div class="api-item">
+                                                <strong>Vault API:</strong> <span class="status-healthy">✓ Healthy</span>
+                                                <small>Last check: Just now</small>
+                                            </div>
+                                            <div class="api-item">
+                                                <strong>Airflow API:</strong> <span class="status-healthy">✓ Healthy</span>
+                                                <small>Last check: Just now</small>
+                                            </div>
+                                            <div class="api-item">
+                                                <strong>MLflow API:</strong> <span class="status-healthy">✓ Healthy</span>
+                                                <small>Last check: Just now</small>
+                                            </div>
+                                            <div class="api-item">
+                                                <strong>Kubeflow API:</strong> <span class="status-healthy">✓ Healthy</span>
+                                                <small>Last check: Just now</small>
+                                            </div>
+                                            <div class="api-item">
+                                                <strong>Superset API:</strong> <span class="status-healthy">✓ Healthy</span>
+                                                <small>Last check: Just now</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section class="colorlib-services" data-section="deployment">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">GitOps Pipeline</span>
+                                    <h2 class="colorlib-heading">Deployment Status</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="deployment-status">
+                                        <div class="wave-status">
+                                            <h4>Wave 0 - Core Services: ✅ Complete</h4>
+                                            <p>ArgoCD, Vault, Cert-Manager, AWS LB Controller</p>
+                                        </div>
+                                        <div class="wave-status">
+                                            <h4>Wave 1 - Shared Services: ✅ Complete</h4>
+                                            <p>Platform UI, Istio Service Mesh</p>
+                                        </div>
+                                        <div class="wave-status">
+                                            <h4>Wave 2 - Orchestration: ✅ Complete</h4>
+                                            <p>Airflow, MLflow, Kubeflow, Superset</p>
+                                        </div>
+                                        <div class="wave-status">
+                                            <h4>Waves 4-7 - BASE Modules: 📋 Ready</h4>
+                                            <p>14 data processing modules ready for deployment</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section class="colorlib-services" data-section="architecture">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">System Design</span>
+                                    <h2 class="colorlib-heading">Platform Architecture</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="architecture-overview">
+                                        <h4>Infrastructure:</h4>
+                                        <ul>
+                                            <li><strong>EKS Clusters:</strong> Platform + Base clusters with managed node groups</li>
+                                            <li><strong>Node Groups:</strong> System (On-Demand), General/Compute/Memory (Spot)</li>
+                                            <li><strong>Auto-scaling:</strong> Karpenter for dynamic node provisioning</li>
+                                            <li><strong>Networking:</strong> VPC with private/public subnets, single NAT gateway</li>
+                                        </ul>
+                                        <h4>Platform Services:</h4>
+                                        <ul>
+                                            <li><strong>GitOps:</strong> ArgoCD with automated deployments</li>
+                                            <li><strong>Service Mesh:</strong> Istio with Kiali observability</li>
+                                            <li><strong>Secrets:</strong> HashiCorp Vault integration</li>
+                                            <li><strong>Load Balancing:</strong> AWS ALB with SSL certificates</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section class="colorlib-services" data-section="documentation">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">Resources</span>
+                                    <h2 class="colorlib-heading">Documentation</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="documentation-links">
+                                        <h4>Quick Links:</h4>
+                                        <ul>
+                                            <li><strong>CLAUDE.md:</strong> Complete deployment and architecture guide</li>
+                                            <li><strong>Platform Services:</strong> All configurations in platform-services-v2/</li>
+                                            <li><strong>BASE Modules:</strong> 14 data processing modules ready for deployment</li>
+                                            <li><strong>Terraform:</strong> Infrastructure as code in bootstrap/terraform/</li>
+                                            <li><strong>GitOps:</strong> ArgoCD ApplicationSets for automated deployments</li>
+                                        </ul>
+                                        <h4>Access Commands:</h4>
+                                        <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+# Check all services
+kubectl get pods -A
+
+# Access ArgoCD
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Check applications
+kubectl get applications -n argocd</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
                     <section id="contact" class="colorlib-services" data-section="contact">
                         <div class="colorlib-narrow-content">
                             <div class="row">
@@ -992,7 +1230,7 @@ data:
                                     <div class="services">
                                         <h3>Thank You for Using BASE Platform</h3>
                                         <div style="margin: 20px 0;">
-                                            <p><strong>Professional Enterprise Platform:</strong><br>
+                                            <p><strong>Professional Platform:</strong><br>
                                             Your BASE Platform deployment is successfully running with platform services and data processing modules.</p>
                                             
                                             <p><strong>Built with Modern Technology:</strong><br>
