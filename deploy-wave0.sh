@@ -391,7 +391,7 @@ EOF
     
     wait_for_pods "vault" 120
     
-    # Deploy ServiceAccount and RBAC first, then Jobs
+    # Deploy ServiceAccount and RBAC for later Job use
     log_info "Creating ServiceAccount and RBAC for Vault automation..."
     cat <<'EOF' | kubectl apply -f -
 apiVersion: v1
@@ -425,17 +425,34 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 EOF
 
-    # Wait a moment for RBAC to propagate
+    # Wait for RBAC to propagate
     sleep 5
+    
+    # Wait for Vault service to be responding before creating Jobs
+    log_info "Waiting for Vault service to be ready before creating automation Jobs..."
+    VAULT_SERVICE_URL="http://vault.vault.svc.cluster.local:8200"
+    
+    for i in $(seq 1 30); do
+        if curl -sf "$VAULT_SERVICE_URL/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" >/dev/null 2>&1; then
+            log_info "✅ Vault service is responding, proceeding with automation Jobs"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            log_error "❌ Vault service not responding after 30 attempts"
+            return 1
+        fi
+        log_info "⏳ Waiting for Vault service... (attempt $i/30)"
+        sleep 10
+    done
     
     # Clean up any existing Jobs first (Jobs are immutable)
     log_info "Cleaning up any existing Vault Jobs..."
     kubectl delete job vault-init vault-unseal -n vault --ignore-not-found=true
     
-    # Wait a moment for cleanup
+    # Wait for cleanup
     sleep 2
     
-    # Now deploy the Jobs
+    # Now deploy the Jobs (Vault service is confirmed working)
     log_info "Deploying Vault automation Jobs..."
     cat <<'EOF' | kubectl apply -f -
 apiVersion: batch/v1
