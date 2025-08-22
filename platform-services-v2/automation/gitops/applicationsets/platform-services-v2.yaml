@@ -147,7 +147,7 @@ spec:
       project: platform-v2
       
       source:
-        repoURL: https://github.com/your-org/base-app-layer
+        repoURL: https://github.com/vsem-svoim/base-app-layer.git
         path: '{{path}}'
         targetRevision: HEAD
         
@@ -201,7 +201,7 @@ spec:
   description: BASE Platform V2 - Complete Enterprise Data Platform
   
   sourceRepos:
-  - 'https://github.com/your-org/base-app-layer'
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
   - 'https://charts.bitnami.com/bitnami'
   - 'https://prometheus-community.github.io/helm-charts'
   - 'https://grafana.github.io/helm-charts'
