@@ -8,6 +8,8 @@ metadata:
 resources:
   - namespace.yaml
   - kubeflow-rbac.yaml
+  - kubeflow-mysql-secret.yaml
+  - kubeflow-minio-secret.yaml
   - kubeflow-mysql.yaml
   - kubeflow-pipelines-deployment.yaml
   - kubeflow-ui-deployment.yaml
