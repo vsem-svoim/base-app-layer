@@ -1052,12 +1052,6 @@ data:
             .services { min-height: 260px; padding: 30px 20px; }
             .colorlib-heading { font-size: 36px; }
         }
-        </style>
-    </head>
-    <body>
-        <div id="colorlib-page">
-            <div class="container-wrap">
-                <a href="#" class="js-colorlib-nav-toggle colorlib-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
                 <aside id="colorlib-aside" role="complementary" class="js-fullheight">
                     <div class="text-center">
                         <div class="author-img"></div>
