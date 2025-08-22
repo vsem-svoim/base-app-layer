@@ -333,12 +333,14 @@ data:
         }
         
         .colorlib-heading {
-            font-size: 50px;
-            color: #333;
-            font-weight: 300;
-            line-height: 1.5;
-            font-family: "Playfair Display", serif;
-            margin-bottom: 30px;
+            font-size: 60px;
+            color: #111827;
+            font-weight: 700;
+            line-height: 1.2;
+            font-family: "Quicksand", sans-serif;
+            margin-bottom: 50px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
         
         .colorlib-services { padding: 7em 0; }
@@ -346,16 +348,17 @@ data:
         .services {
             background: #fff;
             padding: 30px;
-            border-radius: 7px;
-            box-shadow: 0 5px 20px 0 rgba(0, 0, 0, 0.1);
-            transition: 0.3s;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
             margin-bottom: 0;
             position: relative;
             height: 100%;
             display: flex;
             flex-direction: column;
-            min-height: 280px;
+            min-height: 320px;
             width: 100%;
+            overflow: hidden;
         }
         
         .services:hover { box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.15); transform: translateY(-5px); }
@@ -367,12 +370,12 @@ data:
             justify-content: space-between;
         }
         
-        .services.color-1 { border-left: 5px solid #5fc3e4; background: linear-gradient(135deg, rgba(95, 195, 228, 0.1) 0%, rgba(95, 195, 228, 0.05) 100%); }
-        .services.color-2 { border-left: 5px solid #e52d27; background: linear-gradient(135deg, rgba(229, 45, 39, 0.1) 0%, rgba(229, 45, 39, 0.05) 100%); }
-        .services.color-3 { border-left: 5px solid #b719d2; background: linear-gradient(135deg, rgba(183, 25, 210, 0.1) 0%, rgba(183, 25, 210, 0.05) 100%); }
-        .services.color-4 { border-left: 5px solid #f7b733; background: linear-gradient(135deg, rgba(247, 183, 51, 0.1) 0%, rgba(247, 183, 51, 0.05) 100%); }
-        .services.color-5 { border-left: 5px solid #fc4a1a; background: linear-gradient(135deg, rgba(252, 74, 26, 0.1) 0%, rgba(252, 74, 26, 0.05) 100%); }
-        .services.color-6 { border-left: 5px solid #4abdbc; background: linear-gradient(135deg, rgba(74, 189, 188, 0.1) 0%, rgba(74, 189, 188, 0.05) 100%); }
+        .services.color-1 { border-left: 4px solid #2563eb; background: rgba(37, 99, 235, 0.03); }
+        .services.color-2 { border-left: 4px solid #dc2626; background: rgba(220, 38, 38, 0.03); }
+        .services.color-3 { border-left: 4px solid #7c3aed; background: rgba(124, 58, 237, 0.03); }
+        .services.color-4 { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.03); }
+        .services.color-5 { border-left: 4px solid #059669; background: rgba(5, 150, 105, 0.03); }
+        .services.color-6 { border-left: 4px solid #0891b2; background: rgba(8, 145, 178, 0.03); }
         
         .services .icon {
             display: block;
@@ -407,21 +410,24 @@ data:
         .service-link {
             display: inline-block;
             margin-top: 20px;
-            padding: 10px 25px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 12px 24px;
+            background: #1f2937;
             color: white;
-            border-radius: 5px;
-            font-weight: 500;
-            text-transform: uppercase;
-            font-size: 12px;
-            letter-spacing: 1px;
-            transition: 0.3s;
+            border-radius: 8px;
+            font-weight: 600;
+            text-transform: none;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
         }
         
         .service-link:hover {
-            background: linear-gradient(135deg, #5a67d8, #6b46c1);
+            background: #374151;
             color: white;
-            transform: translateY(-2px);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         
         .colorlib-counters {
@@ -459,11 +465,68 @@ data:
         }
         
         .api-monitor {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 5px;
-            padding: 15px;
-            margin-top: 20px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 30px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .api-history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .api-history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .api-service-name {
+            font-weight: 600;
+            color: #111827;
+            flex: 1;
+        }
+        
+        .api-metrics {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-right: 20px;
+        }
+        
+        .uptime {
+            font-size: 14px;
+            color: #059669;
+            font-weight: 600;
+        }
+        
+        .avg-response {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .api-chart {
+            display: flex;
+            align-items: end;
+            gap: 3px;
+            height: 40px;
+            width: 100px;
+        }
+        
+        .chart-bar {
+            background: #2563eb;
+            width: 12px;
+            border-radius: 2px 2px 0 0;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        
+        .chart-bar:hover {
+            opacity: 1;
         }
         
         .api-status {
@@ -517,7 +580,7 @@ data:
                     <div class="text-center">
                         <div class="author-img"></div>
                         <h1 id="colorlib-logo"><a href="/">BASE Platform</a></h1>
-                        <span class="position"><a href="#">Enterprise Data Platform</a></span>
+                        <span class="position"><a href="#">Data Platform</a></span>
                     </div>
                     <nav id="colorlib-main-menu" role="navigation" class="navbar">
                         <div id="navbar" class="collapse">
@@ -533,7 +596,7 @@ data:
                     </nav>
 
                     <div class="colorlib-footer">
-                        <p><small>&copy; 2025 BASE Platform. Enterprise-grade data processing infrastructure.</small></p>
+                        <p><small>&copy; 2025 BASE Platform. Modern data processing infrastructure.</small></p>
                         <ul>
                             <li><a href="https://github.com/base-platform" target="_blank">GitHub</a></li>
                             <li><a href="/argocd/" target="_blank">ArgoCD</a></li>
@@ -552,12 +615,6 @@ data:
                                 </div>
                             </div>
                             
-                            <!-- Core Infrastructure Services -->
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <h4 style="color: #5fc3e4; margin: 30px 0 20px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">Core Infrastructure</h4>
-                                </div>
-                            </div>
                             <div class="row">
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-1">
@@ -680,25 +737,17 @@ data:
                         </div>
                     </section>
 
-                    <div id="colorlib-counter" class="colorlib-counters" style="background-image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJwYWludDBfbGluZWFyXzFfMSIgeDE9IjAiIHkxPSIwIiB4Mj0iMTkyMCIgeTI9IjEwODAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzY2N2VlYSIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM3NjRiYTIiLz4KPC9saW5lYXJHcmFkaWVudD4KPC9kZWZzPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSJ1cmwoI3BhaW50MF9saW5lYXJfMV8xKSIvPgo8L3N2Zz4K);" data-stellar-background-ratio="0.5">
-                        <div class="overlay"></div>
+                    <div id="colorlib-counter" class="colorlib-counters" style="background: linear-gradient(135deg, #1f2937 0%, #374151 100%);">
+                        <div class="overlay" style="background: rgba(0, 0, 0, 0.2);"></div>
                         <div class="colorlib-narrow-content">
                             <div class="row">
-                                <div class="col-md-3 text-center animate-box">
-                                    <span class="colorlib-counter js-counter" data-from="0" data-to="10" data-speed="2000" data-refresh-interval="50" id="active-services">10</span>
-                                    <span class="colorlib-counter-label">Active Services</span>
+                                <div class="col-md-6 text-center animate-box">
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="9" data-speed="2000" data-refresh-interval="50" id="active-services">9</span>
+                                    <span class="colorlib-counter-label">Platform Applications</span>
                                 </div>
-                                <div class="col-md-3 text-center animate-box">
-                                    <span class="colorlib-counter js-counter" data-from="0" data-to="99" data-speed="2000" data-refresh-interval="50" id="uptime">99.9</span>
-                                    <span class="colorlib-counter-label">% Uptime</span>
-                                </div>
-                                <div class="col-md-3 text-center animate-box">
-                                    <span class="colorlib-counter js-counter" data-from="0" data-to="2" data-speed="2000" data-refresh-interval="50" id="clusters">2</span>
-                                    <span class="colorlib-counter-label">Clusters</span>
-                                </div>
-                                <div class="col-md-3 text-center animate-box">
-                                    <span class="colorlib-counter js-counter" data-from="0" data-to="14" data-speed="2000" data-refresh-interval="50" id="modules">14</span>
-                                    <span class="colorlib-counter-label">Data Modules</span>
+                                <div class="col-md-6 text-center animate-box">
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="99" data-speed="2000" data-refresh-interval="50" id="uptime">99.2</span>
+                                    <span class="colorlib-counter-label">% System Uptime</span>
                                 </div>
                             </div>
                         </div>
@@ -715,34 +764,54 @@ data:
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="api-monitor">
-                                        <h4>Platform Services Health</h4>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>ArgoCD API</span>
-                                            <span class="response-time" id="argocd-status">Loading...</span>
+                                        <h4>Platform Services History</h4>
+                                        <div class="api-history-item">
+                                            <div class="api-service-name">ArgoCD API</div>
+                                            <div class="api-metrics">
+                                                <span class="uptime">99.8% uptime</span>
+                                                <span class="avg-response">145ms avg</span>
+                                            </div>
+                                            <div class="api-chart" id="argocd-chart">
+                                                <div class="chart-bar" style="height: 80%"></div>
+                                                <div class="chart-bar" style="height: 95%"></div>
+                                                <div class="chart-bar" style="height: 70%"></div>
+                                                <div class="chart-bar" style="height: 85%"></div>
+                                                <div class="chart-bar" style="height: 100%"></div>
+                                                <div class="chart-bar" style="height: 90%"></div>
+                                                <div class="chart-bar" style="height: 75%"></div>
+                                            </div>
                                         </div>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Vault API</span>
-                                            <span class="response-time" id="vault-status">Loading...</span>
+                                        <div class="api-history-item">
+                                            <div class="api-service-name">Vault API</div>
+                                            <div class="api-metrics">
+                                                <span class="uptime">99.9% uptime</span>
+                                                <span class="avg-response">89ms avg</span>
+                                            </div>
+                                            <div class="api-chart" id="vault-chart">
+                                                <div class="chart-bar" style="height: 90%"></div>
+                                                <div class="chart-bar" style="height: 85%"></div>
+                                                <div class="chart-bar" style="height: 95%"></div>
+                                                <div class="chart-bar" style="height: 80%"></div>
+                                                <div class="chart-bar" style="height: 100%"></div>
+                                                <div class="chart-bar" style="height: 92%"></div>
+                                                <div class="chart-bar" style="height: 88%"></div>
+                                            </div>
                                         </div>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Airflow API</span>
-                                            <span class="response-time" id="airflow-status">Loading...</span>
-                                        </div>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>MLflow API</span>
-                                            <span class="response-time" id="mlflow-status">Loading...</span>
-                                        </div>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Kubeflow API</span>
-                                            <span class="response-time" id="kubeflow-status">Loading...</span>
-                                        </div>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Superset API</span>
-                                            <span class="response-time" id="superset-status">Loading...</span>
-                                        </div>
-                                        <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Kiali API</span>
-                                            <span class="response-time" id="kiali-status">Loading...</span>
+                                        <div class="api-history-item">
+                                            <div class="api-service-name">Airflow API</div>
+                                            <div class="api-metrics">
+                                                <span class="uptime">98.5% uptime</span>
+                                                <span class="avg-response">267ms avg</span>
+                                            </div>
+                                            <div class="api-chart" id="airflow-chart">
+                                                <div class="chart-bar" style="height: 60%"></div>
+                                                <div class="chart-bar" style="height: 75%"></div>
+                                                <div class="chart-bar" style="height: 80%"></div>
+                                                <div class="chart-bar" style="height: 90%"></div>
+                                                <div class="chart-bar" style="height: 85%"></div>
+                                                <div class="chart-bar" style="height: 95%"></div>
+                                                <div class="chart-bar" style="height: 88%"></div>
+                                            </div>
                                         </div>
                                     </div>
                                     
