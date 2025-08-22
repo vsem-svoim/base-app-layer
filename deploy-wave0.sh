@@ -141,6 +141,10 @@ spec:
           value: "root"
         - name: VAULT_DEV_LISTEN_ADDRESS
           value: "0.0.0.0:8200"
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_API_ADDR
+          value: "http://127.0.0.1:8200"
         command: ["vault", "server", "-dev"]
         resources:
           requests:
@@ -175,12 +179,12 @@ EOF
     sleep 10
     
     # Check if Vault is already initialized
-    if kubectl exec -n vault deployment/vault -- vault status | grep -q "Initialized.*true"; then
+    if kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault status | grep -q "Initialized.*true"; then
         log_info "Vault is already initialized"
     else
         log_info "Initializing Vault with 5 key shares, threshold 3..."
         # Initialize Vault and capture keys
-        kubectl exec -n vault deployment/vault -- vault operator init -key-shares=5 -key-threshold=3 -format=json > /tmp/vault-init.json
+        kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator init -key-shares=5 -key-threshold=3 -format=json > /tmp/vault-init.json
         
         # Extract unseal keys and root token
         UNSEAL_KEY_1=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[0]')
@@ -204,12 +208,12 @@ EOF
     UNSEAL_KEY_2=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-2}' | base64 -d)
     UNSEAL_KEY_3=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-3}' | base64 -d)
     
-    kubectl exec -n vault deployment/vault -- vault operator unseal "$UNSEAL_KEY_1"
-    kubectl exec -n vault deployment/vault -- vault operator unseal "$UNSEAL_KEY_2" 
-    kubectl exec -n vault deployment/vault -- vault operator unseal "$UNSEAL_KEY_3"
+    kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY_1"
+    kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY_2" 
+    kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY_3"
     
     # Verify Vault is unsealed
-    if kubectl exec -n vault deployment/vault -- vault status | grep -q "Sealed.*false"; then
+    if kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault status | grep -q "Sealed.*false"; then
         log_info "✅ Vault is unsealed and ready"
     else
         log_error "❌ Failed to unseal Vault"
@@ -340,7 +344,7 @@ show_access_info() {
     echo "🔍 Troubleshooting Commands:"
     echo "  • Check ALB status: kubectl get ingress -n platform-ui"
     echo "  • Get Vault root token: kubectl get secret vault-keys -n vault -o jsonpath='{.data.root-token}' | base64 -d"
-    echo "  • Check Vault status: kubectl exec -n vault deployment/vault -- vault status"
+    echo "  • Check Vault status: kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault status"
     echo ""
     echo "⚠️  DO NOT PROCEED TO WAVE 1 UNTIL ALL TESTS PASS!"
 }
