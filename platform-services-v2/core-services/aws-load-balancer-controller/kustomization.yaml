@@ -12,7 +12,7 @@ resources:
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: aws-load-balancer-controller
-  app.kubernetes.io/component: controller
-  app.kubernetes.io/part-of: base-platform
-  deployment.wave: "0"
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: base-platform
+    deployment.wave: "0"
