@@ -210,66 +210,160 @@ data:
     disable_mlock = true
     ui = true
   init.sh: |
-    #!/bin/sh
-    set -e
+    #!/bin/bash
+    set -euo pipefail
     
-    # Wait for Vault to be ready
-    until curl -f http://vault:8200/v1/sys/health 2>/dev/null; do
-      echo "Waiting for Vault to be ready..."
-      sleep 5
+    # Production-grade Vault initialization script
+    VAULT_URL="http://vault.vault.svc.cluster.local:8200"
+    MAX_RETRIES=60
+    RETRY_DELAY=5
+    
+    echo "Starting Vault initialization process..."
+    
+    # Wait for Vault service to be available
+    echo "Waiting for Vault service at $VAULT_URL..."
+    for i in $(seq 1 $MAX_RETRIES); do
+      if curl -sf "$VAULT_URL/v1/sys/health" >/dev/null 2>&1; then
+        echo "Vault service is responding (attempt $i/$MAX_RETRIES)"
+        break
+      fi
+      if [ $i -eq $MAX_RETRIES ]; then
+        echo "ERROR: Vault service not available after $MAX_RETRIES attempts"
+        exit 1
+      fi
+      echo "Vault not ready, waiting... (attempt $i/$MAX_RETRIES)"
+      sleep $RETRY_DELAY
     done
     
     # Check if already initialized
-    if curl -f http://vault:8200/v1/sys/init 2>/dev/null | grep '"initialized":true'; then
-      echo "Vault already initialized"
+    echo "Checking Vault initialization status..."
+    INIT_STATUS=$(curl -sf "$VAULT_URL/v1/sys/init" || echo '{"initialized":false}')
+    
+    if echo "$INIT_STATUS" | grep -q '"initialized":true'; then
+      echo "Vault is already initialized, skipping initialization"
       exit 0
     fi
     
     # Initialize Vault
-    echo "Initializing Vault..."
-    INIT_RESPONSE=$(curl -X POST \
+    echo "Initializing Vault with 5 key shares, threshold 3..."
+    INIT_RESPONSE=$(curl -sf -X POST \
       -H "Content-Type: application/json" \
       -d '{"key_shares":5,"key_threshold":3}' \
-      http://vault:8200/v1/sys/init)
+      "$VAULT_URL/v1/sys/init")
     
-    # Extract keys and token
+    if [ $? -ne 0 ]; then
+      echo "ERROR: Failed to initialize Vault"
+      exit 1
+    fi
+    
+    # Validate response
+    if ! echo "$INIT_RESPONSE" | grep -q '"keys_base64"'; then
+      echo "ERROR: Invalid initialization response"
+      echo "Response: $INIT_RESPONSE"
+      exit 1
+    fi
+    
+    # Extract and store keys
+    echo "Extracting unseal keys and root token..."
     echo "$INIT_RESPONSE" | jq -r '.keys_base64[]' > /tmp/unseal-keys
     echo "$INIT_RESPONSE" | jq -r '.root_token' > /tmp/root-token
     
-    # Store in Kubernetes secret
+    # Create Kubernetes secret
+    echo "Storing keys in Kubernetes secret..."
     kubectl create secret generic vault-keys -n vault \
-      --from-file=keys=/tmp/unseal-keys \
-      --from-file=root-token=/tmp/root-token
+      --from-file=unseal-keys=/tmp/unseal-keys \
+      --from-file=root-token=/tmp/root-token \
+      --dry-run=client -o yaml | kubectl apply -f -
     
-    echo "Vault initialized successfully"
+    echo "✅ Vault initialization completed successfully"
   unseal.sh: |
-    #!/bin/sh
-    set -e
+    #!/bin/bash
+    set -euo pipefail
     
-    # Wait for Vault to be ready
-    until curl -f http://vault:8200/v1/sys/health 2>/dev/null; do
-      echo "Waiting for Vault to be ready..."
-      sleep 5
+    # Production-grade Vault unsealing script
+    VAULT_URL="http://vault.vault.svc.cluster.local:8200"
+    MAX_RETRIES=60
+    RETRY_DELAY=5
+    
+    echo "Starting Vault unsealing process..."
+    
+    # Wait for Vault to be responsive
+    echo "Waiting for Vault service at $VAULT_URL..."
+    for i in $(seq 1 $MAX_RETRIES); do
+      if curl -sf "$VAULT_URL/v1/sys/health" >/dev/null 2>&1; then
+        echo "Vault service is responding (attempt $i/$MAX_RETRIES)"
+        break
+      fi
+      if [ $i -eq $MAX_RETRIES ]; then
+        echo "ERROR: Vault service not available after $MAX_RETRIES attempts"
+        exit 1
+      fi
+      echo "Vault not ready, waiting... (attempt $i/$MAX_RETRIES)"
+      sleep $RETRY_DELAY
     done
     
-    # Check if unsealed
-    if curl -f http://vault:8200/v1/sys/seal-status 2>/dev/null | grep '"sealed":false'; then
-      echo "Vault already unsealed"
+    # Check seal status
+    echo "Checking Vault seal status..."
+    SEAL_STATUS=$(curl -sf "$VAULT_URL/v1/sys/seal-status" || echo '{"sealed":true}')
+    
+    if echo "$SEAL_STATUS" | grep -q '"sealed":false'; then
+      echo "Vault is already unsealed"
       exit 0
     fi
     
-    # Get unseal keys
-    kubectl get secret vault-keys -n vault -o jsonpath='{.data.keys}' | base64 -d > /tmp/unseal-keys
-    
-    # Unseal with first 3 keys
-    head -3 /tmp/unseal-keys | while read key; do
-      curl -X POST \
-        -H "Content-Type: application/json" \
-        -d "{\"key\":\"$key\"}" \
-        http://vault:8200/v1/sys/unseal
+    # Wait for vault-keys secret to exist
+    echo "Waiting for vault-keys secret..."
+    for i in $(seq 1 30); do
+      if kubectl get secret vault-keys -n vault >/dev/null 2>&1; then
+        echo "vault-keys secret found"
+        break
+      fi
+      if [ $i -eq 30 ]; then
+        echo "ERROR: vault-keys secret not found after 30 attempts"
+        exit 1
+      fi
+      echo "Waiting for vault-keys secret... (attempt $i/30)"
+      sleep 2
     done
     
-    echo "Vault unsealed successfully"
+    # Get unseal keys
+    echo "Retrieving unseal keys..."
+    kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-keys}' | base64 -d > /tmp/unseal-keys
+    
+    if [ ! -s /tmp/unseal-keys ]; then
+      echo "ERROR: No unseal keys found in secret"
+      exit 1
+    fi
+    
+    # Unseal with first 3 keys
+    echo "Unsealing Vault..."
+    KEY_COUNT=0
+    while read -r key && [ $KEY_COUNT -lt 3 ]; do
+      if [ -n "$key" ]; then
+        echo "Using unseal key $((KEY_COUNT + 1))/3..."
+        UNSEAL_RESPONSE=$(curl -sf -X POST \
+          -H "Content-Type: application/json" \
+          -d "{\"key\":\"$key\"}" \
+          "$VAULT_URL/v1/sys/unseal")
+        
+        if echo "$UNSEAL_RESPONSE" | grep -q '"sealed":false'; then
+          echo "✅ Vault unsealed successfully"
+          exit 0
+        fi
+        
+        KEY_COUNT=$((KEY_COUNT + 1))
+      fi
+    done < /tmp/unseal-keys
+    
+    # Final status check
+    FINAL_STATUS=$(curl -sf "$VAULT_URL/v1/sys/seal-status")
+    if echo "$FINAL_STATUS" | grep -q '"sealed":false'; then
+      echo "✅ Vault unsealing completed successfully"
+    else
+      echo "ERROR: Vault unsealing failed"
+      echo "Final status: $FINAL_STATUS"
+      exit 1
+    fi
 ---
 apiVersion: v1
 kind: Service
@@ -297,8 +391,8 @@ spec:
       serviceAccountName: vault-init
       containers:
       - name: vault-init
-        image: curlimages/curl:latest
-        command: ["/bin/sh", "/scripts/init.sh"]
+        image: bitnami/kubectl:latest
+        command: ["/bin/bash", "/scripts/init.sh"]
         volumeMounts:
         - name: init-scripts
           mountPath: /scripts
@@ -321,8 +415,8 @@ spec:
       serviceAccountName: vault-init
       containers:
       - name: vault-unseal
-        image: curlimages/curl:latest
-        command: ["/bin/sh", "/scripts/unseal.sh"]
+        image: bitnami/kubectl:latest
+        command: ["/bin/bash", "/scripts/unseal.sh"]
         volumeMounts:
         - name: unseal-scripts
           mountPath: /scripts
