@@ -159,15 +159,26 @@ spec:
         ports:
         - containerPort: 8200
         env:
-        - name: VAULT_DEV_ROOT_TOKEN_ID
-          value: "root"
-        - name: VAULT_DEV_LISTEN_ADDRESS
-          value: "0.0.0.0:8200"
         - name: VAULT_ADDR
           value: "http://127.0.0.1:8200"
         - name: VAULT_API_ADDR
           value: "http://127.0.0.1:8200"
-        command: ["vault", "server", "-dev"]
+        - name: VAULT_LOCAL_CONFIG
+          value: |
+            storage "file" {
+              path = "/vault/data"
+            }
+            listener "tcp" {
+              address = "0.0.0.0:8200"
+              tls_disable = 1
+            }
+            ui = true
+        command: ["vault", "server", "-config=/vault/config/config.hcl"]
+        volumeMounts:
+        - name: vault-data
+          mountPath: /vault/data
+        - name: vault-config
+          mountPath: /vault/config
         resources:
           requests:
             memory: "128Mi"
@@ -175,6 +186,28 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      volumes:
+      - name: vault-data
+        emptyDir: {}
+      - name: vault-config
+        configMap:
+          name: vault-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-config
+  namespace: vault
+data:
+  config.hcl: |
+    storage "file" {
+      path = "/vault/data"
+    }
+    listener "tcp" {
+      address = "0.0.0.0:8200"
+      tls_disable = 1
+    }
+    ui = true
 ---
 apiVersion: v1
 kind: Service
