@@ -127,15 +127,15 @@ spec:
         - resources-finalizer.argocd.argoproj.io
         
     spec:
-      project: default
+      project: base-layer
       
       source:
-        repoURL: https://github.com/vsem-svoim/base-app-layer.git
+        repoURL: ${GITHUB_REPO}
         path: '{{module}}'
-        targetRevision: main
+        targetRevision: ${BRANCH}
         
       destination:
-        server: https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com
+        server: ${BASE_CLUSTER_SERVER}
         namespace: '{{namespace}}'
         
       syncPolicy:
@@ -171,79 +171,3 @@ spec:
         kind: Ingress
         jsonPointers:
         - /status/loadBalancer/ingress
----
-apiVersion: argoproj.io/v1alpha1
-kind: AppProject
-metadata:
-  name: base-layer
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: base-layer-project
-spec:
-  description: BASE App Layer - Enterprise Data Platform
-  
-  sourceRepos:
-  - 'https://github.com/vsem-svoim/base-app-layer.git'
-  - '*'
-  
-  destinations:
-  - namespace: 'base-*'
-    server: https://1416B69D01B335109B84B367D0772AE3.gr7.us-east-1.eks.amazonaws.com
-  - namespace: 'kube-system'
-    server: https://1416B69D01B335109B84B367D0772AE3.gr7.us-east-1.eks.amazonaws.com
-    
-  clusterResourceWhitelist:
-  - group: ''
-    kind: Namespace
-  - group: rbac.authorization.k8s.io
-    kind: ClusterRole
-  - group: rbac.authorization.k8s.io
-    kind: ClusterRoleBinding
-  - group: apiextensions.k8s.io
-    kind: CustomResourceDefinition
-  - group: admissionregistration.k8s.io
-    kind: MutatingWebhookConfiguration
-  - group: admissionregistration.k8s.io
-    kind: ValidatingWebhookConfiguration
-    
-  namespaceResourceWhitelist:
-  - group: ''
-    kind: '*'
-  - group: apps
-    kind: '*'
-  - group: networking.k8s.io
-    kind: '*'
-  - group: extensions
-    kind: '*'
-  - group: batch
-    kind: '*'
-  - group: autoscaling
-    kind: '*'
-  - group: policy
-    kind: '*'
-  - group: monitoring.coreos.com
-    kind: '*'
-  - group: argoproj.io
-    kind: '*'
-  - group: base.io
-    kind: '*'
-    
-  roles:
-  - name: admin
-    description: Admin access to BASE layer applications
-    policies:
-    - p, proj:base-layer:admin, applications, *, base-layer/*, allow
-    - p, proj:base-layer:admin, clusters, get, *, allow
-    - p, proj:base-layer:admin, repositories, *, *, allow
-    groups:
-    - base-layer:admin
-    
-  - name: developer
-    description: Developer access to BASE layer applications
-    policies:
-    - p, proj:base-layer:developer, applications, get, base-layer/*, allow
-    - p, proj:base-layer:developer, applications, sync, base-layer/*, allow
-    - p, proj:base-layer:developer, applications, action/*, base-layer/*, allow
-    - p, proj:base-layer:developer, logs, get, base-layer/*, allow
-    groups:
-    - base-layer:developer

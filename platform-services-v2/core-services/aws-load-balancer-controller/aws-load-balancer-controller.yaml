@@ -94,7 +94,7 @@ spec:
             weight: 100
       containers:
       - args:
-        - --cluster-name=base-app-layer-dev-platform
+        - --cluster-name=platform-app-layer-dev
         - --ingress-class=alb
         - --feature-gates=wafv2=false,shield=false
         image: public.ecr.aws/eks/aws-load-balancer-controller:v2.7.2

@@ -80,3 +80,19 @@ spec:
             duration: 5s
             factor: 2
             maxDuration: 30s
+            
+      revisionHistoryLimit: 3
+      
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
+      - group: ""
+        kind: Service
+        jsonPointers:
+        - /spec/clusterIP
+      - group: networking.k8s.io
+        kind: Ingress
+        jsonPointers:
+        - "*"

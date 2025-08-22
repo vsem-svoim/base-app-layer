@@ -8,6 +8,7 @@ spec:
   
   sourceRepos:
   - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
   - 'https://prometheus-community.github.io/helm-charts'
   - 'https://grafana.github.io/helm-charts'
   - 'https://elastic.github.io/helm-charts'

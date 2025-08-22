@@ -179,7 +179,7 @@ spec:
     spec:
       containers:
       - args:
-        - --cluster-name=base-app-layer-dev-platform
+        - --cluster-name=platform-app-layer-dev
         - --ingress-class=alb
         - --enable-shield=false
         - --enable-waf=false

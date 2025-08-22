@@ -9,52 +9,39 @@ metadata:
     component: proxy
 data:
   default.conf: |
-    upstream grafana_backend {
-        server 127.0.0.1:3000;  # Service not available yet
-    }
-    
-    upstream prometheus_backend {
-        server 127.0.0.1:9090;  # Service not available yet
-    }
-    
-    upstream kibana_backend {
-        server 127.0.0.1:5601;  # Service not available yet
-    }
-    
-    upstream airflow_backend {
-        server airflow.airflow.svc.cluster.local:8080;
-    }
+    # Upstream configurations for fresh install state
+    # Services will return "not deployed" until Wave deployment completes
     
     upstream argocd_backend {
-        server 127.0.0.1:80;  # ArgoCD service via Istio Gateway
+        server 127.0.0.1:8080;  # Will be updated after ArgoCD deployment
     }
     
     upstream vault_backend {
-        server vault.vault.svc.cluster.local:8200;
+        server 127.0.0.1:8200;  # Will be updated after Vault deployment  
     }
     
-    upstream istio_gateway_backend {
-        server istio-ingressgateway.istio-system.svc.cluster.local:80;
-    }
-    
-    upstream argo_workflows_backend {
-        server 127.0.0.1:2746;  # Argo Workflows via Istio Gateway
-    }
-    
-    upstream kubeflow_backend {
-        server 127.0.0.1:3000;  # Kubeflow via Istio Gateway
-    }
-    
-    upstream superset_backend {
-        server 127.0.0.1:8088;  # Superset via Istio Gateway
-    }
-    
-    upstream kiali_backend {
-        server 127.0.0.1:20001;  # Kiali via Istio Gateway
+    upstream airflow_backend {
+        server 127.0.0.1:8081;  # Will be updated after Airflow deployment
     }
     
     upstream mlflow_backend {
-        server 127.0.0.1:5000;  # MLflow via Istio Gateway
+        server 127.0.0.1:5000;  # Will be updated after MLflow deployment
+    }
+    
+    upstream kubeflow_backend {
+        server 127.0.0.1:8082;  # Will be updated after Kubeflow deployment
+    }
+    
+    upstream superset_backend {
+        server 127.0.0.1:8088;  # Will be updated after Superset deployment
+    }
+    
+    upstream grafana_backend {
+        server 127.0.0.1:3000;  # Will be updated after Grafana deployment
+    }
+    
+    upstream prometheus_backend {
+        server 127.0.0.1:9090;  # Will be updated after Prometheus deployment
     }
     
     server {
@@ -76,21 +63,47 @@ data:
             add_header Content-Type text/plain;
         }
         
-        # Wave 0 Core Services - Clean slate for proper deployment testing
+        # Wave 0 Core Services (deploy first)
         location /argocd/ {
-            return 503 "Wave 0 not deployed. Deploy ArgoCD first using Wave 0 commands.";
-            add_header Content-Type text/plain;
+            return 503 '{"status":"not_deployed","message":"ArgoCD not deployed. Run Wave 0 deployment first.","wave":"0","service":"argocd"}';
+            add_header Content-Type application/json;
         }
         
         location /vault/ {
-            return 503 "Wave 0 not deployed. Deploy Vault first using Wave 0 commands.";
-            add_header Content-Type text/plain;
+            return 503 '{"status":"not_deployed","message":"Vault not deployed. Run Wave 0 deployment first.","wave":"0","service":"vault"}';
+            add_header Content-Type application/json;
         }
         
-        # All other services require Wave 0 foundation
-        location ~ ^/(airflow|mlflow|kubeflow|superset|grafana|prometheus|kiali|istio|seldon)/ {
-            return 503 "Service requires Wave 0 foundation. Deploy ArgoCD and core services first.";
-            add_header Content-Type text/plain;
+        # Wave 2 Orchestration Services
+        location /airflow/ {
+            return 503 '{"status":"not_deployed","message":"Airflow not deployed. Complete Wave 0, then run Wave 2 deployment.","wave":"2","service":"airflow"}';
+            add_header Content-Type application/json;
+        }
+        
+        location /mlflow/ {
+            return 503 '{"status":"not_deployed","message":"MLflow not deployed. Complete Wave 0, then run Wave 2 deployment.","wave":"2","service":"mlflow"}';
+            add_header Content-Type application/json;
+        }
+        
+        location /kubeflow/ {
+            return 503 '{"status":"not_deployed","message":"Kubeflow not deployed. Complete Wave 0, then run Wave 2 deployment.","wave":"2","service":"kubeflow"}';
+            add_header Content-Type application/json;
+        }
+        
+        location /superset/ {
+            return 503 '{"status":"not_deployed","message":"Superset not deployed. Complete Wave 0, then run Wave 2 deployment.","wave":"2","service":"superset"}';
+            add_header Content-Type application/json;
+        }
+        
+        # Monitoring Services
+        location /grafana/ {
+            return 503 '{"status":"not_deployed","message":"Grafana not deployed. Complete Wave 0-1, then run monitoring deployment.","wave":"1","service":"grafana"}';
+            add_header Content-Type application/json;
+        }
+        
+        location /prometheus/ {
+            return 503 '{"status":"not_deployed","message":"Prometheus not deployed. Complete Wave 0-1, then run monitoring deployment.","wave":"1","service":"prometheus"}';
+            add_header Content-Type application/json;
         }
         
         
@@ -553,20 +566,33 @@ data:
                             </div>
                             
                             <div class="row">
-                                <div class="col-md-4 text-center animate-box">
-                                    <div class="services color-1">
-                                        <div class="service-status">CORE</div>
-                                        <span class="icon"><i class="icon-layers2"></i></span>
-                                        <div class="desc">
-                                            <h3>ArgoCD</h3>
-                                            <p>GitOps continuous deployment platform for managing application lifecycles and automated deployments across clusters</p>
-                                            <a href="javascript:void(0)" onclick="openService('/argocd/')" class="service-link">Access ArgoCD</a>
+                                <div class="col-md-12 text-center">
+                                    <div class="fresh-install-message" style="padding: 60px 20px; background: #f8f9fa; border-radius: 12px; margin: 40px 0;">
+                                        <span class="icon" style="font-size: 80px; color: #9ca3af; margin-bottom: 20px; display: block;"><i class="icon-cloud"></i></span>
+                                        <h3 style="color: #6b7280; margin-bottom: 15px;">Platform Ready for Deployment</h3>
+                                        <p style="color: #9ca3af; font-size: 16px; max-width: 700px; margin: 0 auto;">
+                                            Platform UI configured and ready. Service tiles will show deployment status as you deploy each wave.
+                                        </p>
+                                        <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px auto; max-width: 600px; text-align: left;">
+                                            <h4 style="color: #374151; margin-bottom: 10px; font-size: 14px;">🚀 Wave 0 Deployment Commands:</h4>
+                                            <code style="background: #1f2937; color: #10b981; padding: 8px; border-radius: 4px; display: block; font-size: 12px; margin-bottom: 8px;">
+                                                kubectl create namespace argocd<br/>
+                                                kubectl apply -k platform-services-v2/core-services/argocd<br/>
+                                                kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave0-core-services.yaml
+                                            </code>
+                                            <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">
+                                                ✅ ArgoCD, Vault, Cert-Manager, AWS LB Controller will be deployed
+                                            </p>
+                                        </div>
+                                        <div style="margin-top: 25px;">
+                                            <a href="#" data-nav-section="deployment" style="background: #2563eb; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">View Deployment Guide</a>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-2">
-                                        <div class="service-status">CORE</div>
+                                        <div class="service-status" style="background: #ef4444; color: white;">NOT DEPLOYED</div>
                                         <span class="icon"><i class="icon-shield"></i></span>
                                         <div class="desc">
                                             <h3>Vault</h3>
@@ -577,7 +603,7 @@ data:
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-3">
-                                        <div class="service-status">ORCHESTRATION</div>
+                                        <div class="service-status" style="background: #ef4444; color: white;">NOT DEPLOYED</div>
                                         <span class="icon"><i class="icon-flow-tree"></i></span>
                                         <div class="desc">
                                             <h3>Apache Airflow</h3>
@@ -650,7 +676,7 @@ data:
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-6">
-                                        <div class="service-status">MONITORING</div>
+                                        <div class="service-status" style="background: #ef4444; color: white;">NOT DEPLOYED</div>
                                         <span class="icon"><i class="icon-line-graph"></i></span>
                                         <div class="desc">
                                             <h3>Grafana</h3>
@@ -661,7 +687,7 @@ data:
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-6">
-                                        <div class="service-status">MONITORING</div>
+                                        <div class="service-status" style="background: #ef4444; color: white;">NOT DEPLOYED</div>
                                         <span class="icon"><i class="icon-stats-dots"></i></span>
                                         <div class="desc">
                                             <h3>Prometheus</h3>
@@ -679,12 +705,12 @@ data:
                         <div class="colorlib-narrow-content">
                             <div class="row">
                                 <div class="col-md-6 text-center animate-box">
-                                    <span class="colorlib-counter js-counter" data-from="0" data-to="9" data-speed="2000" data-refresh-interval="50" id="active-services">9</span>
-                                    <span class="colorlib-counter-label">Platform Applications</span>
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="0" data-speed="2000" data-refresh-interval="50" id="active-services">0</span>
+                                    <span class="colorlib-counter-label">Services Deployed</span>
                                 </div>
                                 <div class="col-md-6 text-center animate-box">
-                                    <span class="colorlib-counter js-counter" data-from="0" data-to="99" data-speed="2000" data-refresh-interval="50" id="uptime">99.2</span>
-                                    <span class="colorlib-counter-label">% System Uptime</span>
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="0" data-speed="2000" data-refresh-interval="50" id="uptime">0</span>
+                                    <span class="colorlib-counter-label">Waves Deployed</span>
                                 </div>
                             </div>
                         </div>
@@ -755,44 +781,44 @@ data:
                                     <div class="api-monitor" style="margin-top: 30px;">
                                         <h4>Database Layer APIs</h4>
                                         <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>PostgreSQL</span>
-                                            <span class="response-time" id="postgres-status">Loading...</span>
+                                            <span><span class="status-indicator status-error"></span>PostgreSQL</span>
+                                            <span class="response-time" id="postgres-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Redis Cache</span>
-                                            <span class="response-time" id="redis-status">Loading...</span>
+                                            <span><span class="status-indicator status-error"></span>Redis Cache</span>
+                                            <span class="response-time" id="redis-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Elasticsearch</span>
-                                            <span class="response-time" id="elasticsearch-status">Loading...</span>
+                                            <span><span class="status-indicator status-error"></span>Elasticsearch</span>
+                                            <span class="response-time" id="elasticsearch-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>InfluxDB</span>
-                                            <span class="response-time" id="influxdb-status">Loading...</span>
+                                            <span><span class="status-indicator status-error"></span>InfluxDB</span>
+                                            <span class="response-time" id="influxdb-status">Not Deployed</span>
                                         </div>
                                     </div>
                                     
                                     <div class="api-monitor" style="margin-top: 30px;">
                                         <h4>BASE Data Processing Modules</h4>
                                         <div class="api-status">
-                                            <span><span class="status-indicator status-ok"></span>Data Ingestion API</span>
-                                            <span class="response-time" id="data-ingestion-status">Loading...</span>
+                                            <span><span class="status-indicator status-error"></span>Data Ingestion API</span>
+                                            <span class="response-time" id="data-ingestion-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
                                             <span><span class="status-indicator status-warning"></span>Data Quality API</span>
-                                            <span class="response-time" id="data-quality-status">Loading...</span>
+                                            <span class="response-time" id="data-quality-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
                                             <span><span class="status-indicator status-warning"></span>Data Storage API</span>
-                                            <span class="response-time" id="data-storage-status">Loading...</span>
+                                            <span class="response-time" id="data-storage-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
                                             <span><span class="status-indicator status-warning"></span>Feature Engineering API</span>
-                                            <span class="response-time" id="feature-engineering-status">Loading...</span>
+                                            <span class="response-time" id="feature-engineering-status">Not Deployed</span>
                                         </div>
                                         <div class="api-status">
                                             <span><span class="status-indicator status-warning"></span>Pipeline Management API</span>
-                                            <span class="response-time" id="pipeline-mgmt-status">Loading...</span>
+                                            <span class="response-time" id="pipeline-mgmt-status">Not Deployed</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1269,12 +1295,13 @@ metadata:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/load-balancer-name: base-platform-ui-v2
+    alb.ingress.kubernetes.io/load-balancer-name: fin-vsem-svoim-com
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /health
 spec:
   rules:
-  - http:
+  - host: fin.vsem-svoim.com
+    http:
       paths:
       - path: /
         pathType: Prefix

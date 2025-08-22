@@ -8,6 +8,7 @@ spec:
   
   sourceRepos:
   - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
   - 'https://airflow.apache.org'
   - 'https://charts.bitnami.com/bitnami'
   - 'https://larribas.me/helm-charts'

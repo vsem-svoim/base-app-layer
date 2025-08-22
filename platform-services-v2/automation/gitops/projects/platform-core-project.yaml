@@ -8,6 +8,7 @@ spec:
   
   sourceRepos:
   - 'https://github.com/vsem-svoim/base-app-layer.git'
+  - 'https://github.com/vsem-svoim/base-app-layer.git'
   - 'https://charts.jetstack.io'
   - 'https://kubernetes-sigs.github.io/aws-load-balancer-controller'
   - 'https://helm.releases.hashicorp.com'

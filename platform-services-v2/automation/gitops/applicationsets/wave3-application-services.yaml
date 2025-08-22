@@ -26,7 +26,7 @@ spec:
         category: application
         description: "Data Services Gateway - BASE module integration layer"
         path: platform-services-v2/application-services/data-services
-        server: https://9A36FAEDB0D8596EE561CFD8B59E4645.gr7.us-east-1.eks.amazonaws.com
+        server: https://1416B69D01B335109B84B367D0772AE3.gr7.us-east-1.eks.amazonaws.com
         
   template:
     metadata:
