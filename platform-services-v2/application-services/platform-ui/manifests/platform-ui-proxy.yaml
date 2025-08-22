@@ -105,7 +105,21 @@ data:
         }
         
         location /argocd/ {
-            return 503 "ArgoCD service is being redeployed. Please contact administrators.";
+            # Try to proxy to ArgoCD service, fallback to service status
+            proxy_pass http://argocd-server.argocd.svc.cluster.local:80/;
+            proxy_set_header Host $host;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+            proxy_redirect off;
+            proxy_buffering off;
+            
+            # If service is not available, show status
+            error_page 502 503 504 = @argocd_unavailable;
+        }
+        
+        location @argocd_unavailable {
+            return 503 "ArgoCD service is not available. Check ApplicationSet deployment status.";
             add_header Content-Type text/plain;
         }
         
@@ -483,6 +497,45 @@ data:
             opacity: 1;
         }
         
+        .deployment-status {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        
+        .wave-status {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #2563eb;
+        }
+        
+        .wave-status h4 {
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        
+        .wave-status pre {
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        
+        .wave-status code {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .wave-status p {
+            color: #6b7280;
+            margin: 10px 0;
+        }
+        
         .api-status {
             display: flex;
             justify-content: space-between;
@@ -540,6 +593,7 @@ data:
                         <div id="navbar" class="collapse">
                             <ul>
                                 <li class="active"><a href="#" data-nav-section="services">Platform Services</a></li>
+                                <li><a href="#" data-nav-section="deployment">GitOps Deployment</a></li>
                                 <li><a href="#" data-nav-section="monitoring">API Monitoring</a></li>
                                 <li><a href="#" data-nav-section="about">About Platform</a></li>
                                 <li><a href="#" data-nav-section="architecture">Architecture</a></li>
@@ -845,6 +899,44 @@ data:
                                         
                                         <h3>Performance Metrics</h3>
                                         <p>The platform processes over 100GB of data per hour with sub-second response times for critical operations. Built for enterprise scale with auto-scaling capabilities from 2 to 20 replicas based on demand.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="colorlib-services" data-section="deployment" style="display: none;">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">GitOps Deployment</span>
+                                    <h2 class="colorlib-heading">ApplicationSet Deployment Status</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="deployment-status">
+                                        <h3>Wave-Based Deployment Commands</h3>
+                                        <div class="wave-status">
+                                            <h4>✅ Wave 1: Platform Services (DEPLOYED)</h4>
+                                            <pre><code>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave1-shared-services.yaml</code></pre>
+                                            <p>Status: Platform UI + Istio Service Mesh operational</p>
+                                        </div>
+                                        <div class="wave-status">
+                                            <h4>🔄 Wave 2: Orchestration Services (PENDING)</h4>
+                                            <pre><code>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave2-monitoring-logging.yaml</code></pre>
+                                            <p>Will deploy: MLflow, Kubeflow, Superset, Seldon Core</p>
+                                        </div>
+                                        <div class="wave-status">
+                                            <h4>⏳ Wave 3: Application Services (PENDING)</h4>
+                                            <pre><code>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave3-application-services.yaml</code></pre>
+                                            <p>Will deploy: API Gateway, Data Services</p>
+                                        </div>
+                                        <div class="wave-status">
+                                            <h4>📋 ArgoCD Verification</h4>
+                                            <pre><code>kubectl get applicationsets -n argocd<br/>kubectl get applications -n argocd -o custom-columns=NAME,SYNC,HEALTH</code></pre>
+                                            <p>Verify ArgoCD is running and managing ApplicationSets</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
