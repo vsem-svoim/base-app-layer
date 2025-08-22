@@ -22,6 +22,7 @@ enable_data_storage = false
 enable_databases    = false
 enable_service_iam  = false
 enable_backup       = false
+enable_karpenter    = true
 
 # ===================================================================
 # VPC Configuration
@@ -45,16 +46,10 @@ one_nat_gateway_per_az   = false
 # Base Cluster (Data Processing)
 base_cluster_config = {
   version            = "1.33"
-  enable_fargate     = true
+  enable_fargate     = false
   enable_managed_nodes = true
   
-  fargate_profiles = {
-    base_data_ingestion = {
-      namespace_selectors = ["base-data-ingestion", "base-data-quality"]
-      label_selectors    = {}
-      subnet_type        = "private"
-    }
-  }
+  fargate_profiles = {}
   
   managed_node_groups = {
     base_apps = {
@@ -88,18 +83,10 @@ base_cluster_config = {
 # Platform Cluster (GitOps & Platform Services)
 platform_cluster_config = {
   version            = "1.33"
-  enable_fargate     = true
+  enable_fargate     = false
   enable_managed_nodes = true
   
-  fargate_profiles = {
-    platform_gitops = {
-      namespace_selectors = ["argo-events", "argo-workflows"]
-      label_selectors    = {}
-      subnet_type        = "private"
-    }
-    # Removed platform_monitoring and ml_platform Fargate profiles
-    # These services need to run on managed nodes to support Istio sidecars
-  }
+  fargate_profiles = {}
   
   managed_node_groups = {
     # System workloads (ArgoCD, Load Balancers, Monitoring, Orchestration) - 100% On-Demand for stability

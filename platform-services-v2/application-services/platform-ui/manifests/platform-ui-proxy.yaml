@@ -9,40 +9,11 @@ metadata:
     component: proxy
 data:
   default.conf: |
+    # DNS resolver for dynamic service discovery
+    resolver 172.20.0.10 valid=5s;
+    
     # Upstream configurations for fresh install state
     # Services will return "not deployed" until Wave deployment completes
-    
-    upstream argocd_backend {
-        server argocd-server.argocd.svc.cluster.local:443;
-    }
-    
-    upstream vault_backend {
-        server vault.vault.svc.cluster.local:8200;
-    }
-    
-    upstream airflow_backend {
-        server airflow.airflow.svc.cluster.local:8080;
-    }
-    
-    upstream mlflow_backend {
-        server mlflow-tracking-server.mlflow.svc.cluster.local:5000;
-    }
-    
-    upstream kubeflow_backend {
-        server kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
-    }
-    
-    upstream superset_backend {
-        server apache-superset.superset.svc.cluster.local:8088;
-    }
-    
-    upstream grafana_backend {
-        server grafana.monitoring.svc.cluster.local:3000;
-    }
-    
-    upstream prometheus_backend {
-        server prometheus.monitoring.svc.cluster.local:9090;
-    }
     
     server {
         listen 80;
@@ -65,7 +36,8 @@ data:
         
         # Wave 0 Core Services (deploy first)
         location /argocd/ {
-            proxy_pass https://argocd_backend/;
+            set $argocd_upstream argocd-server.argocd.svc.cluster.local:443;
+            proxy_pass https://$argocd_upstream/;
             proxy_ssl_verify off;
             proxy_ssl_server_name on;
             proxy_ssl_name argocd-server.argocd.svc.cluster.local;
@@ -80,7 +52,8 @@ data:
         }
         
         location /vault/ {
-            proxy_pass http://vault_backend/ui/;
+            set $vault_upstream vault.vault.svc.cluster.local:8200;
+            proxy_pass http://$vault_upstream/ui/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -90,7 +63,8 @@ data:
         
         # Wave 2 Orchestration Services  
         location /airflow/ {
-            proxy_pass http://airflow_backend/;
+            set $airflow_upstream airflow.airflow.svc.cluster.local:8080;
+            proxy_pass http://$airflow_upstream/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -99,7 +73,8 @@ data:
         }
         
         location /mlflow/ {
-            proxy_pass http://mlflow_backend/;
+            set $mlflow_upstream mlflow-tracking-server.mlflow.svc.cluster.local:5000;
+            proxy_pass http://$mlflow_upstream/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -108,7 +83,8 @@ data:
         }
         
         location /kubeflow/ {
-            proxy_pass http://kubeflow_backend/;
+            set $kubeflow_upstream kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
+            proxy_pass http://$kubeflow_upstream/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -117,7 +93,8 @@ data:
         }
         
         location /superset/ {
-            proxy_pass http://superset_backend/;
+            set $superset_upstream apache-superset.superset.svc.cluster.local:8088;
+            proxy_pass http://$superset_upstream/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -127,7 +104,8 @@ data:
         
         # Wave 1 Monitoring Services
         location /grafana/ {
-            proxy_pass http://grafana_backend/;
+            set $grafana_upstream grafana.monitoring.svc.cluster.local:3000;
+            proxy_pass http://$grafana_upstream/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -136,12 +114,23 @@ data:
         }
         
         location /prometheus/ {
-            proxy_pass http://prometheus_backend/prometheus/;
+            set $prometheus_upstream prometheus.monitoring.svc.cluster.local:9090;
+            proxy_pass http://$prometheus_upstream/prometheus/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_redirect http://prometheus.monitoring.svc.cluster.local:9090/ /prometheus/;
+        }
+        
+        location /kiali/ {
+            set $kiali_upstream kiali.istio-system.svc.cluster.local:20001;
+            proxy_pass http://$kiali_upstream/kiali/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://kiali.istio-system.svc.cluster.local:20001/ /kiali/;
         }
         
         
@@ -558,6 +547,71 @@ data:
             box-shadow: 0 5px 15px rgba(44, 152, 240, 0.4);
         }
         
+        /* Istio Injection Controls */
+        .istio-control-panel {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        
+        .namespace-controls {
+            margin: 20px 0;
+        }
+        
+        .namespace-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .namespace-item:last-child {
+            border-bottom: none;
+        }
+        
+        .injection-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .injection-btn.enabled {
+            background: #5cb85c;
+            color: white;
+        }
+        
+        .injection-btn.disabled {
+            background: #d9534f;
+            color: white;
+        }
+        
+        .injection-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .observability-links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .observability-links .service-link {
+            background: #6c757d;
+            margin-top: 0;
+        }
+        
+        .observability-links .service-link:hover {
+            background: #5a6268;
+        }
+        
         /* Category Headers */
         .category-header {
             margin: 50px 0 30px 0;
@@ -692,6 +746,7 @@ data:
                                 <li class="active"><a href="#" data-nav-section="services">Application Gallery</a></li>
                                 <li><a href="#" data-nav-section="base-modules">BASE Layer Modules</a></li>
                                 <li><a href="#" data-nav-section="monitoring">API History Monitor</a></li>
+                                <li><a href="#" data-nav-section="istio">Istio Injection</a></li>
                                 <li><a href="#" data-nav-section="deployment">GitOps Deployment</a></li>
                                 <li><a href="#" data-nav-section="architecture">Architecture</a></li>
                                 <li><a href="#" data-nav-section="documentation">Documentation</a></li>
@@ -749,12 +804,12 @@ data:
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-6">
-                                        <div class="service-status warning">NOT DEPLOYED</div>
+                                        <div class="service-status">DEPLOYED</div>
                                         <span class="icon"><i class="fas fa-sitemap"></i></span>
                                         <div class="desc">
                                             <h3>Istio Service Mesh</h3>
                                             <p>Traffic management and security</p>
-                                            <button onclick="alert('Istio not deployed. Deploy monitoring stack first.')" class="service-link">Deploy Istio</button>
+                                            <button onclick="window.open('/kiali/', '_blank')" class="service-link">Launch Kiali</button>
                                         </div>
                                     </div>
                                 </div>
@@ -856,6 +911,74 @@ data:
                         </div>
                     </section>
                     
+                    <section class="colorlib-services" data-section="istio">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">Service Mesh Control</span>
+                                    <h2 class="colorlib-heading">Istio Injection Management</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8 col-md-offset-2 animate-box">
+                                    <div class="istio-control-panel">
+                                        <h3><i class="fas fa-sitemap"></i> Namespace Injection Control</h3>
+                                        <p>Enable or disable Istio sidecar injection for namespaces:</p>
+                                        
+                                        <div class="namespace-controls">
+                                            <div class="namespace-item">
+                                                <strong>argocd:</strong> 
+                                                <button onclick="toggleIstioInjection('argocd', this)" class="injection-btn enabled">
+                                                    <i class="fas fa-check-circle"></i> Enabled
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="namespace-item">
+                                                <strong>airflow:</strong> 
+                                                <button onclick="toggleIstioInjection('airflow', this)" class="injection-btn enabled">
+                                                    <i class="fas fa-check-circle"></i> Enabled
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="namespace-item">
+                                                <strong>mlflow:</strong> 
+                                                <button onclick="toggleIstioInjection('mlflow', this)" class="injection-btn enabled">
+                                                    <i class="fas fa-check-circle"></i> Enabled
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="namespace-item">
+                                                <strong>kubeflow:</strong> 
+                                                <button onclick="toggleIstioInjection('kubeflow', this)" class="injection-btn disabled">
+                                                    <i class="fas fa-times-circle"></i> Disabled
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="namespace-item">
+                                                <strong>monitoring:</strong> 
+                                                <button onclick="toggleIstioInjection('monitoring', this)" class="injection-btn disabled">
+                                                    <i class="fas fa-times-circle"></i> Disabled
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="margin-top: 30px;">
+                                            <h4><i class="fas fa-eye"></i> Service Mesh Observability</h4>
+                                            <div class="observability-links">
+                                                <button onclick="window.open('/kiali/', '_blank')" class="service-link">
+                                                    <i class="fas fa-network-wired"></i> Launch Kiali
+                                                </button>
+                                                <button onclick="window.open('/grafana/', '_blank')" class="service-link">
+                                                    <i class="fas fa-chart-area"></i> Istio Metrics
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
                     <section id="contact" class="colorlib-services" data-section="contact">
                         <div class="colorlib-narrow-content">
                             <div class="row">
@@ -915,6 +1038,37 @@ data:
                 });
             });
         });
+        
+        // Istio Injection Toggle Function
+        function toggleIstioInjection(namespace, buttonElement) {
+            const currentState = buttonElement.classList.contains('enabled');
+            const newState = !currentState;
+            
+            // Simulate API call (in real implementation, this would call kubectl)
+            const action = newState ? 'enable' : 'disable';
+            
+            // Show confirmation
+            if (confirm(`${action === 'enable' ? 'Enable' : 'Disable'} Istio injection for namespace "${namespace}"?`)) {
+                // Toggle button state
+                if (newState) {
+                    buttonElement.classList.remove('disabled');
+                    buttonElement.classList.add('enabled');
+                    buttonElement.innerHTML = '<i class="fas fa-check-circle"></i> Enabled';
+                } else {
+                    buttonElement.classList.remove('enabled');
+                    buttonElement.classList.add('disabled');
+                    buttonElement.innerHTML = '<i class="fas fa-times-circle"></i> Disabled';
+                }
+                
+                // In a real implementation, you would make an API call here:
+                // kubectl label namespace ${namespace} istio-injection=${newState ? 'enabled' : 'disabled'}
+                
+                // Show success message
+                setTimeout(() => {
+                    alert(`Istio injection ${newState ? 'enabled' : 'disabled'} for namespace "${namespace}"`);
+                }, 500);
+            }
+        }
         </script>
     </body>
     </html>

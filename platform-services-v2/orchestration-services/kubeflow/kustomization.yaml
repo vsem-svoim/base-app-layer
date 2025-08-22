@@ -24,3 +24,29 @@ labels:
     app.kubernetes.io/component: ml-workflows
     app.kubernetes.io/part-of: base-platform
     deployment.wave: "2"
+
+patches:
+- target:
+    kind: Deployment
+    name: kubeflow-mysql
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_memory
+- target:
+    kind: Deployment
+    name: kubeflow-pipelines-api-server
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_compute
+- target:
+    kind: Deployment
+    name: kubeflow-ui-server
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_general
