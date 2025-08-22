@@ -134,7 +134,7 @@ data:
       spec:
         # Default node selector for workflow pods
         nodeSelector:
-          eks.amazonaws.com/nodegroup: platform_compute
+          NodeGroup: base-apps
         
         # Default resource limits
         podSpecPatch: |
@@ -211,7 +211,7 @@ spec:
     spec:
       serviceAccountName: argo
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_system
+        NodeGroup: base-apps
       containers:
       - name: workflow-controller
         image: quay.io/argoproj/workflow-controller:v3.5.11
@@ -280,7 +280,7 @@ spec:
     spec:
       serviceAccountName: argo-server
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_general
+        NodeGroup: base-apps
       containers:
       - name: argo-server
         image: quay.io/argoproj/argocli:v3.5.11
@@ -412,7 +412,7 @@ spec:
         app.kubernetes.io/component: database
     spec:
       nodeSelector:
-        eks.amazonaws.com/nodegroup: platform_memory
+        NodeGroup: base-apps
       containers:
       - name: postgres
         image: postgres:15-alpine

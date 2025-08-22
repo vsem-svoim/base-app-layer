@@ -10,31 +10,31 @@ metadata:
 data:
   default.conf: |
     upstream grafana_backend {
-        server grafana.platform-monitoring.svc.cluster.local:3000;
+        server 127.0.0.1:3000;  # Service not available yet
     }
     
     upstream prometheus_backend {
-        server prometheus.platform-monitoring.svc.cluster.local:9090;
+        server 127.0.0.1:9090;  # Service not available yet
     }
     
     upstream kibana_backend {
-        server kibana.platform-logging.svc.cluster.local:5601;
+        server 127.0.0.1:5601;  # Service not available yet
     }
     
     upstream airflow_backend {
-        server airflow.platform-orchestration.svc.cluster.local:8080;
+        server airflow.airflow.svc.cluster.local:8080;
     }
     
     upstream mlflow_backend {
-        server mlflow.platform-orchestration.svc.cluster.local:5000;
+        server mlflow.mlflow.svc.cluster.local:5000;
     }
     
     upstream argocd_backend {
-        server argocd-server.argocd.svc.cluster.local:80;
+        server 127.0.0.1:80;  # ArgoCD not available
     }
     
     upstream vault_backend {
-        server vault.vault.svc.cluster.local:8200;
+        server 127.0.0.1:8200;  # Vault not available
     }
     
     upstream argo_workflows_backend {
@@ -42,11 +42,15 @@ data:
     }
     
     upstream kubeflow_backend {
-        server kubeflow-dashboard.kubeflow.svc.cluster.local:80;
+        server kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
+    }
+    
+    upstream superset_backend {
+        server apache-superset.superset.svc.cluster.local:8088;
     }
     
     upstream kiali_backend {
-        server kiali.istio-mesh.svc.cluster.local:20001;
+        server 127.0.0.1:20001;  # Kiali not available
     }
     
     server {
@@ -115,6 +119,11 @@ data:
         
         location /kubeflow/ {
             proxy_pass http://kubeflow_backend/;
+        }
+        
+        location /superset/ {
+            proxy_pass http://superset_backend/;
+            proxy_set_header Accept-Encoding "";
         }
         
         location /istio/ {
