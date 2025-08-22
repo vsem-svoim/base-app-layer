@@ -428,6 +428,13 @@ EOF
     # Wait a moment for RBAC to propagate
     sleep 5
     
+    # Clean up any existing Jobs first (Jobs are immutable)
+    log_info "Cleaning up any existing Vault Jobs..."
+    kubectl delete job vault-init vault-unseal -n vault --ignore-not-found=true
+    
+    # Wait a moment for cleanup
+    sleep 2
+    
     # Now deploy the Jobs
     log_info "Deploying Vault automation Jobs..."
     cat <<'EOF' | kubectl apply -f -
@@ -640,6 +647,12 @@ show_access_info() {
 # Rollback function
 rollback() {
     log_warn "Rolling back Wave 0 deployment..."
+    
+    # Clean up Jobs first (they prevent namespace deletion)
+    kubectl delete jobs --all -n vault --ignore-not-found=true &> /dev/null &
+    kubectl delete jobs --all -n argocd --ignore-not-found=true &> /dev/null &
+    kubectl delete jobs --all -n cert-manager --ignore-not-found=true &> /dev/null &
+    kubectl delete jobs --all -n platform-ui --ignore-not-found=true &> /dev/null &
     
     # Delete namespaces with force cleanup
     for ns in argocd cert-manager vault platform-ui; do
