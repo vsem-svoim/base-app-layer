@@ -30,7 +30,7 @@ data:
     }
     
     upstream vault_backend {
-        server 127.0.0.1:8200;  # Vault service via Istio Gateway  
+        server vault.vault.svc.cluster.local:8200;
     }
     
     upstream istio_gateway_backend {
@@ -77,31 +77,11 @@ data:
         }
         
         # Service proxies with upstream backends and proper path handling
-        location /grafana/ {
-            proxy_pass http://grafana_backend/grafana/;
-            proxy_set_header Accept-Encoding "";
-            sub_filter_once off;
-            sub_filter '<head>' '<head><base href="/grafana/">';
-        }
-        
-        location /prometheus/ {
-            proxy_pass http://prometheus_backend/prometheus/;
-            proxy_set_header Accept-Encoding "";
-            sub_filter_once off;
-            sub_filter 'href="/' 'href="/prometheus/';
-            sub_filter 'src="/' 'src="/prometheus/';
-        }
-        
-        location /kibana/ {
-            proxy_pass http://kibana_backend/kibana/;
-            proxy_set_header kbn-xsrf true;
-            proxy_set_header Accept-Encoding "";
-        }
         
         location /airflow/ {
-            proxy_pass http://istio_gateway_backend/;
+            proxy_pass http://airflow_backend/;
             proxy_set_header Accept-Encoding "";
-            proxy_set_header Host "airflow.base-app-layer.dev";
+            proxy_set_header Host $host;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
             proxy_http_version 1.1;
@@ -120,30 +100,18 @@ data:
         }
         
         location /mlflow/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "mlflow.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
+            return 503 "MLflow service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
         }
         
         location /argocd/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "argocd.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
+            return 503 "ArgoCD service is being redeployed. Please contact administrators.";
+            add_header Content-Type text/plain;
         }
         
         location /vault/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "vault.base-app-layer.dev";
+            proxy_pass http://vault_backend/;
+            proxy_set_header Host $host;
             proxy_set_header X-Vault-Request true;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
@@ -153,47 +121,33 @@ data:
         }
         
         location /argo-workflows/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "argo-workflows.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
+            return 503 "Argo Workflows service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
         }
         
         location /kubeflow/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "kubeflow.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
+            return 503 "Kubeflow service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
         }
         
         location /superset/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "superset.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
+            return 503 "Superset service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
         }
         
         location /istio/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "kiali.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
+            return 503 "Kiali service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
+        }
+        
+        location /grafana/ {
+            return 503 "Grafana service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
+        }
+        
+        location /prometheus/ {
+            return 503 "Prometheus service is not currently deployed. Please contact administrators.";
+            add_header Content-Type text/plain;
         }
         
         
