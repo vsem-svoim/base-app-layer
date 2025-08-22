@@ -10,7 +10,8 @@ resources:
 - manifests/mlflow-deployment.yaml
 - mlflow-rbac.yaml
 - mlflow-service.yaml
-- mlflow-ingress.yaml
+# Ingress excluded - using centralized Platform UI ALB proxy instead
+# - mlflow-ingress.yaml
 
 namePrefix: ""
 nameSuffix: ""

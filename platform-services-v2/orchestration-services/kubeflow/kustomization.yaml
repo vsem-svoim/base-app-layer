@@ -12,7 +12,8 @@ resources:
   - kubeflow-pipelines-deployment.yaml
   - kubeflow-ui-deployment.yaml
   - kubeflow-services.yaml
-  - kubeflow-ingress.yaml
+  # Ingress excluded - using centralized Platform UI ALB proxy instead
+  # - kubeflow-ingress.yaml
 
 namespace: kubeflow
 

@@ -9,7 +9,8 @@ resources:
 - namespace.yaml
 - manifests/airflow-deployment.yaml
 - airflow-rbac.yaml
-- airflow-ingress.yaml
+# Ingress excluded - using centralized Platform UI ALB proxy instead
+# - airflow-ingress.yaml
 
 namePrefix: ""
 nameSuffix: ""

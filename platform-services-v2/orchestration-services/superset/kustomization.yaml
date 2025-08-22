@@ -11,7 +11,8 @@ resources:
 - superset-config.yaml
 - superset-deployment.yaml
 - superset-service.yaml
-- superset-ingress.yaml
+# Ingress excluded - using centralized Platform UI ALB proxy instead
+# - superset-ingress.yaml
 
 namePrefix: ""
 nameSuffix: ""

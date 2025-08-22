@@ -10,7 +10,8 @@ resources:
 - seldon-rbac.yaml
 - seldon-deployment.yaml
 - seldon-service.yaml
-- seldon-ingress.yaml
+# Ingress excluded - using centralized Platform UI ALB proxy instead
+# - seldon-ingress.yaml
 
 namePrefix: ""
 nameSuffix: ""
