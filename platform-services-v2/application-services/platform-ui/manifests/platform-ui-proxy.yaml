@@ -1203,13 +1203,8 @@ data:
                                         </ul>
                                         <h4>Access Commands:</h4>
                                         <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
-# Check all services
 kubectl get pods -A
-
-# Access ArgoCD
 kubectl port-forward svc/argocd-server -n argocd 8080:443
-
-# Check applications
 kubectl get applications -n argocd</pre>
                                     </div>
                                 </div>
