@@ -15,15 +15,23 @@ namespace: monitoring
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: monitoring
-  app.kubernetes.io/component: observability
-  app.kubernetes.io/part-of: base-platform
-  deployment.wave: "1"
+    app.kubernetes.io/name: monitoring
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: base-platform
+    deployment.wave: "1"
 
 patches:
 - target:
     kind: Deployment
     name: prometheus
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_system
+- target:
+    kind: Deployment
+    name: grafana
   patch: |-
     - op: replace
       path: /spec/template/spec/nodeSelector
