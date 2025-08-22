@@ -66,6 +66,9 @@ data:
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
         
         # Health check
         location /health {
@@ -99,6 +102,11 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Accept-Encoding "";
             proxy_set_header Host "airflow.base-app-layer.dev";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+            proxy_redirect off;
+            proxy_buffering off;
             sub_filter_once off;
             sub_filter 'href="/' 'href="/airflow/';
             sub_filter 'src="/' 'src="/airflow/';
@@ -115,12 +123,20 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "mlflow.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         location /argocd/ {
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "argocd.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
             proxy_redirect off;
             proxy_buffering off;
         }
@@ -129,6 +145,9 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "vault.base-app-layer.dev";
             proxy_set_header X-Vault-Request true;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
             proxy_redirect off;
             proxy_buffering off;
         }
@@ -137,6 +156,9 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "argo-workflows.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
             proxy_redirect off;
             proxy_buffering off;
         }
@@ -145,6 +167,9 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "kubeflow.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
             proxy_redirect off;
             proxy_buffering off;
         }
@@ -153,6 +178,9 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "superset.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
             proxy_redirect off;
             proxy_buffering off;
         }
@@ -161,6 +189,9 @@ data:
             proxy_pass http://istio_gateway_backend/;
             proxy_set_header Host "kiali.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
             proxy_redirect off;
             proxy_buffering off;
         }
