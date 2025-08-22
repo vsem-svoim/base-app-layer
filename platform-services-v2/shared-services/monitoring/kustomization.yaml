@@ -10,7 +10,7 @@ resources:
 - manifests/grafana-deployment.yaml
 - manifests/prometheus-deployment.yaml
 
-namespace: platform-monitoring
+namespace: monitoring
 
 labels:
 - includeSelectors: true

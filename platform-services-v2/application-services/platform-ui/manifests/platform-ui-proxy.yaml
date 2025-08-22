@@ -36,14 +36,13 @@ data:
         server apache-superset.superset.svc.cluster.local:8088;
     }
     
-    # Note: Grafana and Prometheus are not deployed yet
-    # upstream grafana_backend {
-    #     server prometheus-grafana.monitoring.svc.cluster.local:80;
-    # }
+    upstream grafana_backend {
+        server grafana.monitoring.svc.cluster.local:3000;
+    }
     
-    # upstream prometheus_backend {
-    #     server prometheus-server.monitoring.svc.cluster.local:80;
-    # }
+    upstream prometheus_backend {
+        server prometheus.monitoring.svc.cluster.local:9090;
+    }
     
     server {
         listen 80;
@@ -126,15 +125,23 @@ data:
             proxy_redirect http://apache-superset.superset.svc.cluster.local:8088/ /superset/;
         }
         
-        # Monitoring Services
+        # Wave 1 Monitoring Services
         location /grafana/ {
-            return 503 '{"status":"not_deployed","message":"Grafana not deployed. Deploy monitoring stack first.","wave":"monitoring","service":"grafana"}';
-            add_header Content-Type application/json;
+            proxy_pass http://grafana_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://grafana.monitoring.svc.cluster.local:3000/ /grafana/;
         }
         
         location /prometheus/ {
-            return 503 '{"status":"not_deployed","message":"Prometheus not deployed. Deploy monitoring stack first.","wave":"monitoring","service":"prometheus"}';
-            add_header Content-Type application/json;
+            proxy_pass http://prometheus_backend/prometheus/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://prometheus.monitoring.svc.cluster.local:9090/ /prometheus/;
         }
         
         
