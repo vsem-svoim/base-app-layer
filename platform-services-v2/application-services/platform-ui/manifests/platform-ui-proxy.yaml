@@ -76,91 +76,20 @@ data:
             add_header Content-Type text/plain;
         }
         
-        # Service proxies with upstream backends and proper path handling
-        
-        location /airflow/ {
-            proxy_pass http://airflow_backend/;
-            proxy_set_header Accept-Encoding "";
-            proxy_set_header Host $host;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
-            sub_filter_once off;
-            sub_filter 'href="/' 'href="/airflow/';
-            sub_filter 'src="/' 'src="/airflow/';
-        }
-        
-        # Data Ingestion Testing API
-        location /api/data-ingestion/test {
-            proxy_pass http://istio_gateway_backend/api/data-ingestion/test;
-            proxy_set_header Host "data-ingestion.base-app-layer.dev";
-            proxy_set_header Content-Type application/json;
-        }
-        
-        location /mlflow/ {
-            return 503 "MLflow service is not currently deployed. Please contact administrators.";
-            add_header Content-Type text/plain;
-        }
-        
+        # Wave 0 Core Services - Clean slate for proper deployment testing
         location /argocd/ {
-            # Try to proxy to ArgoCD service, fallback to service status
-            proxy_pass http://argocd-server.argocd.svc.cluster.local:80/;
-            proxy_set_header Host $host;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
-            
-            # If service is not available, show status
-            error_page 502 503 504 = @argocd_unavailable;
-        }
-        
-        location @argocd_unavailable {
-            return 503 "ArgoCD service is not available. Check ApplicationSet deployment status.";
+            return 503 "Wave 0 not deployed. Deploy ArgoCD first using Wave 0 commands.";
             add_header Content-Type text/plain;
         }
         
         location /vault/ {
-            proxy_pass http://vault_backend/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Vault-Request true;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_http_version 1.1;
-            proxy_redirect off;
-            proxy_buffering off;
-        }
-        
-        location /argo-workflows/ {
-            return 503 "Argo Workflows service is not currently deployed. Please contact administrators.";
+            return 503 "Wave 0 not deployed. Deploy Vault first using Wave 0 commands.";
             add_header Content-Type text/plain;
         }
         
-        location /kubeflow/ {
-            return 503 "Kubeflow service is not currently deployed. Please contact administrators.";
-            add_header Content-Type text/plain;
-        }
-        
-        location /superset/ {
-            return 503 "Superset service is not currently deployed. Please contact administrators.";
-            add_header Content-Type text/plain;
-        }
-        
-        location /istio/ {
-            return 503 "Kiali service is not currently deployed. Please contact administrators.";
-            add_header Content-Type text/plain;
-        }
-        
-        location /grafana/ {
-            return 503 "Grafana service is not currently deployed. Please contact administrators.";
-            add_header Content-Type text/plain;
-        }
-        
-        location /prometheus/ {
-            return 503 "Prometheus service is not currently deployed. Please contact administrators.";
+        # All other services require Wave 0 foundation
+        location ~ ^/(airflow|mlflow|kubeflow|superset|grafana|prometheus|kiali|istio|seldon)/ {
+            return 503 "Service requires Wave 0 foundation. Deploy ArgoCD and core services first.";
             add_header Content-Type text/plain;
         }
         
@@ -916,26 +845,21 @@ data:
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="deployment-status">
-                                        <h3>Wave-Based Deployment Commands</h3>
-                                        <div class="wave-status">
-                                            <h4>✅ Wave 1: Platform Services (DEPLOYED)</h4>
-                                            <pre><code>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave1-shared-services.yaml</code></pre>
-                                            <p>Status: Platform UI + Istio Service Mesh operational</p>
+                                        <h3>Wave 0: Core Services Deployment (REQUIRED FIRST)</h3>
+                                        <div class="wave-status" style="border-left-color: #dc2626;">
+                                            <h4>❌ Wave 0: Core Foundation (NOT DEPLOYED)</h4>
+                                            <p><strong>BOOTSTRAP PROBLEM: ArgoCD ApplicationSet requires ArgoCD to be running</strong></p>
+                                            <p><strong>Manual Wave 0 deployment commands:</strong></p>
+                                            <pre><code># Option 1: Use deployment script<br/>cd platform-services-v2/automation/scripts<br/>./deploy-platform.sh core</code></pre>
+                                            <p><strong>Option 2: Deploy manually step by step:</strong></p>
+                                            <pre><code># 1. Deploy ArgoCD first (bootstrap)<br/>kubectl create namespace argocd<br/>kubectl apply -k platform-services-v2/core-services/argocd<br/><br/># 2. Wait for ArgoCD to be ready<br/>kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s<br/><br/># 3. Deploy Wave 0 ApplicationSet<br/>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave0-core-services.yaml<br/><br/># 4. Verify Wave 0 ApplicationSet deployment<br/>kubectl get applicationsets -n argocd<br/>kubectl get applications -n argocd</code></pre>
+                                            <p><strong>Verify Wave 0 deployment:</strong></p>
+                                            <pre><code>kubectl get pods -n argocd<br/>kubectl get pods -n vault<br/>kubectl get pods -n cert-manager<br/>kubectl get pods -n kube-system | grep aws-load-balancer</code></pre>
                                         </div>
-                                        <div class="wave-status">
-                                            <h4>🔄 Wave 2: Orchestration Services (PENDING)</h4>
-                                            <pre><code>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave2-monitoring-logging.yaml</code></pre>
-                                            <p>Will deploy: MLflow, Kubeflow, Superset, Seldon Core</p>
-                                        </div>
-                                        <div class="wave-status">
-                                            <h4>⏳ Wave 3: Application Services (PENDING)</h4>
-                                            <pre><code>kubectl apply -f platform-services-v2/automation/gitops/applicationsets/wave3-application-services.yaml</code></pre>
-                                            <p>Will deploy: API Gateway, Data Services</p>
-                                        </div>
-                                        <div class="wave-status">
-                                            <h4>📋 ArgoCD Verification</h4>
-                                            <pre><code>kubectl get applicationsets -n argocd<br/>kubectl get applications -n argocd -o custom-columns=NAME,SYNC,HEALTH</code></pre>
-                                            <p>Verify ArgoCD is running and managing ApplicationSets</p>
+                                        <div class="wave-status" style="border-left-color: #6b7280;">
+                                            <h4>⏸️ Wave 1-3: Require Wave 0 Foundation</h4>
+                                            <p>Platform UI, Istio, and all other services require ArgoCD and Wave 0 core services to be deployed first.</p>
+                                            <p><strong>After Wave 0 is complete, deploy subsequent waves via ApplicationSets.</strong></p>
                                         </div>
                                     </div>
                                 </div>
