@@ -104,13 +104,35 @@ deploy_aws_lb_controller() {
 deploy_vault() {
     log_info "Deploying Vault..."
     
-    # Wait for any terminating vault namespace to be gone
-    while kubectl get namespace vault &> /dev/null; do
-        log_info "Waiting for vault namespace to be deleted..."
-        sleep 5
-    done
+    # Force cleanup any existing vault namespace with timeout
+    if kubectl get namespace vault &> /dev/null; then
+        log_info "Cleaning up existing vault namespace..."
+        kubectl delete namespace vault --force --grace-period=0 &> /dev/null || true
+        kubectl patch namespace vault -p '{"metadata":{"finalizers":[]}}' --type=merge &> /dev/null || true
+        
+        # Wait with timeout (max 30 seconds)
+        local timeout=15
+        local count=0
+        while kubectl get namespace vault &> /dev/null && [ $count -lt $timeout ]; do
+            log_info "Waiting for vault namespace cleanup... ($count/$timeout)"
+            sleep 2
+            ((count++))
+        done
+        
+        # If still stuck, force finalize and continue
+        if kubectl get namespace vault &> /dev/null; then
+            log_warn "Namespace stuck, continuing anyway..."
+            kubectl get namespace vault -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/vault/finalize" -f - &> /dev/null || true
+        fi
+    fi
     
-    kubectl create namespace vault
+    # Create namespace (will succeed even if old one is terminating)
+    kubectl create namespace vault 2>/dev/null || kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+EOF
     
     # Deploy minimal Vault (avoid Helm complications)
     cat <<EOF | kubectl apply -f -
@@ -353,13 +375,31 @@ show_access_info() {
 rollback() {
     log_warn "Rolling back Wave 0 deployment..."
     
-    kubectl delete namespace argocd --force --grace-period=0 &
-    kubectl delete namespace cert-manager --force --grace-period=0 &
-    kubectl delete namespace vault --force --grace-period=0 &
-    kubectl delete namespace platform-ui --force --grace-period=0 &
-    kubectl delete -k platform-services-v2/core-services/aws-load-balancer-controller 2>/dev/null &
+    # Delete namespaces with force cleanup
+    for ns in argocd cert-manager vault platform-ui; do
+        if kubectl get namespace $ns &> /dev/null; then
+            log_info "Cleaning up namespace: $ns"
+            kubectl delete namespace $ns --force --grace-period=0 &> /dev/null &
+            kubectl patch namespace $ns -p '{"metadata":{"finalizers":[]}}' --type=merge &> /dev/null &
+        fi
+    done
     
-    wait
+    # Clean up AWS LB Controller if local manifests exist
+    if [[ -f "platform-services-v2/core-services/aws-load-balancer-controller/kustomization.yaml" ]]; then
+        kubectl delete -k platform-services-v2/core-services/aws-load-balancer-controller &> /dev/null &
+    fi
+    
+    # Wait a bit for cleanup
+    sleep 10
+    
+    # Force finalize any stuck namespaces
+    for ns in argocd cert-manager vault platform-ui; do
+        if kubectl get namespace $ns &> /dev/null; then
+            log_warn "Force finalizing stuck namespace: $ns"
+            kubectl get namespace $ns -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/$ns/finalize" -f - &> /dev/null || true
+        fi
+    done
+    
     log_info "Rollback complete"
 }
 
