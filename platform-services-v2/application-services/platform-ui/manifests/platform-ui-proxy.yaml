@@ -227,7 +227,7 @@ data:
             align-items: stretch;
         }
         .col-md-3 { flex: 0 0 25%; max-width: 25%; padding: 0 15px; margin-bottom: 30px; }
-        .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px; margin-bottom: 30px; }
+        .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px; margin-bottom: 40px; display: flex; }
         .col-md-6 { flex: 0 0 50%; max-width: 50%; padding: 0 15px; margin-bottom: 30px; }
         .col-md-12 { flex: 0 0 100%; max-width: 100%; padding: 0 15px; }
         .col-md-offset-3 { margin-left: 25%; }
@@ -328,16 +328,17 @@ data:
         
         .services {
             background: #fff;
-            padding: 40px;
+            padding: 30px;
             border-radius: 7px;
             box-shadow: 0 5px 20px 0 rgba(0, 0, 0, 0.1);
             transition: 0.3s;
-            margin-bottom: 30px;
+            margin-bottom: 0;
             position: relative;
             height: 100%;
             display: flex;
             flex-direction: column;
-            min-height: 320px;
+            min-height: 280px;
+            width: 100%;
         }
         
         .services:hover { box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.15); transform: translateY(-5px); }
@@ -476,12 +477,12 @@ data:
             #colorlib-aside { transform: translateX(-300px); }
             #colorlib-main { width: 100%; }
             .colorlib-narrow-content { padding: 0 1em; }
-            .col-md-4 { flex: 0 0 100%; max-width: 100%; }
+            .col-md-4 { flex: 0 0 100%; max-width: 100%; margin-bottom: 20px; }
             .col-md-3 { flex: 0 0 50%; max-width: 50%; }
             .col-md-6 { flex: 0 0 100%; max-width: 100%; }
             .col-md-offset-3 { margin-left: 0; }
             .col-md-pull-3 { right: 0; position: static; }
-            .services { min-height: 280px; }
+            .services { min-height: 240px; padding: 20px; }
         }
         
         @media screen and (max-width: 480px) {
@@ -634,19 +635,6 @@ data:
                                             <h3>Prometheus</h3>
                                             <p>Metrics collection and monitoring system with powerful querying capabilities</p>
                                             <a href="javascript:void(0)" onclick="openService('/prometheus/')" class="service-link">Access Prometheus</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-4 text-center animate-box">
-                                    <div class="services color-4">
-                                        <div class="service-status">LOGGING</div>
-                                        <span class="icon"><i class="icon-search"></i></span>
-                                        <div class="desc">
-                                            <h3>Kibana</h3>
-                                            <p>Elasticsearch-powered log analysis and visualization for centralized logging and search</p>
-                                            <a href="javascript:void(0)" onclick="openService('/kibana/')" class="service-link">Access Kibana</a>
                                         </div>
                                     </div>
                                 </div>
@@ -1093,13 +1081,18 @@ data:
             
             // Service navigation function
             function openService(path) {
-                // Use current hostname with new path for proper Istio routing
-                const currentHost = window.location.hostname;
-                const currentPort = window.location.port ? ':' + window.location.port : '';
-                const newUrl = window.location.protocol + '//' + currentHost + currentPort + path;
-                
-                // Navigate to service through NGINX proxy
-                window.location.href = newUrl;
+                // Force navigation to the service path
+                try {
+                    // Use window.open and immediately replace current location
+                    const serviceWindow = window.open(path, '_blank');
+                    if (!serviceWindow) {
+                        // Fallback: direct navigation in same window
+                        window.location.assign(path);
+                    }
+                } catch (error) {
+                    // Final fallback: simple location change
+                    window.location.href = path;
+                }
             }
         </script>
     </body>
