@@ -26,7 +26,7 @@ data:
     }
     
     upstream mlflow_backend {
-        server mlflow.mlflow.svc.cluster.local:5000;
+        server 127.0.0.1:5000;  # MLflow not available yet
     }
     
     upstream argocd_backend {
@@ -34,19 +34,19 @@ data:
     }
     
     upstream vault_backend {
-        server 127.0.0.1:8200;  # Vault not available
+        server vault.vault.svc.cluster.local:8200;
     }
     
     upstream argo_workflows_backend {
-        server argo-server.argo-workflows.svc.cluster.local:2746;
+        server 127.0.0.1:2746;  # Argo Workflows not available yet
     }
     
     upstream kubeflow_backend {
-        server kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
+        server 127.0.0.1:3000;  # Kubeflow not available yet
     }
     
     upstream superset_backend {
-        server apache-superset.superset.svc.cluster.local:8088;
+        server 127.0.0.1:8088;  # Superset not available yet
     }
     
     upstream kiali_backend {
