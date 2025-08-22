@@ -17,7 +17,7 @@ spec:
         app: kubeflow-mysql
     spec:
       nodeSelector:
-        NodeGroup: base-apps
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: mysql
         image: mysql:8.0

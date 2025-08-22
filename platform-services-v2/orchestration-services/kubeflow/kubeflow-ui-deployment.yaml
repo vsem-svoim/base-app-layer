@@ -21,7 +21,7 @@ spec:
     spec:
       serviceAccountName: kubeflow-pipelines
       nodeSelector:
-        NodeGroup: base-apps
+        eks.amazonaws.com/nodegroup: platform_system
       containers:
       - name: ui-server
         image: gcr.io/ml-pipeline/frontend:2.2.0
