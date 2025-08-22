@@ -135,7 +135,7 @@ metadata:
 EOF
     
     # Deploy minimal Vault (avoid Helm complications)
-    cat <<EOF | kubectl apply -f -
+    cat <<'EOF' | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
