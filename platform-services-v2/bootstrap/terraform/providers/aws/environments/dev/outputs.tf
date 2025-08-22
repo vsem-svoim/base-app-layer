@@ -149,6 +149,39 @@ output "data_processing_role_arn" {
 }
 
 # ===================================================================
+# SSL Certificate Outputs
+# ===================================================================
+
+output "ssl_certificate_arn" {
+  description = "SSL certificate ARN"
+  value       = var.enable_ssl_certificates ? module.acm_certificates[0].certificate_arn : null
+}
+
+output "ssl_certificate_domain" {
+  description = "SSL certificate domain"
+  value       = var.enable_ssl_certificates ? module.acm_certificates[0].certificate_domain : null
+}
+
+# ===================================================================
+# DNS Outputs
+# ===================================================================
+
+output "hosted_zone_id" {
+  description = "Route 53 hosted zone ID"
+  value       = var.enable_dns_management ? module.route53_dns[0].hosted_zone_id : null
+}
+
+output "platform_fqdn" {
+  description = "Platform FQDN"
+  value       = var.enable_dns_management ? module.route53_dns[0].platform_fqdn : var.platform_domain
+}
+
+output "platform_url" {
+  description = "Platform HTTPS URL"
+  value       = "https://${var.platform_domain}"
+}
+
+# ===================================================================
 # Kubectl Commands for Cluster Access
 # ===================================================================
 output "kubectl_config_base_cluster" {
@@ -176,7 +209,15 @@ output "deployment_summary" {
     data_storage_enabled       = var.enable_data_storage
     databases_enabled          = var.enable_databases
     service_iam_enabled        = var.enable_service_iam
+    ssl_certificates_enabled   = var.enable_ssl_certificates
+    dns_management_enabled     = var.enable_dns_management
     monitoring_enabled         = var.enable_monitoring
     backup_enabled             = var.enable_backup
+    platform_access = {
+      domain           = var.platform_domain
+      ssl_certificate  = var.enable_ssl_certificates ? module.acm_certificates[0].certificate_arn : "none"
+      alb_dns_name     = var.alb_dns_name
+      platform_url     = "https://${var.platform_domain}"
+    }
   }
 }

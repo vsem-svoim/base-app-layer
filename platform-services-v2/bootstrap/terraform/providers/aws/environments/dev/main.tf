@@ -290,6 +290,47 @@ module "iam_service_roles" {
 }
 
 # ===================================================================
+# SSL Certificate Management (ACM)
+# ===================================================================
+module "acm_certificates" {
+  count  = var.enable_ssl_certificates ? 1 : 0
+  source = "../../modules/acm"
+
+  project_name     = var.project_name
+  environment      = var.environment
+  platform_domain  = var.platform_domain
+  base_domain      = var.base_domain
+  
+  common_tags      = var.common_tags
+}
+
+# ===================================================================
+# DNS Management (Route 53)
+# ===================================================================
+module "route53_dns" {
+  count  = var.enable_dns_management ? 1 : 0
+  source = "../../modules/route53"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  region             = var.region
+  domain_name        = var.base_domain
+  platform_subdomain = var.platform_domain
+  
+  # ALB integration (will be populated after ALB creation)
+  alb_dns_name       = var.alb_dns_name
+  alb_zone_id        = var.alb_zone_id
+  
+  # Certificate validation records from ACM module
+  certificate_validation_records = var.enable_ssl_certificates ? module.acm_certificates[0].domain_validation_options : {}
+  
+  enable_health_checks = var.enable_health_checks
+  common_tags         = var.common_tags
+  
+  depends_on = [module.acm_certificates]
+}
+
+# ===================================================================
 # Crossplane Infrastructure as Code Platform
 # ===================================================================
 module "crossplane" {
@@ -314,6 +355,31 @@ module "crossplane" {
   common_tags           = var.common_tags
 
   depends_on = [module.eks_platform_cluster]
+}
+
+# ===================================================================
+# Karpenter Node Provisioning for Base Cluster
+# ===================================================================
+module "karpenter_base_cluster" {
+  count  = var.base_cluster_enabled && var.enable_karpenter ? 1 : 0
+  source = "../../modules/karpenter"
+
+  cluster_name           = module.eks_base_cluster[0].cluster_name
+  cluster_endpoint       = module.eks_base_cluster[0].cluster_endpoint
+  
+  enable_karpenter       = var.enable_karpenter
+  karpenter_version      = var.karpenter_version
+  karpenter_irsa_role_arn = module.eks_base_cluster[0].pod_identity_role_arns["karpenter"]
+  
+  vpc_id                 = module.vpc.vpc_id
+  subnet_ids             = module.vpc.private_subnets
+  
+  common_tags            = var.common_tags
+
+  depends_on = [
+    module.eks_base_cluster,
+    module.vpc
+  ]
 }
 
 # ===================================================================

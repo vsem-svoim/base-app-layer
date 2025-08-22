@@ -154,18 +154,23 @@ variable "base_cluster_config" {
       instance_types = list(string)
       capacity_type  = optional(string, "SPOT")
       min_size      = optional(number, 1)
-      max_size      = optional(number, 2)
+      max_size      = optional(number, 10)
       desired_size  = optional(number, 1)
       disk_size     = optional(number, 100)
       disk_type     = optional(string, "gp3")
       ami_type      = optional(string, "BOTTLEROCKET_x86_64")
       labels        = optional(map(string), {})
+      taints        = optional(list(object({
+        key    = string
+        value  = optional(string)
+        effect = string
+      })), [])
       
       mixed_instances_policy = optional(object({
         instances_distribution = optional(object({
-          on_demand_percentage     = optional(number, 40)
+          on_demand_percentage     = optional(number, 20)
           spot_allocation_strategy = optional(string, "price-capacity-optimized")
-          spot_instance_pools      = optional(number, 2)
+          spot_instance_pools      = optional(number, 3)
         }), {})
       }), null)
     })), {})
@@ -173,39 +178,89 @@ variable "base_cluster_config" {
   
   default = {
     version            = "1.33"
-    enable_fargate     = true
+    enable_fargate     = false
     enable_managed_nodes = true
     
-    fargate_profiles = {
-      base_data_ingestion = {
-        namespace_selectors = ["base-data-ingestion"]
-        label_selectors    = {}
-        subnet_type        = "private"
-      }
-    }
+    fargate_profiles = {}
     
     managed_node_groups = {
-      base_apps = {
-        instance_types = ["m7i.2xlarge", "m7i.4xlarge"]
-        capacity_type  = "SPOT"
-        min_size      = 1
-        max_size      = 2
-        desired_size  = 1
-        disk_size     = 100
+      base_data_processing = {
+        instance_types = ["m7i.2xlarge", "m7i.4xlarge", "m7i.8xlarge"]
+        capacity_type  = "MIXED"
+        min_size      = 2
+        max_size      = 10
+        desired_size  = 3
+        disk_size     = 200
         disk_type     = "gp3"
-        ami_type      = "BOTTLEROCKET_x86_64"
+        ami_type      = "AL2_x86_64"
         
         labels = {
-          NodeGroup    = "base-apps"
+          NodeGroup    = "base-data-processing"
           Environment  = "dev"
-          WorkloadType = "base-apps"
+          WorkloadType = "data-processing"
+          "cluster-autoscaler/enabled" = "true"
+          "cluster-autoscaler/base-app-layer-dev" = "owned"
         }
         
         mixed_instances_policy = {
           instances_distribution = {
-            on_demand_percentage     = 40
+            on_demand_percentage     = 20
             spot_allocation_strategy = "price-capacity-optimized"
-            spot_instance_pools      = 2
+            spot_instance_pools      = 3
+          }
+        }
+      }
+      
+      base_data_compute = {
+        instance_types = ["c7i.4xlarge", "c7i.8xlarge", "c7i.16xlarge"]
+        capacity_type  = "MIXED"
+        min_size      = 1
+        max_size      = 20
+        desired_size  = 2
+        disk_size     = 100
+        disk_type     = "gp3"
+        ami_type      = "AL2_x86_64"
+        
+        labels = {
+          NodeGroup    = "base-data-compute"
+          Environment  = "dev"
+          WorkloadType = "compute-intensive"
+          "cluster-autoscaler/enabled" = "true"
+          "cluster-autoscaler/base-app-layer-dev" = "owned"
+        }
+        
+        mixed_instances_policy = {
+          instances_distribution = {
+            on_demand_percentage     = 20
+            spot_allocation_strategy = "price-capacity-optimized"
+            spot_instance_pools      = 3
+          }
+        }
+      }
+      
+      base_data_memory = {
+        instance_types = ["r7i.2xlarge", "r7i.4xlarge", "r7i.8xlarge"]
+        capacity_type  = "MIXED"
+        min_size      = 0
+        max_size      = 10
+        desired_size  = 1
+        disk_size     = 100
+        disk_type     = "gp3"
+        ami_type      = "AL2_x86_64"
+        
+        labels = {
+          NodeGroup    = "base-data-memory"
+          Environment  = "dev"
+          WorkloadType = "memory-intensive"
+          "cluster-autoscaler/enabled" = "true"
+          "cluster-autoscaler/base-app-layer-dev" = "owned"
+        }
+        
+        mixed_instances_policy = {
+          instances_distribution = {
+            on_demand_percentage     = 20
+            spot_allocation_strategy = "price-capacity-optimized"
+            spot_instance_pools      = 3
           }
         }
       }
@@ -394,6 +449,21 @@ variable "pod_identity_associations" {
       service_account = "aws-load-balancer-controller"
       policy_arns    = ["arn:aws:iam::084129280818:policy/AWSLoadBalancerControllerIAMPolicy"]
     }
+    cluster_autoscaler = {
+      namespace       = "kube-system"
+      service_account = "cluster-autoscaler"
+      policy_arns    = ["arn:aws:iam::aws:policy/AutoScalingFullAccess"]
+    }
+    karpenter = {
+      namespace       = "karpenter"
+      service_account = "karpenter"
+      policy_arns    = [
+        "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+        "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+        "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      ]
+    }
   }
 }
 
@@ -476,6 +546,52 @@ variable "common_tags" {
 }
 
 # ===================================================================
+# Domain and SSL Configuration
+# ===================================================================
+
+variable "base_domain" {
+  description = "Base domain name (e.g., vsem-svoim.com)"
+  type        = string
+  default     = "vsem-svoim.com"
+}
+
+variable "platform_domain" {
+  description = "Platform subdomain FQDN (e.g., fin.vsem-svoim.com)"
+  type        = string
+  default     = "fin.vsem-svoim.com"
+}
+
+variable "enable_ssl_certificates" {
+  description = "Enable SSL certificate creation and management"
+  type        = bool
+  default     = true
+}
+
+variable "enable_dns_management" {
+  description = "Enable Route 53 DNS management"
+  type        = bool
+  default     = true
+}
+
+variable "enable_health_checks" {
+  description = "Enable Route 53 health checks"
+  type        = bool
+  default     = true
+}
+
+variable "alb_dns_name" {
+  description = "ALB DNS name for Route 53 A record"
+  type        = string
+  default     = "fin-vsem-svoim-com-1611579503.us-east-1.elb.amazonaws.com"
+}
+
+variable "alb_zone_id" {
+  description = "ALB hosted zone ID for Route 53 alias"
+  type        = string
+  default     = "Z35SXDOTRQ7X7K" # US East 1 ALB zone
+}
+
+# ===================================================================
 # Crossplane Configuration
 # ===================================================================
 variable "enable_crossplane" {
@@ -524,4 +640,26 @@ variable "crossplane_create_irsa_role" {
   description = "Create IRSA role for Crossplane"
   type        = bool
   default     = true
+}
+
+# ===================================================================
+# Cluster Autoscaling Configuration
+# ===================================================================
+
+variable "enable_cluster_autoscaler" {
+  description = "Enable Cluster Autoscaler"
+  type        = bool
+  default     = true
+}
+
+variable "enable_karpenter" {
+  description = "Enable Karpenter node provisioning"
+  type        = bool
+  default     = true
+}
+
+variable "karpenter_version" {
+  description = "Karpenter Helm chart version"
+  type        = string
+  default     = "1.6.2"
 }
