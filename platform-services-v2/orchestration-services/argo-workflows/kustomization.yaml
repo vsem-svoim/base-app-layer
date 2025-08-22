@@ -19,3 +19,29 @@ labels:
     app.kubernetes.io/component: workflow-engine
     app.kubernetes.io/part-of: base-platform
     deployment.wave: "2"
+
+patches:
+- target:
+    kind: Deployment
+    name: argo-server
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_system
+- target:
+    kind: Deployment
+    name: workflow-controller
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_system
+- target:
+    kind: StatefulSet
+    name: workflow-postgres
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        eks.amazonaws.com/nodegroup: platform_system
