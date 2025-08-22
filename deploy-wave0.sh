@@ -432,16 +432,54 @@ EOF
     log_info "Waiting for Vault service to be ready before creating automation Jobs..."
     VAULT_SERVICE_URL="http://vault.vault.svc.cluster.local:8200"
     
-    for i in $(seq 1 30); do
-        if curl -sf "$VAULT_SERVICE_URL/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" >/dev/null 2>&1; then
-            log_info "✅ Vault service is responding, proceeding with automation Jobs"
-            break
+    # First, let's diagnose what's actually happening
+    log_info "🔍 Diagnosing Vault deployment status..."
+    log_info "Pod status:"
+    kubectl get pods -n vault -o wide
+    log_info "Service status:"
+    kubectl get svc -n vault -o wide
+    log_info "Service endpoints:"
+    kubectl get endpoints -n vault
+    log_info "Pod logs (last 20 lines):"
+    kubectl logs -n vault --tail=20 deployment/vault || log_warn "Could not get logs"
+    
+    for i in $(seq 1 60); do  # Increased to 60 attempts (10 minutes)
+        log_info "🔬 Attempt $i/60: Testing Vault connectivity..."
+        
+        # Test 1: Basic connectivity to service
+        if kubectl exec -n vault deployment/vault -- curl -f "http://localhost:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" 2>/dev/null; then
+            log_info "✅ Vault localhost health check passed"
+            
+            # Test 2: Service DNS resolution
+            if nslookup vault.vault.svc.cluster.local >/dev/null 2>&1; then
+                log_info "✅ DNS resolution working"
+                
+                # Test 3: Service connectivity from external
+                if curl -sf "$VAULT_SERVICE_URL/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" >/dev/null 2>&1; then
+                    log_info "✅ Vault service is responding, proceeding with automation Jobs"
+                    break
+                else
+                    log_warn "❌ External service connectivity failed"
+                fi
+            else
+                log_warn "❌ DNS resolution failed for vault.vault.svc.cluster.local"
+            fi
+        else
+            log_warn "❌ Vault localhost health check failed"
+            log_info "Current Vault status:"
+            kubectl exec -n vault deployment/vault -- curl -s "http://localhost:8200/v1/sys/health" 2>/dev/null || log_warn "No response from Vault"
         fi
-        if [ $i -eq 30 ]; then
-            log_error "❌ Vault service not responding after 30 attempts"
+        
+        if [ $i -eq 60 ]; then
+            log_error "❌ Vault service not responding after 60 attempts (10 minutes)"
+            log_error "Final diagnostics:"
+            kubectl describe pods -n vault
+            kubectl describe svc -n vault
+            kubectl logs -n vault --tail=50 deployment/vault
             return 1
         fi
-        log_info "⏳ Waiting for Vault service... (attempt $i/30)"
+        
+        log_info "⏳ Waiting for Vault service... (attempt $i/60)"
         sleep 10
     done
     
