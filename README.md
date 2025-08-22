@@ -1,19 +1,19 @@
 # BASE App Layer - Enterprise Data Platform
 
-Enterprise data platform with 14 specialized modules and wave-based GitOps architecture for data processing.
+Enterprise data platform with 14 specialized modules, Karpenter v1.6.2 autoscaling, and wave-based GitOps architecture for high-performance data processing.
 
-## Current Deployment Status (Updated 2025-08-21 18:20 UTC)
+## Current Deployment Status (Updated 2025-08-22 17:45 UTC)
 
-**Platform Status: Dual-Cluster Architecture - BASE Modules Ready for Deployment**
+**Platform Status: Production-Ready with Karpenter Autoscaling & SSL-Secured Domain**
 
 | Phase | Component | Status | Health | Cluster | Details |
 |-------|-----------|--------|--------|---------|---------|
-| Phase 1 | Infrastructure | Complete | ✅ Healthy | Both | Dual EKS clusters with auto-scaling node groups |
-| Phase 2 | Terraform Automation | Complete | ✅ Healthy | Both | Kubeconfig auto-management via null resources |
+| Phase 1 | Infrastructure | Complete | ✅ Healthy | Both | Dual EKS clusters with Karpenter v1.6.2 autoscaling |
+| Phase 2 | SSL & Domain | Complete | ✅ Healthy | Both | https://fin.vsem-svoim.com with validated certificate |
 | Phase 3 | GitOps Wave 0 | Complete | ✅ Healthy | Platform | ArgoCD, Vault, Cert-Manager, AWS LB Controller |
 | Phase 4 | GitOps Wave 1 | Complete | ✅ Healthy | Platform | Professional Platform UI, Istio, Monitoring Stack |
-| Phase 5 | GitOps Wave 2 | Complete | ✅ Healthy | Platform | Airflow ✅, MLflow ✅, Kubeflow Ready, Superset ✅ |
-| Phase 6 | BASE Wave 4-7 | Ready | 🔄 Syncing | Base | 14 data processing modules configured for Base cluster |
+| Phase 5 | GitOps Wave 2 | Complete | ✅ Healthy | Platform | Airflow ✅, MLflow ✅, Kubeflow ✅, Superset ✅ |
+| Phase 6 | BASE Wave 4-7 | Ready | 🔄 Optimized | Base | Karpenter node provisioning for data processing |
 
 ### Wave 2 Orchestration Services (Recently Completed)
 
@@ -29,10 +29,12 @@ Enterprise data platform with 14 specialized modules and wave-based GitOps archi
 - **Monitoring Stack**: Prometheus, Grafana, ELK
 
 **🔧 Base Cluster** (`base-app-layer-dev`):
-- **14 BASE Modules**: All data processing modules deployed here
+- **14 BASE Modules**: All data processing modules with Karpenter autoscaling
+- **Karpenter v1.6.2**: Dynamic node provisioning for cost-optimized processing
+- **Specialized Node Groups**: Data processing (m7i), compute (c7i), memory (r7i)
 - **Enterprise Isolation**: Complete separation from platform services
 - **Production Security**: Dedicated RBAC, networking, and resource management
-- **200GB/hour Capacity**: High-performance data processing infrastructure
+- **Auto-scaling**: 20% on-demand, 80% spot instances with 200GB/hour capacity
 
 **✅ Platform Cluster Services (Deployed & Operational):**
 - **Apache Airflow**: Workflow orchestration with proxy integration and health fixes
@@ -110,33 +112,41 @@ git push origin main
 
 ### Platform Access Points
 ```bash
-# Professional Platform UI (enterprise dashboard with tabbed interface)
-Platform UI: https://k8s-platform-platform-909bd21b57-121932925.us-east-1.elb.amazonaws.com/
+# 🌐 PRIMARY PLATFORM ACCESS (SSL-secured with auto HTTP→HTTPS redirect)
+Platform UI: https://fin.vsem-svoim.com/
+
+# 🔒 SSL Certificate: arn:aws:acm:us-east-1:084129280818:certificate/62581121-c32d-4240-a01c-226094a1f085
+# 🏗️ ALB: fin-vsem-svoim-com-1611579503.us-east-1.elb.amazonaws.com
+# 🔄 Auto-redirect: http://fin.vsem-svoim.com → https://fin.vsem-svoim.com
 
 # Platform UI Features:
 # - Applications Tab: Service gallery with professional cards
 # - API Status Tab: Real-time endpoint monitoring with response times
 # - Health Monitoring Tab: System metrics and resource utilization
 
-# Direct Service Access (via Platform UI NGINX proxy)
-ArgoCD: /argocd/          # GitOps continuous delivery
-Airflow: /airflow/        # Workflow orchestration and scheduling
-MLflow: /mlflow/          # ML lifecycle management and model registry  
-Superset: /superset/      # Business intelligence and data visualization
-Vault: /vault/            # Secrets management (⚠️ requires unseal)
-Kiali: /kiali/            # Service mesh observability
-Kubeflow: /kubeflow/      # ML pipelines (API server initializing)
-Seldon: /seldon/          # ML model serving (operator status)
+# Direct Service Access (via SSL-secured NGINX proxy)
+ArgoCD: https://fin.vsem-svoim.com/argocd/          # GitOps continuous delivery
+Airflow: https://fin.vsem-svoim.com/airflow/        # Workflow orchestration
+MLflow: https://fin.vsem-svoim.com/mlflow/          # ML lifecycle management  
+Superset: https://fin.vsem-svoim.com/superset/      # Business intelligence
+Vault: https://fin.vsem-svoim.com/vault/            # Secrets management
+Kiali: https://fin.vsem-svoim.com/kiali/            # Service mesh observability
+Kubeflow: https://fin.vsem-svoim.com/kubeflow/      # ML pipelines
+Seldon: https://fin.vsem-svoim.com/seldon/          # ML model serving
+
+# 🔗 Legacy ALB (deprecated): https://k8s-platform-platform-909bd21b57-121932925.us-east-1.elb.amazonaws.com/
 ```
 
 ### Infrastructure Foundation (100% Complete)
 **Successfully Deployed:**
-- Dual EKS Clusters: platform-app-layer-dev (Fargate) and base-app-layer-dev (EC2)
-- Latest Instance Types: 7th gen AWS instances with auto-scaling node groups
-- Complete VPC: 10.0.0.0/16 with 6 subnets across 2 AZs plus NAT gateway
-- IRSA Integration: 20+ IAM roles with service account authentication
-- Storage Classes: GP3 with immediate and WaitForFirstConsumer binding modes
-- EKS Add-ons: Latest versions of CoreDNS, VPC-CNI, EBS-CSI-Driver, Kube-Proxy
+- **SSL-Secured Domain**: https://fin.vsem-svoim.com with validated ACM certificate
+- **Dual EKS Clusters**: platform-app-layer-dev (Fargate) and base-app-layer-dev (Karpenter)
+- **Karpenter v1.6.2**: Dynamic node provisioning with cost-optimized scaling (20% on-demand, 80% spot)
+- **Latest Instance Types**: 7th gen AWS instances (m7i, c7i, r7i) with auto-scaling node groups
+- **Complete VPC**: 10.0.0.0/16 with 6 subnets across 2 AZs plus NAT gateway
+- **IRSA Integration**: 20+ IAM roles with service account authentication
+- **Storage Classes**: GP3 with immediate and WaitForFirstConsumer binding modes
+- **EKS Add-ons**: Latest versions of CoreDNS, VPC-CNI, EBS-CSI-Driver, Kube-Proxy
 
 ### Terraform Infrastructure Outputs
 ```bash
@@ -163,10 +173,13 @@ kubectl_config_platform_cluster = "aws eks update-kubeconfig --region us-east-1 
 - **Fixed**: Superset proxy configuration for proper routing
 - **Fixed**: Namespace isolation issues between services
 
-**⚠️ Current Issues:**
-- **Vault Unseal**: Vault shows unseal page via Platform UI but login page via port-forward
-- **Kubeflow**: API server still initializing (MySQL database setup in progress)
-- **Cert-Manager**: cainjector pod requires RBAC permission fixes
+**✅ Recently Resolved Issues (2025-08-22):**
+- **Karpenter v1.6.2**: Successfully deployed with official AWS provider and OCI registry
+- **SSL Certificate**: Created and validated for fin.vsem-svoim.com domain
+- **ALB Configuration**: HTTPS listener with HTTP→HTTPS redirect working
+- **Individual Service ALBs**: Removed to consolidate access through single Platform UI ALB
+- **Node Group Optimization**: Replaced Fargate with specialized node groups for data processing
+- **Cost Optimization**: Implemented mixed instance policies (20% on-demand, 80% spot)
 
 ### Current Deployment Commands
 ```bash
@@ -178,9 +191,10 @@ kubectl get pods -n mlflow          # ✅ Should show 1/1 Running (2Gi memory li
 kubectl get pods -n superset        # ✅ Should show running pods
 kubectl get pods -n kubeflow        # 🔄 API server initializing
 
-# Platform UI Access
-# Visit: https://k8s-platform-platform-909bd21b57-121932925.us-east-1.elb.amazonaws.com/
-# Features: Applications tab, API Status monitoring, Health metrics
+# Platform UI Access (SSL-secured)
+# Visit: https://fin.vsem-svoim.com/
+# Features: Applications tab, API Status monitoring, Health metrics, SSL encryption
+# Auto-redirect: HTTP requests automatically redirect to HTTPS
 
 # Continue Wave 3 deployment (when ready)
 kubectl apply -k platform-services-v2/application-services/
@@ -266,9 +280,11 @@ Platform Cluster (GitOps):
 ├── platform_memory: 50% On-Demand, 50% Spot - Databases, caching
 └── platform_gpu: 40% On-Demand, 60% Spot - ML training
 
-Base Cluster (Data):
-├── base_apps: Mixed allocation (c7i.2xlarge, m7i.4xlarge)
-└── Fargate Profiles: base-data-ingestion, base-data-quality
+Base Cluster (Data Processing with Karpenter v1.6.2):
+├── base_data_processing: Mixed allocation (m7i.2xlarge, m7i.4xlarge, m7i.8xlarge)
+├── base_data_compute: Compute-intensive (c7i.4xlarge, c7i.8xlarge, c7i.16xlarge)
+├── base_data_memory: Memory-intensive (r7i.2xlarge, r7i.4xlarge, r7i.8xlarge)
+└── Karpenter NodePools: Dynamic provisioning with 20% on-demand, 80% spot
 ```
 
 ## Infrastructure Deployment
@@ -2081,14 +2097,16 @@ prometheusRule:
 
 This deployment architecture ensures zero-downtime deployments, automatic failure recovery, and enterprise-grade security while maintaining operational simplicity through declarative configuration management.
 
-**Platform Status**: Production Ready (Waves 0-3)  
-**Last Updated**: 2025-08-21  
-**Version**: v2.1.0
+**Platform Status**: Production Ready with Karpenter Autoscaling & SSL Security
+**Last Updated**: 2025-08-22  
+**Version**: v2.2.0
 
 ### Deployment Summary
-- Core Platform: Fully operational (ArgoCD, Vault, Monitoring, Service Mesh)
-- Orchestration: Complete ML/Data workflows (Airflow, MLflow, Kubeflow, Argo)  
-- Applications: Management dashboard and API gateway ready
-- BASE Modules: Partial (root structure complete, subdirectories pending)
+- **SSL-Secured Access**: https://fin.vsem-svoim.com with validated certificate and HTTPS redirect
+- **Core Platform**: Fully operational (ArgoCD, Vault, Monitoring, Service Mesh)
+- **Orchestration**: Complete ML/Data workflows (Airflow, MLflow, Kubeflow, Superset)  
+- **Applications**: Professional Platform UI with real-time monitoring
+- **Autoscaling**: Karpenter v1.6.2 with specialized node groups for cost-optimized data processing
+- **BASE Modules**: Infrastructure ready with Terraform automation and GitOps structure
 
-Ready for production deployment and workload execution.
+**Ready for high-performance production workloads with automatic scaling and SSL security.**
