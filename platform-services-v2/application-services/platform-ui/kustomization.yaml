@@ -4,7 +4,7 @@ kind: Kustomization
 metadata:
   name: platform-ui
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "1"
 
 namespace: platform-ui
 
@@ -17,8 +17,8 @@ labels:
     app.kubernetes.io/name: platform-ui
     app.kubernetes.io/component: dashboard
     app.kubernetes.io/part-of: base-platform
-    deployment.wave: "3"
+    deployment.wave: "1"
 
 commonAnnotations:
-  argocd.argoproj.io/sync-wave: "3"
+  argocd.argoproj.io/sync-wave: "1"
   service.description: "Platform management dashboard and UI"

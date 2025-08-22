@@ -35,9 +35,10 @@ data:
         }
         
         # Wave 0 Core Services (deploy first)
+        # ArgoCD main interface
         location /argocd/ {
             set $argocd_upstream argocd-server.argocd.svc.cluster.local:443;
-            proxy_pass https://$argocd_upstream/;
+            proxy_pass https://$argocd_upstream/argocd/;
             proxy_ssl_verify off;
             proxy_ssl_server_name on;
             proxy_ssl_name argocd-server.argocd.svc.cluster.local;
@@ -45,10 +46,12 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Prefix /argocd;
             proxy_set_header Accept-Encoding gzip;
             # Handle ArgoCD specific headers
             proxy_set_header Argocd-Server argocd-server.argocd.svc.cluster.local;
-            proxy_redirect https://argocd-server.argocd.svc.cluster.local/ /argocd/;
+            proxy_redirect https://argocd-server.argocd.svc.cluster.local/argocd/ /argocd/;
         }
         
         location /vault/ {
@@ -61,98 +64,105 @@ data:
             proxy_redirect http://vault.vault.svc.cluster.local:8200/ /vault/;
         }
         
-        # Wave 2 Orchestration Services  
-        location /airflow/ {
-            set $airflow_upstream airflow.airflow.svc.cluster.local:8080;
-            proxy_pass http://$airflow_upstream/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://airflow.airflow.svc.cluster.local:8080/ /airflow/;
-            
-            # Handle static assets
-            location ~* /airflow/(static|css|js)/ {
-                proxy_pass http://$airflow_upstream;
-                proxy_set_header Host $host;
-                add_header Content-Type text/css;
-                expires 1h;
-            }
+        # Wave 2+ Services - DISABLED until deployed
+        # Uncomment these when services are deployed in subsequent waves
+        
+        # location /airflow/ {
+        #     set $airflow_upstream airflow.airflow.svc.cluster.local:8080;
+        #     proxy_pass http://$airflow_upstream/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://airflow.airflow.svc.cluster.local:8080/ /airflow/;
+        # }
+        
+        # location /mlflow/ {
+        #     set $mlflow_upstream mlflow-tracking-server.mlflow.svc.cluster.local:5000;
+        #     proxy_pass http://$mlflow_upstream/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://mlflow-tracking-server.mlflow.svc.cluster.local:5000/ /mlflow/;
+        # }
+        
+        # location /kubeflow/ {
+        #     set $kubeflow_upstream kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
+        #     proxy_pass http://$kubeflow_upstream/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://kubeflow-ui-server.kubeflow.svc.cluster.local:3000/ /kubeflow/;
+        # }
+        
+        # location /superset/ {
+        #     set $superset_upstream apache-superset.superset.svc.cluster.local:8088;
+        #     proxy_pass http://$superset_upstream/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://apache-superset.superset.svc.cluster.local:8088/ /superset/;
+        # }
+        
+        # Wave 3 Monitoring Services - DISABLED until deployed
+        # location /grafana/ {
+        #     set $grafana_upstream grafana.monitoring.svc.cluster.local:3000;
+        #     proxy_pass http://$grafana_upstream/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://grafana.monitoring.svc.cluster.local:3000/ /grafana/;
+        # }
+        
+        # location /prometheus/ {
+        #     set $prometheus_upstream prometheus.monitoring.svc.cluster.local:9090;
+        #     proxy_pass http://$prometheus_upstream/prometheus/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://prometheus.monitoring.svc.cluster.local:9090/ /prometheus/;
+        # }
+        
+        # location /kiali/ {
+        #     set $kiali_upstream kiali.istio-system.svc.cluster.local:20001;
+        #     proxy_pass http://$kiali_upstream/kiali/;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        #     proxy_set_header Accept-Encoding "";
+        #     proxy_redirect http://kiali.istio-system.svc.cluster.local:20001/ /kiali/;
+        # }
+        
+        
+        # Static files should return 404 if not found
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            root /usr/share/nginx/html;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            try_files $uri =404;
         }
         
-        location /mlflow/ {
-            set $mlflow_upstream mlflow-tracking-server.mlflow.svc.cluster.local:5000;
-            proxy_pass http://$mlflow_upstream/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://mlflow-tracking-server.mlflow.svc.cluster.local:5000/ /mlflow/;
-        }
-        
-        location /kubeflow/ {
-            set $kubeflow_upstream kubeflow-ui-server.kubeflow.svc.cluster.local:3000;
-            proxy_pass http://$kubeflow_upstream/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://kubeflow-ui-server.kubeflow.svc.cluster.local:3000/ /kubeflow/;
-        }
-        
-        location /superset/ {
-            set $superset_upstream apache-superset.superset.svc.cluster.local:8088;
-            proxy_pass http://$superset_upstream/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://apache-superset.superset.svc.cluster.local:8088/ /superset/;
-        }
-        
-        # Wave 1 Monitoring Services
-        location /grafana/ {
-            set $grafana_upstream grafana.monitoring.svc.cluster.local:3000;
-            proxy_pass http://$grafana_upstream/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://grafana.monitoring.svc.cluster.local:3000/ /grafana/;
-        }
-        
-        location /prometheus/ {
-            set $prometheus_upstream prometheus.monitoring.svc.cluster.local:9090;
-            proxy_pass http://$prometheus_upstream/prometheus/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://prometheus.monitoring.svc.cluster.local:9090/ /prometheus/;
-        }
-        
-        location /kiali/ {
-            set $kiali_upstream kiali.istio-system.svc.cluster.local:20001;
-            proxy_pass http://$kiali_upstream/kiali/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect http://kiali.istio-system.svc.cluster.local:20001/ /kiali/;
-        }
-        
-        
-        # Root location serves the dashboard
+        # Root location serves the dashboard (only HTML files fall back to index.html)
         location / {
             root /usr/share/nginx/html;
-            try_files $uri $uri/ /index.html;
+            try_files $uri $uri/ @fallback;
+        }
+        
+        location @fallback {
+            root /usr/share/nginx/html;
+            try_files /index.html =404;
         }
     }
   

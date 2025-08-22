@@ -171,6 +171,84 @@ EOF
     log_info "Vault deployed successfully"
 }
 
+deploy_platform_ui_alb() {
+    log_info "Deploying Platform UI Application Load Balancer..."
+    
+    # Create platform-ui namespace if it doesn't exist
+    kubectl create namespace platform-ui || log_warn "platform-ui namespace already exists"
+    
+    # Deploy ALB Ingress for Platform UI
+    cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-alb
+  namespace: platform-ui
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: base-platform-alb
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/subnets: subnet-00d893f736ab72568,subnet-0bcf6a6eaf4386574
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-port: "80"
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      # Platform UI (default route) - deployed in Wave 0
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-ui-proxy
+            port:
+              number: 80
+      # ArgoCD - Wave 0 core service
+      - path: /argocd
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+      # Vault - Wave 0 core service
+      - path: /vault
+        pathType: Prefix
+        backend:
+          service:
+            name: vault
+            port:
+              number: 8200
+EOF
+    
+    # Wait for ALB to be provisioned
+    log_info "Waiting for ALB to be provisioned (this may take 2-3 minutes)..."
+    kubectl wait --for=condition=ready ingress/platform-alb -n platform-ui --timeout=300s || {
+        log_warn "ALB ingress not ready within 300s, check AWS console"
+    }
+    
+    log_info "Platform UI ALB deployed successfully"
+}
+
+deploy_platform_ui_proxy() {
+    log_info "Deploying Platform UI Proxy Service..."
+    
+    # Deploy Platform UI Proxy using kustomize
+    kubectl apply -k platform-services-v2/application-services/platform-ui
+    
+    # Wait for Platform UI Proxy pods
+    wait_for_pods "platform-ui" 180
+    
+    log_info "Platform UI Proxy deployed successfully"
+}
+
 # Validation after deployment
 validate_deployment() {
     log_info "Validating Wave 0 deployment..."
@@ -186,6 +264,12 @@ validate_deployment() {
     
     # Check Vault
     kubectl get pods -n vault | grep -q "Running" && log_info "✅ Vault: Running" || log_error "❌ Vault: Failed"
+    
+    # Check Platform UI ALB
+    kubectl get ingress -n platform-ui platform-alb | grep -q "platform-alb" && log_info "✅ Platform UI ALB: Deployed" || log_error "❌ Platform UI ALB: Failed"
+    
+    # Check Platform UI Proxy
+    kubectl get pods -n platform-ui | grep -q "Running" && log_info "✅ Platform UI Proxy: Running" || log_error "❌ Platform UI Proxy: Failed"
 }
 
 # Access information
@@ -206,8 +290,14 @@ show_access_info() {
     echo "  Token: root (dev mode)"
     
     echo ""
+    echo "🌐 Platform UI Access:"
+    echo "  ALB URL: \$(kubectl get ingress platform-alb -n platform-ui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+    echo "  Direct access to ArgoCD: <ALB_URL>/argocd/"
+    echo "  Direct access to Vault: <ALB_URL>/vault/"
+    
+    echo ""
     echo "📋 Next Steps:"
-    echo "  1. Access ArgoCD and configure repositories"
+    echo "  1. Access ArgoCD via ALB and configure repositories"
     echo "  2. Deploy Wave 1 ApplicationSet"
     echo "  3. Deploy Wave 2 ApplicationSet"
 }
@@ -219,6 +309,7 @@ rollback() {
     kubectl delete namespace argocd --force --grace-period=0 &
     kubectl delete namespace cert-manager --force --grace-period=0 &
     kubectl delete namespace vault --force --grace-period=0 &
+    kubectl delete namespace platform-ui --force --grace-period=0 &
     kubectl delete -k platform-services-v2/core-services/aws-load-balancer-controller 2>/dev/null &
     
     wait
@@ -241,6 +332,8 @@ main() {
     deploy_cert_manager
     deploy_aws_lb_controller
     deploy_vault
+    deploy_platform_ui_alb
+    deploy_platform_ui_proxy
     
     # Validate deployment
     validate_deployment
