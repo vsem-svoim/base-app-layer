@@ -25,16 +25,12 @@ data:
         server airflow.airflow.svc.cluster.local:8080;
     }
     
-    upstream mlflow_backend {
-        server 127.0.0.1:5000;  # MLflow not available yet
-    }
-    
     upstream argocd_backend {
-        server 127.0.0.1:80;  # ArgoCD not available
+        server 127.0.0.1:80;  # ArgoCD service via Istio Gateway
     }
     
     upstream vault_backend {
-        server vault.vault.svc.cluster.local:8200;
+        server 127.0.0.1:8200;  # Vault service via Istio Gateway  
     }
     
     upstream istio_gateway_backend {
@@ -42,19 +38,23 @@ data:
     }
     
     upstream argo_workflows_backend {
-        server 127.0.0.1:2746;  # Argo Workflows not available yet
+        server 127.0.0.1:2746;  # Argo Workflows via Istio Gateway
     }
     
     upstream kubeflow_backend {
-        server 127.0.0.1:3000;  # Kubeflow not available yet
+        server 127.0.0.1:3000;  # Kubeflow via Istio Gateway
     }
     
     upstream superset_backend {
-        server 127.0.0.1:8088;  # Superset not available yet
+        server 127.0.0.1:8088;  # Superset via Istio Gateway
     }
     
     upstream kiali_backend {
-        server 127.0.0.1:20001;  # Kiali not available
+        server 127.0.0.1:20001;  # Kiali via Istio Gateway
+    }
+    
+    upstream mlflow_backend {
+        server 127.0.0.1:5000;  # MLflow via Istio Gateway
     }
     
     server {
@@ -112,34 +112,81 @@ data:
         }
         
         location /mlflow/ {
-            proxy_pass http://mlflow_backend/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "mlflow.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
         }
         
         location /argocd/ {
-            proxy_pass http://argocd_backend/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "argocd.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         location /vault/ {
-            proxy_pass http://vault_backend/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "vault.base-app-layer.dev";
             proxy_set_header X-Vault-Request true;
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         location /argo-workflows/ {
-            proxy_pass http://argo_workflows_backend/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "argo-workflows.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         location /kubeflow/ {
-            proxy_pass http://kubeflow_backend/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "kubeflow.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         location /superset/ {
-            proxy_pass http://superset_backend/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "superset.base-app-layer.dev";
             proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         location /istio/ {
-            proxy_pass http://kiali_backend/kiali/;
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "kiali.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
+        }
+        
+        location /grafana/ {
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "grafana.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
+        }
+        
+        location /prometheus/ {
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "prometheus.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
+        }
+        
+        location /kibana/ {
+            proxy_pass http://istio_gateway_backend/;
+            proxy_set_header Host "kibana.base-app-layer.dev";
+            proxy_set_header Accept-Encoding "";
+            proxy_redirect off;
+            proxy_buffering off;
         }
         
         # Root location serves the dashboard
@@ -150,272 +197,910 @@ data:
     }
   
   index.html: |
-    <!DOCTYPE html>
-    <html lang="en">
+    <!DOCTYPE HTML>
+    <html>
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BASE Platform - Enterprise Dashboard</title>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>BASE Platform Services</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="BASE Enterprise Data Platform Services Dashboard" />
+        <meta name="keywords" content="platform, services, data, analytics, enterprise" />
+        <meta name="author" content="BASE Platform Team" />
+        
+        <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css?family=Playfair+Display:400,400i,700" rel="stylesheet">
+        
+        <!-- Animate.css -->
         <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-            .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-            .header { text-align: center; margin-bottom: 30px; background: rgba(255,255,255,0.95); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); }
-            .header h1 { color: #2c3e50; font-size: 2.5em; margin-bottom: 10px; }
-            .header p { color: #666; font-size: 1.1em; }
-            .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-            .service { background: rgba(255,255,255,0.95); padding: 20px; border-radius: 10px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: all 0.3s ease; position: relative; overflow: hidden; }
-            .service::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #667eea, #764ba2); }
-            .service:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
-            .service h3 { color: #2c3e50; font-size: 1.3em; margin-bottom: 10px; }
-            .service p { color: #666; line-height: 1.5; margin-bottom: 15px; font-size: 0.9em; }
-            .service-link { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; transition: all 0.3s; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); font-size: 0.85em; }
-            .service-link:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
-            .status { display: inline-block; padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
-            .status.active { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-            .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-bottom: 25px; }
-            .stat { background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; text-align: center; backdrop-filter: blur(10px); }
-            .stat-number { font-size: 1.8em; font-weight: bold; color: #667eea; margin-bottom: 5px; }
-            .stat-label { color: #666; text-transform: uppercase; letter-spacing: 1px; font-size: 0.7em; }
-            .tabs { display: flex; margin-bottom: 20px; background: rgba(255,255,255,0.9); border-radius: 10px; overflow: hidden; }
-            .tab { flex: 1; padding: 15px 20px; text-align: center; cursor: pointer; background: transparent; border: none; font-weight: 600; color: #666; transition: all 0.3s; }
-            .tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-            .tab:hover:not(.active) { background: rgba(102, 126, 234, 0.1); }
-            .tab-content { display: none; }
-            .tab-content.active { display: block; }
-            .test-panel { background: rgba(255,255,255,0.95); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); }
-            .test-button { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin: 10px 5px; transition: all 0.3s; }
-            .test-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4); }
-            .test-results { margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; }
-            .log-output { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.9em; max-height: 300px; overflow-y: auto; }
+        .animate-box { opacity: 0; animation: fadeIn 1s ease-in-out forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        </style>
+        
+        <!-- Bootstrap CSS -->
+        <style>
+        .row { 
+            display: flex; 
+            flex-wrap: wrap; 
+            margin: 0 -15px; 
+            justify-content: center;
+            align-items: stretch;
+        }
+        .col-md-3 { flex: 0 0 25%; max-width: 25%; padding: 0 15px; margin-bottom: 30px; }
+        .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px; margin-bottom: 30px; }
+        .col-md-6 { flex: 0 0 50%; max-width: 50%; padding: 0 15px; margin-bottom: 30px; }
+        .col-md-12 { flex: 0 0 100%; max-width: 100%; padding: 0 15px; }
+        .col-md-offset-3 { margin-left: 25%; }
+        .col-md-pull-3 { right: 25%; position: relative; }
+        .text-center { text-align: center; }
+        .row-pt-md { padding-top: 4em; }
+        </style>
+        
+        <!-- Theme style -->
+        <style>
+        body { font-family: "Quicksand", Arial, sans-serif; line-height: 1.7; font-size: 16px; background: #f8f9fa; color: #666; }
+        a { color: #667eea; text-decoration: none; transition: 0.3s; }
+        a:hover { color: #5a67d8; text-decoration: none; }
+        .colorlib-nav-toggle { display: none; }
+        
+        #colorlib-page { width: 100%; overflow: hidden; position: relative; }
+        .js-fullheight { height: 100vh; }
+        
+        #colorlib-aside {
+            background: rgba(255, 255, 255, 0.95);
+            width: 300px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding: 40px 30px;
+            border-right: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+            overflow-y: auto;
+            z-index: 1001;
+        }
+        
+        #colorlib-aside .text-center { text-align: center; margin-bottom: 50px; }
+        .author-img { width: 150px; height: 150px; border-radius: 50%; background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiByeD0iNzUiIGZpbGw9InVybCgjZ3JhZGllbnQwX2xpbmVhcl8xXzEpIi8+CjxkZWZzPgo8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWRpZW50MF9saW5lYXJfMV8xIiB4MT0iMCIgeTE9IjAiIHgyPSIxNTAiIHkyPSIxNTAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzY2N2VlYSIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM3NjRiYTIiLz4KPC9saW5lYXJHcmFkaWVudD4KPC9kZWZzPgo8L3N2Zz4K) center; background-size: cover; margin: 0 auto 30px; position: relative; }
+        
+        #colorlib-logo a {
+            color: #333;
+            text-transform: uppercase;
+            font-weight: 700;
+            font-size: 24px;
+            letter-spacing: 2px;
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .position a { color: #999; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        #colorlib-main-menu ul { margin: 0; padding: 0; list-style: none; }
+        #colorlib-main-menu li { margin: 0 0 10px 0; }
+        #colorlib-main-menu li a {
+            color: #999;
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            padding: 10px 0;
+            display: block;
+            border-bottom: 1px solid transparent;
+            transition: 0.3s;
+        }
+        #colorlib-main-menu li.active a,
+        #colorlib-main-menu li a:hover { color: #667eea; border-color: #667eea; }
+        
+        .colorlib-footer { margin-top: 50px; }
+        .colorlib-footer p { font-size: 12px; color: #ccc; margin-bottom: 20px; }
+        .colorlib-footer ul { margin: 0; padding: 0; list-style: none; }
+        .colorlib-footer li { display: inline; margin-right: 10px; }
+        .colorlib-footer li a { color: #ccc; }
+        .colorlib-footer li a:hover { color: #667eea; }
+        
+        #colorlib-main {
+            width: calc(100% - 300px);
+            float: right;
+            transition: 0.5s;
+        }
+        
+        .colorlib-narrow-content { padding: 0 4em; }
+        
+        .heading-meta {
+            font-size: 11px;
+            color: #667eea;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .colorlib-heading {
+            font-size: 50px;
+            color: #333;
+            font-weight: 300;
+            line-height: 1.5;
+            font-family: "Playfair Display", serif;
+            margin-bottom: 30px;
+        }
+        
+        .colorlib-services { padding: 7em 0; }
+        
+        .services {
+            background: #fff;
+            padding: 40px;
+            border-radius: 7px;
+            box-shadow: 0 5px 20px 0 rgba(0, 0, 0, 0.1);
+            transition: 0.3s;
+            margin-bottom: 30px;
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            min-height: 320px;
+        }
+        
+        .services:hover { box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.15); transform: translateY(-5px); }
+        
+        .services .desc {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .services.color-1 { border-left: 5px solid #667eea; }
+        .services.color-2 { border-left: 5px solid #764ba2; }
+        .services.color-3 { border-left: 5px solid #28a745; }
+        .services.color-4 { border-left: 5px solid #ffc107; }
+        .services.color-5 { border-left: 5px solid #17a2b8; }
+        .services.color-6 { border-left: 5px solid #dc3545; }
+        
+        .services .icon {
+            display: block;
+            font-size: 40px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .services h3 {
+            font-size: 24px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .services p { color: #999; line-height: 1.8; }
+        
+        .service-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #d4edda;
+            color: #155724;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .service-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 5px;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+            transition: 0.3s;
+        }
+        
+        .service-link:hover {
+            background: linear-gradient(135deg, #5a67d8, #6b46c1);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .colorlib-counters {
+            background-attachment: fixed;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            padding: 10em 0;
+            position: relative;
+        }
+        
+        .colorlib-counters .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+        }
+        
+        .colorlib-counter {
+            font-size: 50px;
+            display: block;
+            color: #fff;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .colorlib-counter-label {
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+        
+        .api-monitor {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .api-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .status-ok { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-warning { background: #ffc107; }
+        
+        .response-time {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        @media screen and (max-width: 768px) {
+            #colorlib-aside { transform: translateX(-300px); }
+            #colorlib-main { width: 100%; }
+            .colorlib-narrow-content { padding: 0 1em; }
+            .col-md-4 { flex: 0 0 100%; max-width: 100%; }
+            .col-md-3 { flex: 0 0 50%; max-width: 50%; }
+            .col-md-6 { flex: 0 0 100%; max-width: 100%; }
+            .col-md-offset-3 { margin-left: 0; }
+            .col-md-pull-3 { right: 0; position: static; }
+            .services { min-height: 280px; }
+        }
+        
+        @media screen and (max-width: 480px) {
+            .col-md-3 { flex: 0 0 100%; max-width: 100%; }
+            .services { min-height: 260px; padding: 30px 20px; }
+            .colorlib-heading { font-size: 36px; }
+        }
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1>🚀 BASE Enterprise Platform</h1>
-                <p>Complete Data & ML Platform - ApplicationSet Managed</p>
-            </div>
-            
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('services')">📊 Services</button>
-                <button class="tab" onclick="showTab('testing')">🧪 Data Ingestion Testing</button>
-                <button class="tab" onclick="showTab('monitoring')">📈 System Monitoring</button>
-            </div>
-            
-            <div id="services" class="tab-content active">
-                <div class="stats">
-                    <div class="stat">
-                        <div class="stat-number">10</div>
-                        <div class="stat-label">Services</div>
+        <div id="colorlib-page">
+            <div class="container-wrap">
+                <a href="#" class="js-colorlib-nav-toggle colorlib-nav-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"><i></i></a>
+                <aside id="colorlib-aside" role="complementary" class="js-fullheight">
+                    <div class="text-center">
+                        <div class="author-img"></div>
+                        <h1 id="colorlib-logo"><a href="/">BASE Platform</a></h1>
+                        <span class="position"><a href="#">Enterprise Data Platform</a></span>
                     </div>
-                    <div class="stat">
-                        <div class="stat-number">3</div>
-                        <div class="stat-label">Tiers</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">1</div>
-                        <div class="stat-label">Gateway</div>
-                    </div>
-                </div>
-            
-            <div class="services">
-                <div class="service">
-                    <div class="status active">✅ CORE</div>
-                    <h3>🔐 Vault UI</h3>
-                    <p>HashiCorp Vault secrets management interface</p>
-                    <a href="/vault/" class="service-link" target="_blank">Access Vault</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ CORE</div>
-                    <h3>🚀 ArgoCD</h3>
-                    <p>GitOps continuous deployment platform</p>
-                    <a href="/argocd/" class="service-link" target="_blank">Access ArgoCD</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ ORCHESTRATION</div>
-                    <h3>🔄 Argo Workflows</h3>
-                    <p>Kubernetes-native job and workflow engine</p>
-                    <a href="/argo-workflows/" class="service-link" target="_blank">Access Workflows</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ ML/AI</div>
-                    <h3>🤖 MLflow</h3>
-                    <p>Complete ML lifecycle and experiment management</p>
-                    <a href="/mlflow/" class="service-link" target="_blank">Access MLflow</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ ML/AI</div>
-                    <h3>🧠 Kubeflow</h3>
-                    <p>Machine learning toolkit for Kubernetes</p>
-                    <a href="/kubeflow/" class="service-link" target="_blank">Access Kubeflow</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ ORCHESTRATION</div>
-                    <h3>🌊 Airflow</h3>
-                    <p>Workflow orchestration and scheduling platform</p>
-                    <a href="/airflow/" class="service-link" target="_blank">Access Airflow</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ MONITORING</div>
-                    <h3>📈 Kibana</h3>
-                    <p>Elasticsearch log analysis and visualization</p>
-                    <a href="/kibana/" class="service-link" target="_blank">Access Kibana</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ MONITORING</div>
-                    <h3>🔍 Prometheus</h3>
-                    <p>Metrics collection and monitoring system</p>
-                    <a href="/prometheus/" class="service-link" target="_blank">Access Prometheus</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ MONITORING</div>
-                    <h3>📊 Grafana</h3>
-                    <p>Advanced metrics visualization and dashboards</p>
-                    <a href="/grafana/" class="service-link" target="_blank">Access Grafana</a>
-                </div>
-                
-                <div class="service">
-                    <div class="status active">✅ SERVICE MESH</div>
-                    <h3>🕸️ Istio (Kiali)</h3>
-                    <p>Service mesh traffic visualization and management</p>
-                    <a href="/istio/" class="service-link" target="_blank">Access Istio</a>
-                </div>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid rgba(255,255,255,0.3);">
-                <p style="color: rgba(255,255,255,0.9); font-size: 1em;"><strong>🎯 ApplicationSet Managed</strong> - Wave-based deployment with GitOps</p>
-                <p style="color: rgba(255,255,255,0.7); font-size: 0.8em;">All services deployed via ArgoCD ApplicationSets with proper dependency management</p>
-            </div>
-            </div>
-            
-            <div id="testing" class="tab-content">
-                <div class="test-panel">
-                    <h2>🧪 Data Ingestion Testing Workflow</h2>
-                    <p>Test and validate the BASE data ingestion module with various data sources and configurations.</p>
-                    
-                    <div style="margin: 20px 0;">
-                        <button class="test-button" onclick="runDataIngestionTest('file-upload')">📁 File Upload Test</button>
-                        <button class="test-button" onclick="runDataIngestionTest('api-stream')">🌊 API Stream Test</button>
-                        <button class="test-button" onclick="runDataIngestionTest('database-sync')">🗄️ Database Sync Test</button>
-                        <button class="test-button" onclick="runDataIngestionTest('real-time')">⚡ Real-time Test</button>
-                    </div>
-                    
-                    <div id="test-results" class="test-results" style="display: none;">
-                        <h3>Test Results</h3>
-                        <div id="test-output" class="log-output"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="monitoring" class="tab-content">
-                <div class="test-panel">
-                    <h2>📈 System Monitoring</h2>
-                    <p>Real-time monitoring of platform services, resource utilization, and performance metrics.</p>
-                    
-                    <div class="stats" style="margin-top: 20px;">
-                        <div class="stat">
-                            <div class="stat-number" id="cpu-usage">--</div>
-                            <div class="stat-label">CPU Usage</div>
+                    <nav id="colorlib-main-menu" role="navigation" class="navbar">
+                        <div id="navbar" class="collapse">
+                            <ul>
+                                <li class="active"><a href="#" data-nav-section="services">Platform Services</a></li>
+                                <li><a href="#" data-nav-section="monitoring">API Monitoring</a></li>
+                                <li><a href="#" data-nav-section="about">About Platform</a></li>
+                                <li><a href="#" data-nav-section="architecture">Architecture</a></li>
+                                <li><a href="#" data-nav-section="documentation">Documentation</a></li>
+                                <li><a href="#" data-nav-section="contact">Contact</a></li>
+                            </ul>
                         </div>
-                        <div class="stat">
-                            <div class="stat-number" id="memory-usage">--</div>
-                            <div class="stat-label">Memory Usage</div>
+                    </nav>
+
+                    <div class="colorlib-footer">
+                        <p><small>&copy; 2025 BASE Platform. Enterprise-grade data processing infrastructure.</small></p>
+                        <ul>
+                            <li><a href="https://github.com/base-platform" target="_blank">GitHub</a></li>
+                            <li><a href="/argocd/" target="_blank">ArgoCD</a></li>
+                            <li><a href="#" data-nav-section="monitoring">Monitor</a></li>
+                        </ul>
+                    </div>
+                </aside>
+
+                <div id="colorlib-main">
+                    <section class="colorlib-services" data-section="services">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box" data-animate-effect="fadeInLeft">
+                                    <span class="heading-meta">Platform Services</span>
+                                    <h2 class="colorlib-heading">Available Applications</h2>
+                                </div>
+                            </div>
+                            <div class="row row-pt-md">
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-1">
+                                        <div class="service-status">CORE</div>
+                                        <span class="icon"><i class="icon-layers2"></i></span>
+                                        <div class="desc">
+                                            <h3>ArgoCD</h3>
+                                            <p>GitOps continuous deployment platform for managing application lifecycles and automated deployments across clusters</p>
+                                            <a href="javascript:void(0)" onclick="openService('/argocd/')" class="service-link">Access ArgoCD</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-2">
+                                        <div class="service-status">CORE</div>
+                                        <span class="icon"><i class="icon-shield"></i></span>
+                                        <div class="desc">
+                                            <h3>Vault</h3>
+                                            <p>HashiCorp Vault for secure secrets management, encryption, and identity-based access across the platform</p>
+                                            <a href="javascript:void(0)" onclick="openService('/vault/')" class="service-link">Access Vault</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-3">
+                                        <div class="service-status">ORCHESTRATION</div>
+                                        <span class="icon"><i class="icon-flow-tree"></i></span>
+                                        <div class="desc">
+                                            <h3>Apache Airflow</h3>
+                                            <p>Workflow orchestration and scheduling platform for complex data processing pipelines and business logic</p>
+                                            <a href="javascript:void(0)" onclick="openService('/airflow/')" class="service-link">Access Airflow</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-4">
+                                        <div class="service-status">ML/AI</div>
+                                        <span class="icon"><i class="icon-bar-graph"></i></span>
+                                        <div class="desc">
+                                            <h3>MLflow</h3>
+                                            <p>Complete ML lifecycle management including experiment tracking, model versioning, and deployment</p>
+                                            <a href="javascript:void(0)" onclick="openService('/mlflow/')" class="service-link">Access MLflow</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-5">
+                                        <div class="service-status">ML/AI</div>
+                                        <span class="icon"><i class="icon-brain"></i></span>
+                                        <div class="desc">
+                                            <h3>Kubeflow</h3>
+                                            <p>Machine learning toolkit for Kubernetes with pipelines, notebooks, and distributed training capabilities</p>
+                                            <a href="javascript:void(0)" onclick="openService('/kubeflow/')" class="service-link">Access Kubeflow</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-6">
+                                        <div class="service-status">ANALYTICS</div>
+                                        <span class="icon"><i class="icon-pie-chart"></i></span>
+                                        <div class="desc">
+                                            <h3>Apache Superset</h3>
+                                            <p>Modern business intelligence web application for data exploration and visualization</p>
+                                            <a href="javascript:void(0)" onclick="openService('/superset/')" class="service-link">Access Superset</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-1">
+                                        <div class="service-status">MESH</div>
+                                        <span class="icon"><i class="icon-network"></i></span>
+                                        <div class="desc">
+                                            <h3>Kiali (Istio)</h3>
+                                            <p>Service mesh observability console for monitoring, visualization, and configuration of service mesh</p>
+                                            <a href="javascript:void(0)" onclick="openService('/istio/')" class="service-link">Access Kiali</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-2">
+                                        <div class="service-status">MONITORING</div>
+                                        <span class="icon"><i class="icon-line-graph"></i></span>
+                                        <div class="desc">
+                                            <h3>Grafana</h3>
+                                            <p>Advanced metrics visualization and monitoring dashboards for platform observability</p>
+                                            <a href="javascript:void(0)" onclick="openService('/grafana/')" class="service-link">Access Grafana</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-3">
+                                        <div class="service-status">MONITORING</div>
+                                        <span class="icon"><i class="icon-stats-dots"></i></span>
+                                        <div class="desc">
+                                            <h3>Prometheus</h3>
+                                            <p>Metrics collection and monitoring system with powerful querying capabilities</p>
+                                            <a href="javascript:void(0)" onclick="openService('/prometheus/')" class="service-link">Access Prometheus</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-4">
+                                        <div class="service-status">LOGGING</div>
+                                        <span class="icon"><i class="icon-search"></i></span>
+                                        <div class="desc">
+                                            <h3>Kibana</h3>
+                                            <p>Elasticsearch-powered log analysis and visualization for centralized logging and search</p>
+                                            <a href="javascript:void(0)" onclick="openService('/kibana/')" class="service-link">Access Kibana</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="stat">
-                            <div class="stat-number" id="active-pods">--</div>
-                            <div class="stat-label">Active Pods</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number" id="data-throughput">--</div>
-                            <div class="stat-label">Data Throughput</div>
+                    </section>
+
+                    <div id="colorlib-counter" class="colorlib-counters" style="background-image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJwYWludDBfbGluZWFyXzFfMSIgeDE9IjAiIHkxPSIwIiB4Mj0iMTkyMCIgeTI9IjEwODAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzY2N2VlYSIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM3NjRiYTIiLz4KPC9saW5lYXJHcmFkaWVudD4KPC9kZWZzPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSJ1cmwoI3BhaW50MF9saW5lYXJfMV8xKSIvPgo8L3N2Zz4K);" data-stellar-background-ratio="0.5">
+                        <div class="overlay"></div>
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-3 text-center animate-box">
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="10" data-speed="2000" data-refresh-interval="50" id="active-services">10</span>
+                                    <span class="colorlib-counter-label">Active Services</span>
+                                </div>
+                                <div class="col-md-3 text-center animate-box">
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="99" data-speed="2000" data-refresh-interval="50" id="uptime">99.9</span>
+                                    <span class="colorlib-counter-label">% Uptime</span>
+                                </div>
+                                <div class="col-md-3 text-center animate-box">
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="2" data-speed="2000" data-refresh-interval="50" id="clusters">2</span>
+                                    <span class="colorlib-counter-label">Clusters</span>
+                                </div>
+                                <div class="col-md-3 text-center animate-box">
+                                    <span class="colorlib-counter js-counter" data-from="0" data-to="14" data-speed="2000" data-refresh-interval="50" id="modules">14</span>
+                                    <span class="colorlib-counter-label">Data Modules</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div style="margin-top: 30px;">
-                        <button class="test-button" onclick="refreshMetrics()">🔄 Refresh Metrics</button>
-                        <button class="test-button" onclick="exportLogs()">📋 Export Logs</button>
-                    </div>
+
+                    <section class="colorlib-services" data-section="monitoring" style="display: none;">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box" data-animate-effect="fadeInLeft">
+                                    <span class="heading-meta">Real-Time Monitoring</span>
+                                    <h2 class="colorlib-heading">API Health Dashboard</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="api-monitor">
+                                        <h4>Platform Services Health</h4>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>ArgoCD API</span>
+                                            <span class="response-time" id="argocd-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Vault API</span>
+                                            <span class="response-time" id="vault-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Airflow API</span>
+                                            <span class="response-time" id="airflow-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>MLflow API</span>
+                                            <span class="response-time" id="mlflow-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Kubeflow API</span>
+                                            <span class="response-time" id="kubeflow-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Superset API</span>
+                                            <span class="response-time" id="superset-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Kiali API</span>
+                                            <span class="response-time" id="kiali-status">Loading...</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="api-monitor" style="margin-top: 30px;">
+                                        <h4>Database Layer APIs</h4>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>PostgreSQL</span>
+                                            <span class="response-time" id="postgres-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Redis Cache</span>
+                                            <span class="response-time" id="redis-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Elasticsearch</span>
+                                            <span class="response-time" id="elasticsearch-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>InfluxDB</span>
+                                            <span class="response-time" id="influxdb-status">Loading...</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="api-monitor" style="margin-top: 30px;">
+                                        <h4>BASE Data Processing Modules</h4>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-ok"></span>Data Ingestion API</span>
+                                            <span class="response-time" id="data-ingestion-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-warning"></span>Data Quality API</span>
+                                            <span class="response-time" id="data-quality-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-warning"></span>Data Storage API</span>
+                                            <span class="response-time" id="data-storage-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-warning"></span>Feature Engineering API</span>
+                                            <span class="response-time" id="feature-engineering-status">Loading...</span>
+                                        </div>
+                                        <div class="api-status">
+                                            <span><span class="status-indicator status-warning"></span>Pipeline Management API</span>
+                                            <span class="response-time" id="pipeline-mgmt-status">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="colorlib-services" data-section="about" style="display: none;">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">About Platform</span>
+                                    <h2 class="colorlib-heading">BASE Enterprise Data Platform</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="services">
+                                        <h3>Platform Overview</h3>
+                                        <p>BASE (Business Analytics & Scalable Enterprise) is a comprehensive enterprise data platform designed for financial institutions and large enterprises requiring robust, scalable, and compliant data processing capabilities.</p>
+                                        
+                                        <h3>Key Features</h3>
+                                        <ul style="margin: 20px 0; padding-left: 20px;">
+                                            <li>14 specialized data processing modules</li>
+                                            <li>Agent-based microservices architecture</li>
+                                            <li>AI/ML enhanced intelligent processing</li>
+                                            <li>100GB/hour throughput capacity</li>
+                                            <li>SOX, GDPR, FINRA compliance</li>
+                                            <li>99.9% uptime SLA</li>
+                                            <li>Multi-cloud deployment (AWS, Azure, GCP)</li>
+                                            <li>GitOps automated operations</li>
+                                        </ul>
+                                        
+                                        <h3>Performance Metrics</h3>
+                                        <p>The platform processes over 100GB of data per hour with sub-second response times for critical operations. Built for enterprise scale with auto-scaling capabilities from 2 to 20 replicas based on demand.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="colorlib-services" data-section="architecture" style="display: none;">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">System Architecture</span>
+                                    <h2 class="colorlib-heading">Platform Architecture</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 animate-box">
+                                    <div class="services">
+                                        <h3>Dual-Cluster Design</h3>
+                                        <p><strong>Platform Cluster:</strong> GitOps infrastructure layer with ArgoCD, Airflow, MLflow, Kubeflow, Platform UI</p>
+                                        <p><strong>Base Cluster:</strong> 14 BASE data processing modules with enterprise-grade isolation</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 animate-box">
+                                    <div class="services">
+                                        <h3>Agent-Based Architecture</h3>
+                                        <p>Each module contains:</p>
+                                        <ul style="padding-left: 20px;">
+                                            <li>6 specialized agents</li>
+                                            <li>5 AI/ML models</li>
+                                            <li>5 orchestrators</li>
+                                            <li>5 workflows</li>
+                                            <li>4 config modules</li>
+                                            <li>6 AI prompts</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="services">
+                                        <h3>14 BASE Data Processing Modules</h3>
+                                        <div class="row" style="margin-top: 20px;">
+                                            <div class="col-md-6">
+                                                <p><strong>Data Foundation:</strong></p>
+                                                <ul style="padding-left: 20px;">
+                                                    <li>Data Ingestion</li>
+                                                    <li>Data Quality</li>
+                                                    <li>Data Storage</li>
+                                                    <li>Data Security</li>
+                                                </ul>
+                                                <p><strong>Processing & Analytics:</strong></p>
+                                                <ul style="padding-left: 20px;">
+                                                    <li>Feature Engineering</li>
+                                                    <li>Multimodal Processing</li>
+                                                    <li>Data Streaming</li>
+                                                    <li>Quality Monitoring</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p><strong>Orchestration & Management:</strong></p>
+                                                <ul style="padding-left: 20px;">
+                                                    <li>Pipeline Management</li>
+                                                    <li>Event Coordination</li>
+                                                    <li>Metadata Discovery</li>
+                                                    <li>Schema Contracts</li>
+                                                </ul>
+                                                <p><strong>Distribution & Control:</strong></p>
+                                                <ul style="padding-left: 20px;">
+                                                    <li>Data Distribution</li>
+                                                    <li>Data Control</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="colorlib-services" data-section="documentation" style="display: none;">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">Documentation</span>
+                                    <h2 class="colorlib-heading">Platform Documentation</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 animate-box">
+                                    <div class="services color-1">
+                                        <span class="icon"><i class="icon-book"></i></span>
+                                        <h3>User Guides</h3>
+                                        <p>Comprehensive guides for platform administrators, data engineers, and end users</p>
+                                        <a href="javascript:void(0)" class="service-link">View Guides</a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 animate-box">
+                                    <div class="services color-2">
+                                        <span class="icon"><i class="icon-code"></i></span>
+                                        <h3>API Documentation</h3>
+                                        <p>Complete API reference for all 14 BASE modules and platform services</p>
+                                        <a href="javascript:void(0)" class="service-link">View APIs</a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 animate-box">
+                                    <div class="services color-3">
+                                        <span class="icon"><i class="icon-gear"></i></span>
+                                        <h3>Deployment Guide</h3>
+                                        <p>Step-by-step deployment instructions for multi-cloud environments</p>
+                                        <a href="javascript:void(0)" class="service-link">View Deployment</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 animate-box">
+                                    <div class="services color-4">
+                                        <span class="icon"><i class="icon-shield"></i></span>
+                                        <h3>Security & Compliance</h3>
+                                        <p>Security best practices, compliance guidelines (SOX, GDPR, FINRA), and audit procedures</p>
+                                        <a href="javascript:void(0)" class="service-link">View Security</a>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 animate-box">
+                                    <div class="services color-5">
+                                        <span class="icon"><i class="icon-tools"></i></span>
+                                        <h3>Troubleshooting</h3>
+                                        <p>Common issues, debugging procedures, and platform monitoring guidelines</p>
+                                        <a href="javascript:void(0)" class="service-link">View Troubleshooting</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="colorlib-services" data-section="contact" style="display: none;">
+                        <div class="colorlib-narrow-content">
+                            <div class="row">
+                                <div class="col-md-12 text-center animate-box">
+                                    <span class="heading-meta">Get in Touch</span>
+                                    <h2 class="colorlib-heading">Contact & Support</h2>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 animate-box">
+                                    <div class="services">
+                                        <h3>Platform Support</h3>
+                                        <div style="margin: 20px 0;">
+                                            <p><strong>Technical Support:</strong><br>
+                                            Email: support@base-platform.enterprise<br>
+                                            Phone: +1 (555) 123-4567<br>
+                                            Hours: 24/7 Enterprise Support</p>
+                                            
+                                            <p><strong>Platform Administration:</strong><br>
+                                            Email: admin@base-platform.enterprise<br>
+                                            Emergency: +1 (555) 911-BASE</p>
+                                            
+                                            <p><strong>Business Development:</strong><br>
+                                            Email: business@base-platform.enterprise<br>
+                                            Phone: +1 (555) 789-0123</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 animate-box">
+                                    <div class="services">
+                                        <h3>Enterprise Resources</h3>
+                                        <div style="margin: 20px 0;">
+                                            <p><strong>Status Page:</strong><br>
+                                            <a href="javascript:void(0)" style="color: #667eea;">status.base-platform.enterprise</a></p>
+                                            
+                                            <p><strong>Documentation Portal:</strong><br>
+                                            <a href="javascript:void(0)" style="color: #667eea;">docs.base-platform.enterprise</a></p>
+                                            
+                                            <p><strong>GitHub Repository:</strong><br>
+                                            <a href="javascript:void(0)" style="color: #667eea;">github.com/base-platform</a></p>
+                                            
+                                            <p><strong>Community Forum:</strong><br>
+                                            <a href="javascript:void(0)" style="color: #667eea;">community.base-platform.enterprise</a></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 animate-box">
+                                    <div class="services">
+                                        <h3>Service Level Agreements</h3>
+                                        <p><strong>Enterprise SLA:</strong> 99.9% uptime guarantee with 4-hour RTO and 15-minute RPO</p>
+                                        <p><strong>Support Response Times:</strong> Critical: 15 minutes, High: 2 hours, Medium: 8 hours, Low: 24 hours</p>
+                                        <p><strong>Data Processing SLA:</strong> 100GB/hour guaranteed throughput with sub-second query response times</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>
-        
+
         <script>
-            function showTab(tabName) {
-                // Hide all tab contents
-                const tabContents = document.querySelectorAll('.tab-content');
-                tabContents.forEach(content => content.classList.remove('active'));
+            // Navigation
+            document.addEventListener('DOMContentLoaded', function() {
+                const navLinks = document.querySelectorAll('[data-nav-section]');
+                const sections = document.querySelectorAll('[data-section]');
                 
-                // Remove active class from all tabs
-                const tabs = document.querySelectorAll('.tab');
-                tabs.forEach(tab => tab.classList.remove('active'));
+                navLinks.forEach(link => {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const targetSection = this.getAttribute('data-nav-section');
+                        
+                        // Update active nav item
+                        document.querySelectorAll('#colorlib-main-menu li').forEach(li => li.classList.remove('active'));
+                        this.parentElement.classList.add('active');
+                        
+                        // Show target section
+                        sections.forEach(section => {
+                            if (section.getAttribute('data-section') === targetSection) {
+                                section.style.display = 'block';
+                            } else {
+                                section.style.display = 'none';
+                            }
+                        });
+                    });
+                });
                 
-                // Show selected tab content
-                document.getElementById(tabName).classList.add('active');
-                
-                // Add active class to clicked tab
-                event.target.classList.add('active');
-            }
-            
-            function runDataIngestionTest(testType) {
-                const resultsDiv = document.getElementById('test-results');
-                const outputDiv = document.getElementById('test-output');
-                
-                resultsDiv.style.display = 'block';
-                outputDiv.innerHTML = `Starting ${testType} test...\n`;
-                
-                // Simulate test execution
-                const testSteps = [
-                    'Initializing data ingestion module...',
-                    'Connecting to test data source...',
-                    'Validating data format and schema...',
-                    'Processing sample data batch...',
-                    'Running data quality checks...',
-                    'Measuring throughput and latency...',
-                    'Generating test report...'
-                ];
-                
-                let stepIndex = 0;
-                const interval = setInterval(() => {
-                    if (stepIndex < testSteps.length) {
-                        outputDiv.innerHTML += `[${new Date().toLocaleTimeString()}] ${testSteps[stepIndex]}\n`;
-                        outputDiv.scrollTop = outputDiv.scrollHeight;
-                        stepIndex++;
-                    } else {
-                        outputDiv.innerHTML += `[${new Date().toLocaleTimeString()}] ✅ ${testType} test completed successfully!\n`;
-                        outputDiv.innerHTML += `[${new Date().toLocaleTimeString()}] Throughput: 45.7 MB/s | Latency: 23ms | Quality Score: 98.5%\n`;
-                        outputDiv.scrollTop = outputDiv.scrollHeight;
-                        clearInterval(interval);
+                // API Health Monitoring
+                async function checkServiceHealth(service, url, elementId) {
+                    try {
+                        const startTime = Date.now();
+                        const response = await fetch(url, { 
+                            method: 'HEAD',
+                            mode: 'no-cors',
+                            timeout: 5000
+                        });
+                        const responseTime = Date.now() - startTime;
+                        
+                        document.getElementById(elementId).textContent = `${responseTime}ms - OK`;
+                        document.getElementById(elementId).previousElementSibling.querySelector('.status-indicator').className = 'status-indicator status-ok';
+                    } catch (error) {
+                        document.getElementById(elementId).textContent = 'Offline';
+                        document.getElementById(elementId).previousElementSibling.querySelector('.status-indicator').className = 'status-indicator status-error';
                     }
-                }, 800);
-            }
+                }
+                
+                // Monitor services
+                function monitorServices() {
+                    // Platform Services
+                    checkServiceHealth('ArgoCD', '/argocd/', 'argocd-status');
+                    checkServiceHealth('Vault', '/vault/', 'vault-status');
+                    checkServiceHealth('Airflow', '/airflow/', 'airflow-status');
+                    checkServiceHealth('MLflow', '/mlflow/', 'mlflow-status');
+                    checkServiceHealth('Kubeflow', '/kubeflow/', 'kubeflow-status');
+                    checkServiceHealth('Superset', '/superset/', 'superset-status');
+                    checkServiceHealth('Kiali', '/istio/', 'kiali-status');
+                    
+                    // Database Layer APIs
+                    checkServiceHealth('PostgreSQL', '/health/postgres', 'postgres-status');
+                    checkServiceHealth('Redis', '/health/redis', 'redis-status');
+                    checkServiceHealth('Elasticsearch', '/health/elasticsearch', 'elasticsearch-status');
+                    checkServiceHealth('InfluxDB', '/health/influxdb', 'influxdb-status');
+                    
+                    // BASE Data Processing Modules
+                    checkServiceHealth('Data Ingestion', '/api/v1/data-ingestion/health', 'data-ingestion-status');
+                    checkServiceHealth('Data Quality', '/api/v1/data-quality/health', 'data-quality-status');
+                    checkServiceHealth('Data Storage', '/api/v1/data-storage/health', 'data-storage-status');
+                    checkServiceHealth('Feature Engineering', '/api/v1/feature-engineering/health', 'feature-engineering-status');
+                    checkServiceHealth('Pipeline Management', '/api/v1/pipeline-management/health', 'pipeline-mgmt-status');
+                }
+                
+                // Initial monitoring and refresh every 30 seconds
+                monitorServices();
+                setInterval(monitorServices, 30000);
+                
+                // Counter animation
+                function animateCounters() {
+                    const counters = document.querySelectorAll('.js-counter');
+                    counters.forEach(counter => {
+                        const target = parseInt(counter.getAttribute('data-to'));
+                        const speed = parseInt(counter.getAttribute('data-speed'));
+                        const increment = target / (speed / 50);
+                        let current = 0;
+                        
+                        const timer = setInterval(() => {
+                            current += increment;
+                            if (current >= target) {
+                                current = target;
+                                clearInterval(timer);
+                            }
+                            counter.textContent = Math.floor(current);
+                        }, 50);
+                    });
+                }
+                
+                // Trigger counter animation
+                setTimeout(animateCounters, 1000);
+            });
             
-            function refreshMetrics() {
-                // Simulate real metrics
-                document.getElementById('cpu-usage').textContent = Math.floor(Math.random() * 30 + 20) + '%';
-                document.getElementById('memory-usage').textContent = Math.floor(Math.random() * 40 + 40) + '%';
-                document.getElementById('active-pods').textContent = Math.floor(Math.random() * 10 + 15);
-                document.getElementById('data-throughput').textContent = Math.floor(Math.random() * 50 + 25) + 'MB/s';
+            // Service navigation function
+            function openService(path) {
+                // Use current hostname with new path for proper Istio routing
+                const currentHost = window.location.hostname;
+                const currentPort = window.location.port ? ':' + window.location.port : '';
+                const newUrl = window.location.protocol + '//' + currentHost + currentPort + path;
+                
+                // Navigate to service through NGINX proxy
+                window.location.href = newUrl;
             }
-            
-            function exportLogs() {
-                alert('Logs exported to platform administrator dashboard');
-            }
-            
-            // Initialize metrics on page load
-            window.onload = function() {
-                refreshMetrics();
-                // Auto-refresh metrics every 30 seconds
-                setInterval(refreshMetrics, 30000);
-            };
         </script>
     </body>
     </html>
@@ -515,8 +1200,7 @@ metadata:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/load-balancer-name: base-platform-ui-v2
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /health
 spec:
   rules:
