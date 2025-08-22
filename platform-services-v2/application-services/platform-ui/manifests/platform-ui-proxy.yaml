@@ -367,12 +367,12 @@ data:
             justify-content: space-between;
         }
         
-        .services.color-1 { border-left: 5px solid #667eea; }
-        .services.color-2 { border-left: 5px solid #764ba2; }
-        .services.color-3 { border-left: 5px solid #28a745; }
-        .services.color-4 { border-left: 5px solid #ffc107; }
-        .services.color-5 { border-left: 5px solid #17a2b8; }
-        .services.color-6 { border-left: 5px solid #dc3545; }
+        .services.color-1 { border-left: 5px solid #5fc3e4; background: linear-gradient(135deg, rgba(95, 195, 228, 0.1) 0%, rgba(95, 195, 228, 0.05) 100%); }
+        .services.color-2 { border-left: 5px solid #e52d27; background: linear-gradient(135deg, rgba(229, 45, 39, 0.1) 0%, rgba(229, 45, 39, 0.05) 100%); }
+        .services.color-3 { border-left: 5px solid #b719d2; background: linear-gradient(135deg, rgba(183, 25, 210, 0.1) 0%, rgba(183, 25, 210, 0.05) 100%); }
+        .services.color-4 { border-left: 5px solid #f7b733; background: linear-gradient(135deg, rgba(247, 183, 51, 0.1) 0%, rgba(247, 183, 51, 0.05) 100%); }
+        .services.color-5 { border-left: 5px solid #fc4a1a; background: linear-gradient(135deg, rgba(252, 74, 26, 0.1) 0%, rgba(252, 74, 26, 0.05) 100%); }
+        .services.color-6 { border-left: 5px solid #4abdbc; background: linear-gradient(135deg, rgba(74, 189, 188, 0.1) 0%, rgba(74, 189, 188, 0.05) 100%); }
         
         .services .icon {
             display: block;
@@ -551,7 +551,14 @@ data:
                                     <h2 class="colorlib-heading">Available Applications</h2>
                                 </div>
                             </div>
-                            <div class="row row-pt-md">
+                            
+                            <!-- Core Infrastructure Services -->
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h4 style="color: #5fc3e4; margin: 30px 0 20px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">Core Infrastructure</h4>
+                                </div>
+                            </div>
+                            <div class="row">
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-1">
                                         <div class="service-status">CORE</div>
@@ -584,6 +591,13 @@ data:
                                             <a href="javascript:void(0)" onclick="openService('/airflow/')" class="service-link">Access Airflow</a>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <!-- ML & Analytics Services -->
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h4 style="color: #f7b733; margin: 40px 0 20px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">Machine Learning & Analytics</h4>
                                 </div>
                             </div>
                             <div class="row">
@@ -621,9 +635,16 @@ data:
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- Monitoring & Observability -->
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h4 style="color: #4abdbc; margin: 40px 0 20px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">Monitoring & Observability</h4>
+                                </div>
+                            </div>
                             <div class="row">
                                 <div class="col-md-4 text-center animate-box">
-                                    <div class="services color-1">
+                                    <div class="services color-6">
                                         <div class="service-status">MESH</div>
                                         <span class="icon"><i class="icon-network"></i></span>
                                         <div class="desc">
@@ -634,7 +655,7 @@ data:
                                     </div>
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
-                                    <div class="services color-2">
+                                    <div class="services color-6">
                                         <div class="service-status">MONITORING</div>
                                         <span class="icon"><i class="icon-line-graph"></i></span>
                                         <div class="desc">
@@ -645,7 +666,7 @@ data:
                                     </div>
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
-                                    <div class="services color-3">
+                                    <div class="services color-6">
                                         <div class="service-status">MONITORING</div>
                                         <span class="icon"><i class="icon-stats-dots"></i></span>
                                         <div class="desc">
