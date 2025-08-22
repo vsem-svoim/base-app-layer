@@ -814,30 +814,30 @@ data:
                                 </div>
                             </div>
                             
-                            <!-- Monitoring Stack (Not Deployed) -->
+                            <!-- Wave 1 Monitoring Stack (DEPLOYED) -->
                             <div class="category-header">
-                                <h4>Monitoring & Observability Stack - Not Deployed</h4>
+                                <h4>Wave 1 - Monitoring & Observability Stack</h4>
                             </div>
                             <div class="row">
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-1">
-                                        <div class="service-status error">NOT DEPLOYED</div>
+                                        <div class="service-status">DEPLOYED</div>
                                         <span class="icon"><i class="fas fa-chart-area"></i></span>
                                         <div class="desc">
                                             <h3>Grafana</h3>
                                             <p>Metrics visualization and dashboards</p>
-                                            <button onclick="alert('Grafana not deployed. Deploy monitoring stack first.')" class="service-link">Deploy Grafana</button>
+                                            <button onclick="window.open('/grafana/', '_blank')" class="service-link">Launch Grafana</button>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-2">
-                                        <div class="service-status error">NOT DEPLOYED</div>
+                                        <div class="service-status">DEPLOYED</div>
                                         <span class="icon"><i class="fas fa-database"></i></span>
                                         <div class="desc">
                                             <h3>Prometheus</h3>
                                             <p>Metrics collection and alerting</p>
-                                            <button onclick="alert('Prometheus not deployed. Deploy monitoring stack first.')" class="service-link">Deploy Prometheus</button>
+                                            <button onclick="window.open('/prometheus/', '_blank')" class="service-link">Launch Prometheus</button>
                                         </div>
                                     </div>
                                 </div>
@@ -847,7 +847,7 @@ data:
                                         <span class="icon"><i class="fas fa-search"></i></span>
                                         <div class="desc">
                                             <h3>Kibana</h3>
-                                            <p>Log analysis and visualization</p>
+                                            <p>Log analysis and visualization (ELK)</p>
                                             <button onclick="alert('Kibana not deployed. Deploy ELK stack first.')" class="service-link">Deploy Kibana</button>
                                         </div>
                                     </div>
