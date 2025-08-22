@@ -15,10 +15,10 @@ namespace: istio-system
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: istio
-  app.kubernetes.io/component: service-mesh
-  app.kubernetes.io/part-of: base-platform
-  deployment.wave: "1"
+    app.kubernetes.io/name: istio
+    app.kubernetes.io/component: service-mesh
+    app.kubernetes.io/part-of: base-platform
+    deployment.wave: "1"
 
 patches:
 - target:
