@@ -1,0 +1,101 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: platform-gateway
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: base-platform
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "*"
+    tls:
+      mode: SIMPLE
+      credentialName: platform-tls-secret
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: platform-ui-vs
+  namespace: platform-ui
+  labels:
+    app.kubernetes.io/name: platform-ui
+    app.kubernetes.io/component: virtualservice
+    app.kubernetes.io/part-of: base-platform
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - istio-system/platform-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: platform-ui-proxy.platform-ui.svc.cluster.local
+        port:
+          number: 80
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: airflow-vs
+  namespace: airflow
+  labels:
+    app.kubernetes.io/name: airflow
+    app.kubernetes.io/component: virtualservice
+    app.kubernetes.io/part-of: base-platform
+spec:
+  hosts:
+  - "airflow.base-app-layer.dev"
+  gateways:
+  - istio-system/platform-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /airflow/
+    route:
+    - destination:
+        host: airflow.airflow.svc.cluster.local
+        port:
+          number: 8080
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: data-ingestion-vs
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/name: base-data-ingestion
+    app.kubernetes.io/component: virtualservice
+    app.kubernetes.io/part-of: base-platform
+spec:
+  hosts:
+  - "data-ingestion.base-app-layer.dev"
+  gateways:
+  - istio-system/platform-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/data-ingestion/test
+    route:
+    - destination:
+        host: base-data-ingestion-api.base-data-ingestion.svc.cluster.local
+        port:
+          number: 8080
