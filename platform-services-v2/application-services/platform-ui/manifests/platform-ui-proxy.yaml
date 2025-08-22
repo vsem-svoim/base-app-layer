@@ -165,29 +165,6 @@ data:
             proxy_buffering off;
         }
         
-        location /grafana/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "grafana.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect off;
-            proxy_buffering off;
-        }
-        
-        location /prometheus/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "prometheus.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect off;
-            proxy_buffering off;
-        }
-        
-        location /kibana/ {
-            proxy_pass http://istio_gateway_backend/;
-            proxy_set_header Host "kibana.base-app-layer.dev";
-            proxy_set_header Accept-Encoding "";
-            proxy_redirect off;
-            proxy_buffering off;
-        }
         
         # Root location serves the dashboard
         location / {
@@ -222,12 +199,21 @@ data:
         .row { 
             display: flex; 
             flex-wrap: wrap; 
-            margin: 0 -15px; 
-            justify-content: center;
+            margin: 0 -15px 30px -15px; 
+            justify-content: flex-start;
             align-items: stretch;
+            width: 100%;
+            box-sizing: border-box;
         }
         .col-md-3 { flex: 0 0 25%; max-width: 25%; padding: 0 15px; margin-bottom: 30px; }
-        .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 15px; margin-bottom: 40px; display: flex; }
+        .col-md-4 { 
+            flex: 0 0 33.333333%; 
+            max-width: 33.333333%; 
+            padding: 0 15px; 
+            margin-bottom: 40px; 
+            display: flex;
+            box-sizing: border-box;
+        }
         .col-md-6 { flex: 0 0 50%; max-width: 50%; padding: 0 15px; margin-bottom: 30px; }
         .col-md-12 { flex: 0 0 100%; max-width: 100%; padding: 0 15px; }
         .col-md-offset-3 { margin-left: 25%; }
