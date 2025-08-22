@@ -25,7 +25,7 @@ data:
     }
     
     upstream mlflow_backend {
-        server mlflow.mlflow.svc.cluster.local:5000;
+        server mlflow-tracking-server.mlflow.svc.cluster.local:5000;
     }
     
     upstream kubeflow_backend {
@@ -67,11 +67,17 @@ data:
         # Wave 0 Core Services (deploy first)
         location /argocd/ {
             proxy_pass https://argocd_backend/;
-            proxy_set_header Host $host;
+            proxy_ssl_verify off;
+            proxy_ssl_server_name on;
+            proxy_ssl_name argocd-server.argocd.svc.cluster.local;
+            proxy_set_header Host argocd-server.argocd.svc.cluster.local;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_ssl_verify off;
+            proxy_set_header Accept-Encoding gzip;
+            # Handle ArgoCD specific headers
+            proxy_set_header Argocd-Server argocd-server.argocd.svc.cluster.local;
+            proxy_redirect https://argocd-server.argocd.svc.cluster.local/ /argocd/;
         }
         
         location /vault/ {
@@ -80,15 +86,17 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://vault.vault.svc.cluster.local:8200/ /vault/;
         }
         
-        # Wave 2 Orchestration Services
+        # Wave 2 Orchestration Services  
         location /airflow/ {
             proxy_pass http://airflow_backend/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://airflow.airflow.svc.cluster.local:8080/ /airflow/;
         }
         
         location /mlflow/ {
@@ -97,6 +105,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://mlflow-tracking-server.mlflow.svc.cluster.local:5000/ /mlflow/;
         }
         
         location /kubeflow/ {
@@ -105,6 +114,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://kubeflow-ui-server.kubeflow.svc.cluster.local:3000/ /kubeflow/;
         }
         
         location /superset/ {
@@ -113,6 +123,7 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_redirect http://apache-superset.superset.svc.cluster.local:8088/ /superset/;
         }
         
         # Monitoring Services
