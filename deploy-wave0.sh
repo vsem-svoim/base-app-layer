@@ -207,7 +207,69 @@ data:
       address = "0.0.0.0:8200"
       tls_disable = 1
     }
+    disable_mlock = true
     ui = true
+  init.sh: |
+    #!/bin/sh
+    set -e
+    
+    # Wait for Vault to be ready
+    until curl -f http://vault:8200/v1/sys/health 2>/dev/null; do
+      echo "Waiting for Vault to be ready..."
+      sleep 5
+    done
+    
+    # Check if already initialized
+    if curl -f http://vault:8200/v1/sys/init 2>/dev/null | grep '"initialized":true'; then
+      echo "Vault already initialized"
+      exit 0
+    fi
+    
+    # Initialize Vault
+    echo "Initializing Vault..."
+    INIT_RESPONSE=$(curl -X POST \
+      -H "Content-Type: application/json" \
+      -d '{"key_shares":5,"key_threshold":3}' \
+      http://vault:8200/v1/sys/init)
+    
+    # Extract keys and token
+    echo "$INIT_RESPONSE" | jq -r '.keys_base64[]' > /tmp/unseal-keys
+    echo "$INIT_RESPONSE" | jq -r '.root_token' > /tmp/root-token
+    
+    # Store in Kubernetes secret
+    kubectl create secret generic vault-keys -n vault \
+      --from-file=keys=/tmp/unseal-keys \
+      --from-file=root-token=/tmp/root-token
+    
+    echo "Vault initialized successfully"
+  unseal.sh: |
+    #!/bin/sh
+    set -e
+    
+    # Wait for Vault to be ready
+    until curl -f http://vault:8200/v1/sys/health 2>/dev/null; do
+      echo "Waiting for Vault to be ready..."
+      sleep 5
+    done
+    
+    # Check if unsealed
+    if curl -f http://vault:8200/v1/sys/seal-status 2>/dev/null | grep '"sealed":false'; then
+      echo "Vault already unsealed"
+      exit 0
+    fi
+    
+    # Get unseal keys
+    kubectl get secret vault-keys -n vault -o jsonpath='{.data.keys}' | base64 -d > /tmp/unseal-keys
+    
+    # Unseal with first 3 keys
+    head -3 /tmp/unseal-keys | while read key; do
+      curl -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"key\":\"$key\"}" \
+        http://vault:8200/v1/sys/unseal
+    done
+    
+    echo "Vault unsealed successfully"
 ---
 apiVersion: v1
 kind: Service
@@ -223,55 +285,111 @@ spec:
   - port: 8200
     targetPort: 8200
   type: ClusterIP
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: vault
+spec:
+  template:
+    spec:
+      serviceAccountName: vault-init
+      containers:
+      - name: vault-init
+        image: curlimages/curl:latest
+        command: ["/bin/sh", "/scripts/init.sh"]
+        volumeMounts:
+        - name: init-scripts
+          mountPath: /scripts
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: vault-config
+          defaultMode: 0755
+      restartPolicy: OnFailure
+  backoffLimit: 3
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-unseal
+  namespace: vault
+spec:
+  template:
+    spec:
+      serviceAccountName: vault-init
+      containers:
+      - name: vault-unseal
+        image: curlimages/curl:latest
+        command: ["/bin/sh", "/scripts/unseal.sh"]
+        volumeMounts:
+        - name: unseal-scripts
+          mountPath: /scripts
+      volumes:
+      - name: unseal-scripts
+        configMap:
+          name: vault-config
+          defaultMode: 0755
+      restartPolicy: OnFailure
+  backoffLimit: 3
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-init
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-init
+  namespace: vault
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-init
+  namespace: vault
+subjects:
+- kind: ServiceAccount
+  name: vault-init
+  namespace: vault
+roleRef:
+  kind: Role
+  name: vault-init
+  apiGroup: rbac.authorization.k8s.io
 EOF
     
     wait_for_pods "vault" 120
     
-    # Initialize and unseal Vault (production mode)
-    log_info "Initializing and unsealing Vault..."
+    # Let Kubernetes Jobs handle initialization and unsealing
+    log_info "Starting Vault initialization and unsealing via Kubernetes Jobs..."
     
-    # Wait a bit more for Vault to be fully ready
-    sleep 10
+    # Wait for init job to complete
+    log_info "Waiting for vault-init job to complete..."
+    kubectl wait --for=condition=complete job/vault-init -n vault --timeout=300s || {
+        log_warn "Vault init job did not complete, checking logs..."
+        kubectl logs job/vault-init -n vault
+    }
     
-    # Check if Vault is already initialized
-    if kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault status | grep -q "Initialized.*true"; then
-        log_info "Vault is already initialized"
+    # Wait for unseal job to complete
+    log_info "Waiting for vault-unseal job to complete..."
+    kubectl wait --for=condition=complete job/vault-unseal -n vault --timeout=300s || {
+        log_warn "Vault unseal job did not complete, checking logs..."
+        kubectl logs job/vault-unseal -n vault
+    }
+    
+    # Verify Vault is ready
+    sleep 5
+    if curl -s http://vault.vault.svc.cluster.local:8200/v1/sys/health | grep -q '"sealed":false'; then
+        log_info "✅ Vault is initialized, unsealed, and ready"
     else
-        log_info "Initializing Vault with 5 key shares, threshold 3..."
-        # Initialize Vault and capture keys
-        kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator init -key-shares=5 -key-threshold=3 -format=json > /tmp/vault-init.json
-        
-        # Extract unseal keys and root token
-        UNSEAL_KEY_1=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[0]')
-        UNSEAL_KEY_2=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[1]')
-        UNSEAL_KEY_3=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[2]')
-        ROOT_TOKEN=$(cat /tmp/vault-init.json | jq -r '.root_token')
-        
-        # Store keys in Kubernetes secrets for production use
-        kubectl create secret generic vault-keys -n vault \
-            --from-literal=unseal-key-1="$UNSEAL_KEY_1" \
-            --from-literal=unseal-key-2="$UNSEAL_KEY_2" \
-            --from-literal=unseal-key-3="$UNSEAL_KEY_3" \
-            --from-literal=root-token="$ROOT_TOKEN"
-        
-        log_info "Vault keys stored in vault-keys secret"
-    fi
-    
-    # Unseal Vault
-    log_info "Unsealing Vault..."
-    UNSEAL_KEY_1=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-1}' | base64 -d)
-    UNSEAL_KEY_2=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-2}' | base64 -d)
-    UNSEAL_KEY_3=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-3}' | base64 -d)
-    
-    kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY_1"
-    kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY_2" 
-    kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal "$UNSEAL_KEY_3"
-    
-    # Verify Vault is unsealed
-    if kubectl exec -n vault deployment/vault -- env VAULT_ADDR=http://127.0.0.1:8200 vault status | grep -q "Sealed.*false"; then
-        log_info "✅ Vault is unsealed and ready"
-    else
-        log_error "❌ Failed to unseal Vault"
+        log_error "❌ Vault health check failed"
         return 1
     fi
     
