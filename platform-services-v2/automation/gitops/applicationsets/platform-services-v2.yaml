@@ -248,6 +248,10 @@ spec:
     kind: MutatingWebhookConfiguration
   - group: admissionregistration.k8s.io
     kind: ValidatingWebhookConfiguration
+  - group: networking.k8s.io
+    kind: IngressClass
+  - group: elbv2.k8s.aws
+    kind: IngressClassParams
   - group: security.istio.io
     kind: '*'
   - group: networking.istio.io
