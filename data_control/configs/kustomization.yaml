@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-control-config-checkpoint-policies.yaml
+- base-data-control-config-monitoring-thresholds.yaml
+- base-data-control-config-recovery-procedures.yaml
+- base-data-control-config-sampling-strategies.yaml
 
 labels:
 - includeSelectors: true

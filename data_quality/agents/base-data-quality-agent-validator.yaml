@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: validator-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: validator
+    app.kubernetes.io/component: data_quality
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-quality-agent-validator
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: validator
+    app.kubernetes.io/component: data_quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: agent
+    base.io/function: validator
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: validator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: validator
+        app.kubernetes.io/component: data_quality
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_quality
+        base.io/type: agent
+    spec:
+      serviceAccountName: validator-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: validator
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Gen AI validator Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: AGENT_TYPE
+          value: "validator"
+        - name: MODULE_NAME
+          value: "data_quality"
+        resources:
+          requests:
+            cpu: "0.5"
+            memory: "1Gi"
+            ephemeral-storage: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+            ephemeral-storage: "10Gi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-data-quality-agent-validator-service
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: validator
+    app.kubernetes.io/component: data_quality
+    app.kubernetes.io/part-of: base-system
+spec:
+  selector:
+    app.kubernetes.io/name: validator
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  type: ClusterIP

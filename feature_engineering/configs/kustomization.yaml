@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-feature-engineering-config-analysis-parameters.yaml
+- base-feature-engineering-config-enrichment-sources.yaml
+- base-feature-engineering-config-labeling-taxonomies.yaml
+- base-feature-engineering-config-transformation-templates.yaml
 
 labels:
 - includeSelectors: true

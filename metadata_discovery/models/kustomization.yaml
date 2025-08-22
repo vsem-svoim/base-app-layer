@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-metadata-discovery-model-lineage-mapping.yaml
+- base-metadata-discovery-model-metadata-inference.yaml
+- base-metadata-discovery-model-similarity-matching.yaml
+- base-metadata-discovery-model-usage-prediction.yaml
 
 labels:
 - includeSelectors: true

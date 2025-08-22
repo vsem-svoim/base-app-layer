@@ -1,8 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-storage-agent-archiver.yaml
+- base-data-storage-agent-compactor.yaml
+- base-data-storage-agent-indexer.yaml
+- base-data-storage-agent-partitioner.yaml
+- base-data-storage-agent-replicator.yaml
+- base-data-storage-agent-versioner.yaml
 
 labels:
 - includeSelectors: true

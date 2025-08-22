@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-distribution-agent-api-builder.yaml
+- base-data-distribution-agent-cache-manager.yaml
+- base-data-distribution-agent-publisher.yaml
+- base-data-distribution-agent-query-optimizer.yaml
 
 labels:
 - includeSelectors: true

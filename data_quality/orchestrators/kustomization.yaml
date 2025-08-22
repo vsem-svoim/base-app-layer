@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-quality-orchestrator-audit-manager.yaml
+- base-data-quality-orchestrator-cleaning-manager.yaml
+- base-data-quality-orchestrator-qa-manager.yaml
+- base-data-quality-orchestrator-quality-manager.yaml
+- base-data-quality-orchestrator-validation-manager.yaml
 
 labels:
 - includeSelectors: true

@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-schema-contracts-agent-contract-validator.yaml
+- base-schema-contracts-agent-interface-generator.yaml
+- base-schema-contracts-agent-schema-evolution.yaml
+- base-schema-contracts-agent-schema-registry.yaml
 
 labels:
 - includeSelectors: true

@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-storage-orchestrator-lifecycle-manager.yaml
+- base-data-storage-orchestrator-optimization-manager.yaml
+- base-data-storage-orchestrator-partition-manager.yaml
+- base-data-storage-orchestrator-replication-manager.yaml
+- base-data-storage-orchestrator-storage-manager.yaml
 
 labels:
 - includeSelectors: true

@@ -15,7 +15,7 @@ namespace: argo-workflows
 labels:
 - includeSelectors: true
   pairs:
-  app.kubernetes.io/name: argo-workflows
-  app.kubernetes.io/component: workflow-engine
-  app.kubernetes.io/part-of: base-platform
-  deployment.wave: "2"
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/component: workflow-engine
+    app.kubernetes.io/part-of: base-platform
+    deployment.wave: "2"

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: base-event-coordination
+  labels:
+    app.kubernetes.io/name: base-event-coordination
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: event-coordination
+    deployment.wave: "4"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    module.description: "Event-driven architecture and saga patterns"

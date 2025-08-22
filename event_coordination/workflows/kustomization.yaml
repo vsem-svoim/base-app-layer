@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-event-coordination-workflow-distributed-transaction.yaml
+- base-event-coordination-workflow-error-recovery.yaml
+- base-event-coordination-workflow-event-sourcing.yaml
+- base-event-coordination-workflow-event-transformation.yaml
 
 labels:
 - includeSelectors: true

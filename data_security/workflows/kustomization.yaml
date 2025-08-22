@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-security-workflow-access-review.yaml
+- base-data-security-workflow-breach-response.yaml
+- base-data-security-workflow-classification.yaml
+- base-data-security-workflow-compliance-audit.yaml
+- base-data-security-workflow-privacy-protection.yaml
 
 labels:
 - includeSelectors: true

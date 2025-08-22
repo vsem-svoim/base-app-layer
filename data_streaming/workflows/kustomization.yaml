@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-streaming-workflow-complex-event.yaml
+- base-data-streaming-workflow-event-driven.yaml
+- base-data-streaming-workflow-fault-tolerant-streaming.yaml
+- base-data-streaming-workflow-realtime-processing.yaml
+- base-data-streaming-workflow-streaming-analytics.yaml
 
 labels:
 - includeSelectors: true

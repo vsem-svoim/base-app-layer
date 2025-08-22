@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-streaming-orchestrator-aggregation-manager.yaml
+- base-data-streaming-orchestrator-event-manager.yaml
+- base-data-streaming-orchestrator-flow-control-manager.yaml
+- base-data-streaming-orchestrator-realtime-manager.yaml
+- base-data-streaming-orchestrator-streaming-manager.yaml
 
 labels:
 - includeSelectors: true

@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-quality-model-consistency-check.yaml
+- base-data-quality-model-duplicate-matching.yaml
+- base-data-quality-model-outlier-detection.yaml
+- base-data-quality-model-quality-scoring.yaml
+- base-data-quality-model-schema-validation.yaml
 
 labels:
 - includeSelectors: true

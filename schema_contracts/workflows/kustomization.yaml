@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-schema-contracts-workflow-api-lifecycle.yaml
+- base-schema-contracts-workflow-backward-compatibility.yaml
+- base-schema-contracts-workflow-contract-enforcement.yaml
+- base-schema-contracts-workflow-schema-management.yaml
 
 labels:
 - includeSelectors: true

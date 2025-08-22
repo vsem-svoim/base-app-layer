@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-quality-monitoring-model-anomaly-detection.yaml
+- base-quality-monitoring-model-benchmark-analysis.yaml
+- base-quality-monitoring-model-drift-detection.yaml
+- base-quality-monitoring-model-profiling-optimization.yaml
+- base-quality-monitoring-model-sla-prediction.yaml
 
 labels:
 - includeSelectors: true

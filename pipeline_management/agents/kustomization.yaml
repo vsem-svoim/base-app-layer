@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-pipeline-management-agent-circuit-breaker.yaml
+- base-pipeline-management-agent-dependency-resolver.yaml
+- base-pipeline-management-agent-failure-recovery.yaml
+- base-pipeline-management-agent-pipeline-composer.yaml
+- base-pipeline-management-agent-workflow-orchestrator.yaml
 
 labels:
 - includeSelectors: true

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: base-metadata-discovery
+  labels:
+    app.kubernetes.io/name: base-metadata-discovery
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: metadata-discovery
+    deployment.wave: "4"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    module.description: "Data cataloging and lineage tracking"

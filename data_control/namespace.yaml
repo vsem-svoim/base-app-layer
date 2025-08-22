@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: base-data-control
+  labels:
+    app.kubernetes.io/name: base-data-control
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: data-control
+    deployment.wave: "4"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    module.description: "Data governance and control plane services"

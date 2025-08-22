@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-data-streaming-model-aggregation-strategy.yaml
+- base-data-streaming-model-backpressure-prediction.yaml
+- base-data-streaming-model-join-optimization.yaml
+- base-data-streaming-model-routing-decision.yaml
+- base-data-streaming-model-stream-optimization.yaml
 
 labels:
 - includeSelectors: true

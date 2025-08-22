@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Placeholder kustomization - actual resources will be added when manifests are implemented
-resources: []
+resources:
+- base-quality-monitoring-workflow-anomaly-detection.yaml
+- base-quality-monitoring-workflow-benchmarking.yaml
+- base-quality-monitoring-workflow-drift-analysis.yaml
+- base-quality-monitoring-workflow-profiling.yaml
+- base-quality-monitoring-workflow-quality-monitoring.yaml
 
 labels:
 - includeSelectors: true

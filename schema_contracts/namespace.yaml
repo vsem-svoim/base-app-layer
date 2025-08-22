@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: base-schema-contracts
+  labels:
+    app.kubernetes.io/name: base-schema-contracts
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: schema-contracts
+    deployment.wave: "4"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    module.description: "Schema management and data contracts"

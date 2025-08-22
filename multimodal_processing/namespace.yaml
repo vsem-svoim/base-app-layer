@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: base-multimodal-processing
+  labels:
+    app.kubernetes.io/name: base-multimodal-processing
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+    module.type: multimodal-processing
+    deployment.wave: "4"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    module.description: "Text, image, geospatial, time-series processing"
