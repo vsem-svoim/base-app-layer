@@ -162,18 +162,26 @@ spec:
         - name: VAULT_ADDR
           value: "http://127.0.0.1:8200"
         - name: VAULT_API_ADDR
-          value: "http://127.0.0.1:8200"
-        - name: VAULT_LOCAL_CONFIG
-          value: |
-            storage "file" {
-              path = "/vault/data"
-            }
-            listener "tcp" {
-              address = "0.0.0.0:8200"
-              tls_disable = 1
-            }
-            ui = true
+          value: "http://0.0.0.0:8200"
         command: ["vault", "server", "-config=/vault/config/config.hcl"]
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200
+            port: 8200
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200
+            port: 8200
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
         volumeMounts:
         - name: vault-data
           mountPath: /vault/data
@@ -434,7 +442,7 @@ spec:
       serviceAccountName: vault-init
       containers:
       - name: vault-init
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.2
         command: ["/bin/bash", "/scripts/init.sh"]
         volumeMounts:
         - name: init-scripts
@@ -458,7 +466,7 @@ spec:
       serviceAccountName: vault-init
       containers:
       - name: vault-unseal
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.28.2
         command: ["/bin/bash", "/scripts/unseal.sh"]
         volumeMounts:
         - name: unseal-scripts
@@ -491,10 +499,12 @@ EOF
     
     # Verify Vault is ready
     sleep 5
-    if curl -s http://vault.vault.svc.cluster.local:8200/v1/sys/health | grep -q '"sealed":false'; then
+    if curl -s "http://vault.vault.svc.cluster.local:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" | grep -q '"initialized":true'; then
         log_info "✅ Vault is initialized, unsealed, and ready"
     else
         log_error "❌ Vault health check failed"
+        log_info "Checking Vault status..."
+        curl -s "http://vault.vault.svc.cluster.local:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" || log_error "Health endpoint not responding"
         return 1
     fi
     
