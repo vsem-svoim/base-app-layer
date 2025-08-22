@@ -168,7 +168,55 @@ EOF
     
     wait_for_pods "vault" 120
     
-    log_info "Vault deployed successfully"
+    # Initialize and unseal Vault (production mode)
+    log_info "Initializing and unsealing Vault..."
+    
+    # Wait a bit more for Vault to be fully ready
+    sleep 10
+    
+    # Check if Vault is already initialized
+    if kubectl exec -n vault deployment/vault -- vault status | grep -q "Initialized.*true"; then
+        log_info "Vault is already initialized"
+    else
+        log_info "Initializing Vault with 5 key shares, threshold 3..."
+        # Initialize Vault and capture keys
+        kubectl exec -n vault deployment/vault -- vault operator init -key-shares=5 -key-threshold=3 -format=json > /tmp/vault-init.json
+        
+        # Extract unseal keys and root token
+        UNSEAL_KEY_1=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[0]')
+        UNSEAL_KEY_2=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[1]')
+        UNSEAL_KEY_3=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[2]')
+        ROOT_TOKEN=$(cat /tmp/vault-init.json | jq -r '.root_token')
+        
+        # Store keys in Kubernetes secrets for production use
+        kubectl create secret generic vault-keys -n vault \
+            --from-literal=unseal-key-1="$UNSEAL_KEY_1" \
+            --from-literal=unseal-key-2="$UNSEAL_KEY_2" \
+            --from-literal=unseal-key-3="$UNSEAL_KEY_3" \
+            --from-literal=root-token="$ROOT_TOKEN"
+        
+        log_info "Vault keys stored in vault-keys secret"
+    fi
+    
+    # Unseal Vault
+    log_info "Unsealing Vault..."
+    UNSEAL_KEY_1=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-1}' | base64 -d)
+    UNSEAL_KEY_2=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-2}' | base64 -d)
+    UNSEAL_KEY_3=$(kubectl get secret vault-keys -n vault -o jsonpath='{.data.unseal-key-3}' | base64 -d)
+    
+    kubectl exec -n vault deployment/vault -- vault operator unseal "$UNSEAL_KEY_1"
+    kubectl exec -n vault deployment/vault -- vault operator unseal "$UNSEAL_KEY_2" 
+    kubectl exec -n vault deployment/vault -- vault operator unseal "$UNSEAL_KEY_3"
+    
+    # Verify Vault is unsealed
+    if kubectl exec -n vault deployment/vault -- vault status | grep -q "Sealed.*false"; then
+        log_info "✅ Vault is unsealed and ready"
+    else
+        log_error "❌ Failed to unseal Vault"
+        return 1
+    fi
+    
+    log_info "Vault deployed, initialized, and unsealed successfully"
 }
 
 deploy_platform_ui_alb() {
@@ -177,7 +225,7 @@ deploy_platform_ui_alb() {
     # Create platform-ui namespace if it doesn't exist
     kubectl create namespace platform-ui || log_warn "platform-ui namespace already exists"
     
-    # Deploy ALB Ingress for Platform UI
+    # Deploy ALB Ingress for Platform UI with SSL and Route 53
     cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -185,24 +233,22 @@ metadata:
   name: platform-alb
   namespace: platform-ui
   annotations:
+    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/load-balancer-name: base-platform-alb
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    alb.ingress.kubernetes.io/subnets: subnet-00d893f736ab72568,subnet-0bcf6a6eaf4386574
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/load-balancer-name: fin-vsem-svoim-com
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:084129280818:certificate/62581121-c32d-4240-a01c-226094a1f085
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
     alb.ingress.kubernetes.io/healthcheck-path: /health
     alb.ingress.kubernetes.io/healthcheck-port: "80"
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
 spec:
-  ingressClassName: alb
   rules:
-  - http:
+  - host: fin.vsem-svoim.com
+    http:
       paths:
-      # Platform UI (default route) - deployed in Wave 0
+      # Platform UI (default route) - serves dashboard
       - path: /
         pathType: Prefix
         backend:
@@ -210,22 +256,6 @@ spec:
             name: platform-ui-proxy
             port:
               number: 80
-      # ArgoCD - Wave 0 core service
-      - path: /argocd
-        pathType: Prefix
-        backend:
-          service:
-            name: argocd-server
-            port:
-              number: 80
-      # Vault - Wave 0 core service
-      - path: /vault
-        pathType: Prefix
-        backend:
-          service:
-            name: vault
-            port:
-              number: 8200
 EOF
     
     # Wait for ALB to be provisioned
@@ -296,10 +326,23 @@ show_access_info() {
     echo "  Direct access to Vault: <ALB_URL>/vault/"
     
     echo ""
-    echo "📋 Next Steps:"
-    echo "  1. Access ArgoCD via ALB and configure repositories"
-    echo "  2. Deploy Wave 1 ApplicationSet"
-    echo "  3. Deploy Wave 2 ApplicationSet"
+    echo "🛑 WAVE 0 VALIDATION REQUIRED!"
+    echo "================================"
+    echo ""
+    echo "📋 MUST TEST before Wave 1:"
+    echo "  1. ✅ Platform UI Dashboard: https://fin.vsem-svoim.com/"
+    echo "  2. ✅ ArgoCD Tile Access: Click ArgoCD tile in Platform UI"
+    echo "  3. ✅ Vault Tile Access: Click Vault tile in Platform UI" 
+    echo "  4. ✅ Vault Authentication: Use root token from vault-keys secret"
+    echo "  5. ✅ SSL Certificate: Verify HTTPS redirect works"
+    echo "  6. ✅ Route 53 DNS: Confirm fin.vsem-svoim.com resolves to ALB"
+    echo ""
+    echo "🔍 Troubleshooting Commands:"
+    echo "  • Check ALB status: kubectl get ingress -n platform-ui"
+    echo "  • Get Vault root token: kubectl get secret vault-keys -n vault -o jsonpath='{.data.root-token}' | base64 -d"
+    echo "  • Check Vault status: kubectl exec -n vault deployment/vault -- vault status"
+    echo ""
+    echo "⚠️  DO NOT PROCEED TO WAVE 1 UNTIL ALL TESTS PASS!"
 }
 
 # Rollback function
