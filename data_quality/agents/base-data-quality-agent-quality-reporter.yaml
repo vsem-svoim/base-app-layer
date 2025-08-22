@@ -1,0 +1,722 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-quality-reporter-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-quality-agent-quality-reporter
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: agent
+    base.io/function: quality-reporter
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-quality-reporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-quality-reporter
+        app.kubernetes.io/component: quality
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_quality
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-quality-reporter-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: quality-reporter
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Quality Reporter Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: REPORT_GENERATION_BATCH_SIZE
+          value: "1000"
+        - name: DASHBOARD_UPDATE_FREQUENCY
+          value: "30"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-quality-reporter-config
+      - name: secrets-volume
+        secret:
+          secretName: base-quality-reporter-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-quality-reporter-service
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+    app.kubernetes.io/component: quality
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-quality-reporter
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-quality-reporter-config
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+    app.kubernetes.io/component: quality
+data:
+  reporter.yaml: |
+    # Quality Reporter Agent Configuration
+    reporter:
+      # Agent Identity and Responsibility
+      name: "base-quality-reporter"
+      version: "v2.5.0"
+      responsibility: "Comprehensive data quality reporting with real-time dashboards and automated stakeholder communication"
+      
+      # Reporting Capabilities
+      capabilities:
+        report_types:
+          - "real_time_dashboards"
+          - "executive_scorecards"
+          - "operational_reports"
+          - "regulatory_compliance_reports"
+          - "data_lineage_reports"
+          - "quality_trend_analysis"
+          - "incident_reports"
+          - "sla_performance_reports"
+        output_formats:
+          - "interactive_web_dashboards"
+          - "pdf_reports"
+          - "excel_spreadsheets"
+          - "json_api_responses"
+          - "xml_structured_data"
+          - "csv_data_exports"
+        delivery_channels:
+          - "web_portal_access"
+          - "email_distribution"
+          - "slack_notifications"
+          - "api_endpoints"
+          - "webhook_integrations"
+          - "mobile_push_notifications"
+        max_concurrent_reports: 200
+        throughput_target: "5000 reports/hour"
+        
+      # Dashboard Configuration
+      dashboards:
+        executive_dashboard:
+          refresh_interval: "30 seconds"
+          components:
+            - "overall_quality_score"
+            - "quality_trend_chart"
+            - "critical_alerts_summary"
+            - "compliance_status_overview"
+            - "data_volume_metrics"
+            - "system_health_indicators"
+          kpis:
+            - name: "Overall Data Quality Score"
+              target: 95.0
+              warning_threshold: 90.0
+              critical_threshold: 85.0
+            - name: "Compliance Score"
+              target: 99.0
+              warning_threshold: 95.0
+              critical_threshold: 90.0
+            - name: "Data Freshness"
+              target: "< 5 minutes"
+              warning_threshold: "< 15 minutes"
+              critical_threshold: "< 30 minutes"
+        operational_dashboard:
+          refresh_interval: "10 seconds"
+          components:
+            - "real_time_data_flow"
+            - "validation_queue_depth"
+            - "processing_latency"
+            - "error_rate_trends"
+            - "system_resource_utilization"
+            - "alert_management_panel"
+          metrics:
+            - "records_processed_per_minute"
+            - "validation_success_rate"
+            - "anomaly_detection_accuracy"
+            - "rule_enforcement_effectiveness"
+        regulatory_dashboard:
+          refresh_interval: "1 minute"
+          components:
+            - "mifid_ii_compliance_status"
+            - "emir_reporting_completeness"
+            - "basel_iii_data_quality"
+            - "sox_controls_effectiveness"
+            - "gdpr_privacy_compliance"
+            - "audit_trail_completeness"
+          regulatory_kpis:
+            - framework: "MiFID II"
+              transaction_reporting_completeness: 99.5
+              best_execution_compliance: 98.0
+            - framework: "EMIR"
+              derivative_reporting_accuracy: 99.8
+              clearing_obligation_adherence: 100.0
+            - framework: "Basel III"
+              data_quality_score: 99.9
+              regulatory_reporting_timeliness: 100.0
+              
+      # Report Generation Engine
+      report_engine:
+        template_management:
+          template_repository: "/app/templates"
+          custom_templates_supported: true
+          version_control: true
+          template_validation: true
+        data_aggregation:
+          aggregation_engine: "apache_spark"
+          real_time_aggregation: true
+          historical_data_integration: true
+          cross_system_data_correlation: true
+        visualization_engine:
+          chart_library: "plotly_dash"
+          supported_chart_types:
+            - "line_charts"
+            - "bar_charts"
+            - "pie_charts"
+            - "heatmaps"
+            - "scatter_plots"
+            - "treemaps"
+            - "sankey_diagrams"
+          interactive_features:
+            - "drill_down_capability"
+            - "filter_and_search"
+            - "time_range_selection"
+            - "export_functionality"
+        performance_optimization:
+          caching_strategy: "intelligent_cache"
+          pre_computed_aggregations: true
+          incremental_updates: true
+          lazy_loading: true
+          
+      # Stakeholder Communication
+      stakeholder_communication:
+        distribution_lists:
+          executives:
+            - "ceo@company.com"
+            - "cdo@company.com"
+            - "cro@company.com"
+            frequency: "weekly"
+            report_types: ["executive_scorecard", "quality_trends"]
+          operations_team:
+            - "ops-team@company.com"
+            - "data-team@company.com"
+            frequency: "daily"
+            report_types: ["operational_report", "incident_summary"]
+          compliance_team:
+            - "compliance@company.com"
+            - "risk@company.com"
+            frequency: "daily"
+            report_types: ["regulatory_compliance", "audit_report"]
+          data_stewards:
+            - "data-stewards@company.com"
+            frequency: "hourly"
+            report_types: ["data_quality_alerts", "validation_summary"]
+        notification_rules:
+          critical_alerts:
+            delivery_method: ["email", "sms", "slack"]
+            escalation_time: "5 minutes"
+            acknowledgment_required: true
+          warning_alerts:
+            delivery_method: ["email", "slack"]
+            escalation_time: "15 minutes"
+          informational_alerts:
+            delivery_method: ["email"]
+            batch_delivery: true
+            
+      # Financial Industry Reporting
+      financial_reporting:
+        market_data_quality:
+          price_data_completeness:
+            real_time_monitoring: true
+            historical_analysis: "30 days"
+            benchmark_comparison: true
+          market_surveillance_reports:
+            suspicious_activity_flagging: true
+            unusual_price_movement_detection: true
+            cross_market_analysis: true
+        trade_reporting:
+          trade_lifecycle_tracking:
+            execution_to_settlement: true
+            exception_reporting: true
+            sla_compliance_monitoring: true
+          counterparty_risk_reports:
+            exposure_analysis: true
+            concentration_risk: true
+            credit_rating_changes: true
+        regulatory_reports:
+          automated_generation:
+            mifid_ii_transaction_reports: true
+            emir_derivative_reports: true
+            basel_iii_risk_reports: true
+          validation_and_submission:
+            pre_submission_validation: true
+            regulatory_feedback_tracking: true
+            correction_workflow: true
+            
+      # Quality Metrics and KPIs
+      quality_metrics:
+        data_quality_dimensions:
+          completeness:
+            calculation_method: "field_level_analysis"
+            weighting_factors:
+              critical_fields: 0.6
+              important_fields: 0.3
+              optional_fields: 0.1
+            reporting_frequency: "real_time"
+          accuracy:
+            validation_methods:
+              - "format_validation"
+              - "range_checks"
+              - "cross_reference_validation"
+              - "business_rule_validation"
+            benchmark_sources:
+              - "external_reference_data"
+              - "historical_patterns"
+              - "industry_standards"
+          consistency:
+            consistency_checks:
+              - "duplicate_detection"
+              - "referential_integrity"
+              - "temporal_consistency"
+              - "cross_system_alignment"
+            reporting_granularity: "dataset_level"
+          timeliness:
+            sla_definitions:
+              market_data: "30 seconds"
+              trade_data: "5 minutes"
+              reference_data: "1 hour"
+            latency_monitoring: true
+          validity:
+            schema_compliance: true
+            constraint_validation: true
+            business_rule_adherence: true
+        performance_kpis:
+          throughput_metrics:
+            - "records_processed_per_hour"
+            - "validation_rate"
+            - "anomaly_detection_rate"
+          latency_metrics:
+            - "end_to_end_processing_time"
+            - "validation_latency"
+            - "report_generation_time"
+          accuracy_metrics:
+            - "false_positive_rate"
+            - "false_negative_rate"
+            - "overall_accuracy_score"
+            
+      # Performance and Resource Management  
+      performance:
+        worker_threads: 8
+        memory_limit: "8Gi"
+        temp_storage: "20Gi"
+        report_generation:
+          concurrent_reports: 50
+          report_cache_size: "2Gi"
+          template_cache_size: "500Mi"
+        dashboard_optimization:
+          update_frequency_optimization: true
+          delta_updates_only: true
+          client_side_caching: true
+        monitoring:
+          metrics_interval: 30s
+          health_check_interval: 10s
+          
+      # Integration Points
+      integration:
+        upstream:
+          service: "base-compliance-monitor"
+          endpoint: "/reports/generated"
+          format: "comprehensive_quality_reports"
+        downstream:
+          service: "base-quality-monitoring" 
+          endpoint: "/dashboards/data"
+          format: "dashboard_data_feed"
+        data_sources:
+          quality_metrics_db: "postgresql://quality-metrics:5432/quality_db"
+          time_series_db: "timescaledb://metrics:5432/timeseries_db"
+          audit_logs: "elasticsearch://audit-logs:9200/audit_index"
+        visualization_services:
+          grafana_integration: "http://grafana:3000/api/dashboards"
+          superset_integration: "http://superset:8088/api/v1/dashboard"
+          tableau_connector: true
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "report_generation_started"
+            - "dashboard_updated"
+            - "quality_alert_generated"
+            - "stakeholder_notification_sent"
+        security:
+          service: "base-data-security"
+          encryption: "AES-256"
+          audit_logging: true
+          
+      # Error Handling and Resilience
+      error_handling:
+        retry_policy:
+          max_attempts: 3
+          backoff: exponential
+          base_delay: 1s
+          max_delay: 30s
+        circuit_breaker:
+          failure_threshold: 5
+          timeout: 30s
+          half_open_requests: 3
+        report_fallback:
+          cached_report_serving: true
+          degraded_mode_reporting: true
+          manual_intervention_alert: true
+          
+      # Automated Alerting
+      alerting:
+        alert_rules:
+          quality_score_degradation:
+            threshold: "5_point_drop"
+            time_window: "15_minutes"
+            severity: "high"
+          compliance_violation:
+            threshold: "any_violation"
+            immediate_alert: true
+            severity: "critical"
+          system_performance:
+            cpu_utilization: 85
+            memory_utilization: 90
+            disk_usage: 80
+            severity: "medium"
+        alert_channels:
+          email:
+            smtp_server: "smtp.company.com"
+            from_address: "data-quality@company.com"
+            template_based: true
+          slack:
+            webhook_url: "${SLACK_WEBHOOK_URL}"
+            channel_mapping:
+              critical: "#data-quality-critical"
+              high: "#data-quality-alerts"
+              medium: "#data-quality-info"
+          webhook:
+            external_systems_integration: true
+            payload_customization: true
+            retry_mechanism: true
+            
+      # Report Scheduling and Automation
+      scheduling:
+        automated_reports:
+          executive_scorecard:
+            schedule: "0 8 * * MON"  # Monday 8 AM
+            recipients: ["executives"]
+            format: "pdf"
+          daily_operations_report:
+            schedule: "0 9 * * *"    # Daily 9 AM
+            recipients: ["operations_team"]
+            format: "html_email"
+          compliance_summary:
+            schedule: "0 18 * * *"   # Daily 6 PM
+            recipients: ["compliance_team"]
+            format: "excel"
+        ad_hoc_reporting:
+          on_demand_generation: true
+          custom_date_ranges: true
+          filtered_reports: true
+          export_capabilities: true
+        report_lifecycle:
+          retention_policy: "90 days"
+          archive_strategy: "compress_and_store"
+          purge_schedule: "monthly"
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "report_generation_rate"
+          type: "counter"
+          description: "Rate of report generation operations"
+        - name: "report_generation_duration"  
+          type: "histogram"
+          description: "Time taken for report generation"
+        - name: "dashboard_update_frequency"
+          type: "gauge"
+          description: "Frequency of dashboard updates"
+        - name: "stakeholder_notification_rate"
+          type: "counter" 
+          description: "Rate of stakeholder notifications"
+        - name: "report_delivery_success_rate"
+          type: "gauge"
+          description: "Success rate of report delivery"
+        - name: "quality_alert_generation_rate"
+          type: "counter"
+          description: "Rate of quality alert generation"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-quality-reporter-hpa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-quality-agent-quality-reporter
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: report_generation_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "25"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-quality-reporter-netpol
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-quality-reporter
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality-monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: base-event-coordination
+    ports:
+    - protocol: TCP
+      port: 8080
+  - {} # Allow external email, Slack, and webhook services
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-quality-reporter-secrets
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-reporter
+type: Opaque
+stringData:
+  # Communication Service credentials
+  communication_services.yaml: |
+    email:
+      smtp_server: "${SMTP_SERVER}"
+      smtp_port: "${SMTP_PORT}"
+      username: "${SMTP_USERNAME}"
+      password: "${SMTP_PASSWORD}"
+      use_tls: true
+    slack:
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      bot_token: "${SLACK_BOT_TOKEN}"
+      channel_mapping:
+        critical: "#data-quality-critical"
+        high: "#data-quality-alerts"
+        medium: "#data-quality-info"
+    webhook_services:
+      external_notifications:
+        url: "${EXTERNAL_WEBHOOK_URL}"
+        auth_token: "${WEBHOOK_AUTH_TOKEN}"
+        
+  # Database Connection Strings
+  db_connections.yaml: |
+    databases:
+      postgres_reports:
+        host: "${POSTGRES_HOST}"
+        port: "${POSTGRES_PORT}"
+        database: "${POSTGRES_DB}"
+        username: "${POSTGRES_USER}"
+        password: "${POSTGRES_PASSWORD}"
+        ssl_mode: "require"
+      timescaledb_metrics:
+        host: "${TIMESCALE_HOST}"
+        port: "${TIMESCALE_PORT}"
+        database: "${TIMESCALE_DB}"
+        username: "${TIMESCALE_USER}"
+        password: "${TIMESCALE_PASSWORD}"
+      elasticsearch_logs:
+        hosts: ["${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}"]
+        username: "${ELASTICSEARCH_USER}"
+        password: "${ELASTICSEARCH_PASSWORD}"
+        
+  # External Integration credentials
+  external_integrations.yaml: |
+    visualization_platforms:
+      grafana:
+        api_url: "http://grafana:3000/api"
+        api_key: "${GRAFANA_API_KEY}"
+      superset:
+        api_url: "http://superset:8088/api/v1"
+        username: "${SUPERSET_USERNAME}"
+        password: "${SUPERSET_PASSWORD}"
+      tableau:
+        server_url: "${TABLEAU_SERVER_URL}"
+        username: "${TABLEAU_USERNAME}"
+        password: "${TABLEAU_PASSWORD}"

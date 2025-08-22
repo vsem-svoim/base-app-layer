@@ -2,14 +2,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- base-data-storage-agent-archiver.yaml
-- base-data-storage-agent-compactor.yaml
-- base-data-storage-agent-indexer.yaml
-- base-data-storage-agent-partitioner.yaml
-- base-data-storage-agent-replicator.yaml
-- base-data-storage-agent-versioner.yaml
+- base-data-storage-agent-tier-manager.yaml
+- base-data-storage-agent-backup-manager.yaml
+- base-data-storage-agent-compression-optimizer.yaml
+- base-data-storage-agent-retrieval-optimizer.yaml
+- base-data-storage-agent-lifecycle-manager.yaml
+- base-data-storage-agent-compliance-archiver.yaml
 
-labels:
-- includeSelectors: true
-  pairs:
-    app.kubernetes.io/part-of: base-platform
+commonLabels:
+  app.kubernetes.io/component: storage
+  base.io/category: data_storage
+  base.io/type: agent

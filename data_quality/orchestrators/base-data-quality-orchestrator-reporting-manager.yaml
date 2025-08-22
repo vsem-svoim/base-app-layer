@@ -1,0 +1,521 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-quality-orchestrator-reporting-manager
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: reporting-manager
+    app.kubernetes.io/component: reporting
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: orchestrator
+    base.io/function: reporting-coordination
+spec:
+  type: "reporting_coordinator"
+  coordination:
+    # Saga Pattern Implementation
+    orchestration_pattern: "saga"
+    coordination_model: "centralized"
+    state_coordination: "persistent"
+    transaction_boundaries: "per_report"
+    
+    # Workflow Coordination
+    workflow_management:
+      workflow_engine: "kubernetes_workflows"
+      parallel_execution: true
+      max_concurrent_workflows: 60
+      workflow_timeout: "8h"
+      retry_failed_workflows: true
+      scheduled_reporting: true
+      
+    # Agent Coordination
+    agent_coordination:
+      coordination_protocol: "grpc"
+      service_discovery: "kubernetes_dns"
+      load_balancing: "round_robin"
+      health_check_interval: "30s"
+      
+      managed_agents:
+        - name: "quality-reporter"
+          instances: 4
+          coordination_endpoint: "base-quality-reporter-service:9000"
+          responsibilities: ["quality_metrics_aggregation", "dashboard_generation", "executive_reporting"]
+          
+        - name: "metrics-aggregator"
+          instances: 3
+          coordination_endpoint: "base-metrics-aggregator-service:9000"
+          responsibilities: ["metrics_collection", "statistical_analysis", "trend_calculation"]
+          
+        - name: "dashboard-generator"
+          instances: 2
+          coordination_endpoint: "base-dashboard-generator-service:9000"
+          responsibilities: ["interactive_dashboard_creation", "visualization_rendering", "real_time_updates"]
+          
+        - name: "report-formatter"
+          instances: 3
+          coordination_endpoint: "base-report-formatter-service:9000"
+          responsibilities: ["report_templating", "multi_format_generation", "brand_compliance"]
+          
+        - name: "notification-manager"
+          instances: 2
+          coordination_endpoint: "base-notification-manager-service:9000"
+          responsibilities: ["alert_distribution", "scheduled_notifications", "stakeholder_communication"]
+          
+        - name: "compliance-reporter"
+          instances: 2
+          coordination_endpoint: "base-compliance-reporter-service:9000"
+          responsibilities: ["regulatory_report_generation", "audit_documentation", "compliance_tracking"]
+    
+    # State Management
+    state_management:
+      persistence_backend: "postgresql"
+      state_store_connection: "postgres://state-db:5432/reporting_orchestrator_state"
+      state_retention_days: 365
+      checkpoint_interval: "5m"
+      state_consistency: "strong"
+      report_versioning: true
+      
+    # Event-Driven Coordination
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "reporting.report.generation.started"
+          partitions: 12
+          replication_factor: 3
+        - name: "reporting.report.generation.completed"
+          partitions: 12
+          replication_factor: 3
+        - name: "reporting.report.generation.failed"
+          partitions: 6
+          replication_factor: 3
+        - name: "reporting.dashboard.updated"
+          partitions: 8
+          replication_factor: 3
+        - name: "reporting.alert.triggered"
+          partitions: 6
+          replication_factor: 3
+        - name: "reporting.compliance.submitted"
+          partitions: 4
+          replication_factor: 3
+      
+      event_processing:
+        consumer_group: "reporting-orchestrator"
+        batch_size: 75
+        processing_timeout: "90s"
+        retry_attempts: 4
+        dead_letter_queue: "reporting.dlq"
+        
+  resources:
+    # Deployment Configuration
+    deployment:
+      replicas: 3  # High availability for reporting coordination
+      deployment_strategy: "blue_green"
+      leader_election: true
+      leader_lease_duration: "60s"
+      leader_renew_deadline: "45s"
+      
+    # Resource Allocation
+    resource_allocation:
+      cpu:
+        requests: "2"
+        limits: "6"
+      memory:
+        requests: "4Gi"
+        limits: "16Gi"
+      storage:
+        requests: "100Gi"  # Large storage for report archives
+        limits: "500Gi"
+        
+    # Auto-scaling Configuration
+    auto_scaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 8
+      scaling_metrics:
+        - type: "cpu"
+          target_utilization: 70
+        - type: "memory"
+          target_utilization: 80
+        - type: "custom"
+          metric_name: "report_generation_queue"
+          target_value: 30
+          
+    # Performance Optimization
+    performance:
+      connection_pooling:
+        database_connections: 35
+        agent_connections: 100
+        connection_timeout: "60s"
+        idle_timeout: "10m"
+        
+      caching:
+        report_template_cache_size: "2GB"
+        metrics_cache_ttl: "10m"
+        dashboard_cache_ttl: "5m"
+        historical_data_cache_ttl: "2h"
+        
+      batch_processing:
+        batch_size: 50
+        batch_timeout: "30s"
+        max_batch_wait: "90s"
+        
+  # Workflow Management Configuration
+  workflow_orchestration:
+    # Workflow Types
+    supported_workflows:
+      - name: "comprehensive_quality_report"
+        description: "Comprehensive data quality assessment report"
+        steps: 
+          - "quality_metrics_collection"
+          - "statistical_analysis"
+          - "trend_identification"
+          - "executive_summary_generation"
+          - "detailed_findings_compilation"
+          - "recommendation_generation"
+          - "multi_format_report_creation"
+          - "stakeholder_distribution"
+        report_formats: ["pdf", "html", "excel", "json"]
+        timeout: "4h"
+        
+      - name: "real_time_dashboard_update"
+        description: "Real-time quality dashboard updates"
+        steps:
+          - "real_time_metrics_collection"
+          - "dashboard_data_preparation"
+          - "visualization_updates"
+          - "alert_threshold_checking"
+          - "notification_triggering"
+        continuous: true
+        update_frequency: "30s"
+        
+      - name: "regulatory_compliance_report"
+        description: "Regulatory compliance status report"
+        steps:
+          - "compliance_metrics_aggregation"
+          - "violation_summary_compilation"
+          - "remediation_status_tracking"
+          - "audit_trail_documentation"
+          - "regulatory_format_conversion"
+          - "submission_preparation"
+        regulatory_frameworks: ["MiFID_II", "EMIR", "Dodd_Frank", "Basel_III", "GDPR"]
+        timeout: "6h"
+        
+      - name: "scheduled_executive_briefing"
+        description: "Scheduled executive quality briefing"
+        steps:
+          - "kpi_calculation"
+          - "period_over_period_comparison"
+          - "executive_summary_creation"
+          - "action_items_identification"
+          - "presentation_generation"
+          - "automated_delivery"
+        schedule: "daily"
+        recipients: ["executives", "quality_team_leads"]
+        timeout: "2h"
+        
+      - name: "anomaly_incident_report"
+        description: "Detailed anomaly incident reporting"
+        steps:
+          - "anomaly_incident_investigation"
+          - "impact_assessment"
+          - "root_cause_analysis"
+          - "remediation_tracking"
+          - "incident_documentation"
+          - "stakeholder_notification"
+        trigger: "anomaly_detected"
+        priority: "high"
+        timeout: "1h"
+        
+    # Workflow Execution Engine
+    execution_engine:
+      engine_type: "kubernetes_native"
+      workflow_crd: "ReportingWorkflow"
+      step_execution: "containers"
+      
+      execution_options:
+        parallel_execution: true
+        pipeline_optimization: true
+        resource_optimization: true
+        failure_isolation: true
+        template_caching: true
+        
+      monitoring:
+        step_level_monitoring: true
+        performance_tracking: true
+        resource_utilization_tracking: true
+        report_generation_metrics: true
+        
+    # Workflow Scheduling
+    workflow_scheduling:
+      scheduling_strategy: "deadline_priority_based"
+      priority_levels:
+        regulatory_deadline: 1
+        executive_briefing: 2
+        critical_incident: 3
+        scheduled_report: 4
+        ad_hoc_request: 5
+        
+      scheduling_constraints:
+        resource_constraints: true
+        dependency_constraints: true
+        deadline_constraints: true
+        business_hours_constraints: true
+        
+      queue_management:
+        max_queue_size: 200
+        queue_overflow_strategy: "delay_lowest_priority"
+        queue_monitoring: true
+        deadline_awareness: true
+        
+  # Integration Configuration
+  integration:
+    # Upstream Integrations
+    upstream_services:
+      quality_manager:
+        service: "base-data-quality-orchestrator-quality-manager"
+        endpoint: "/api/v1/quality-metrics"
+        timeout: "120s"
+        
+      validation_coordinator:
+        service: "base-data-quality-orchestrator-validation-coordinator"
+        endpoint: "/api/v1/validation-results"
+        timeout: "90s"
+        
+      anomaly_coordinator:
+        service: "base-data-quality-orchestrator-anomaly-coordinator"
+        endpoint: "/api/v1/anomaly-reports"
+        timeout: "60s"
+        
+      compliance_manager:
+        service: "base-data-quality-orchestrator-compliance-manager"
+        endpoint: "/api/v1/compliance-status"
+        timeout: "180s"
+        
+    # Downstream Integrations
+    downstream_services:
+      notification_service:
+        service: "base-notification-service"
+        endpoint: "/api/v1/send-notification"
+        timeout: "30s"
+        
+      document_storage:
+        service: "base-document-storage"
+        endpoint: "/api/v1/store-report"
+        timeout: "300s"
+        
+      business_intelligence:
+        service: "base-bi-platform"
+        endpoint: "/api/v1/publish-dashboard"
+        timeout: "120s"
+        
+      external_reporting:
+        - name: "regulatory_submission_portal"
+          endpoint: "https://reporting.regulator.gov/api/v1/submit"
+          authentication: "certificate"
+          timeout: "600s"
+        
+    # Cross-cutting Integrations
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        kafka_brokers: "${KAFKA_BROKERS}"
+        
+      metadata_discovery:
+        service: "base-metadata-discovery"
+        endpoint: "/api/v1/reporting-catalog"
+        
+      monitoring_service:
+        service: "base-monitoring"
+        metrics_endpoint: "/metrics"
+        alerts_endpoint: "/alerts"
+        
+  # Monitoring and Observability
+  observability:
+    # Metrics Collection
+    metrics:
+      business_metrics:
+        - name: "reports_generated_total"
+          type: "counter"
+          description: "Total number of reports generated"
+          labels: ["report_type", "format", "recipient_type"]
+          
+        - name: "report_generation_duration"
+          type: "histogram"
+          description: "Time taken to generate reports"
+          buckets: [30, 60, 300, 900, 1800, 3600, 7200, 14400]
+          
+        - name: "dashboard_updates_total"
+          type: "counter"
+          description: "Total number of dashboard updates"
+          labels: ["dashboard_type", "update_trigger"]
+          
+        - name: "report_delivery_success_rate"
+          type: "gauge"
+          description: "Success rate of report delivery"
+          labels: ["delivery_method", "recipient_type"]
+          
+        - name: "regulatory_report_compliance"
+          type: "gauge"
+          description: "Compliance rate for regulatory reports"
+          labels: ["regulatory_framework", "report_type"]
+          
+      technical_metrics:
+        - name: "reporting_orchestrator_cpu_utilization"
+          type: "gauge"
+          description: "CPU utilization of reporting orchestrator"
+          
+        - name: "reporting_orchestrator_memory_utilization"
+          type: "gauge"
+          description: "Memory utilization of reporting orchestrator"
+          
+        - name: "report_generation_queue"
+          type: "gauge"
+          description: "Current size of report generation queue"
+          
+        - name: "report_storage_utilization"
+          type: "gauge"
+          description: "Storage utilization for report archives"
+          
+    # Health Checks
+    health_checks:
+      liveness_check:
+        endpoint: "/health/live"
+        interval: "15s"
+        timeout: "10s"
+        failure_threshold: 3
+        
+      readiness_check:
+        endpoint: "/health/ready"
+        interval: "10s"
+        timeout: "5s"
+        failure_threshold: 3
+        
+      dependency_checks:
+        - name: "database_connection"
+          check: "postgres_ping"
+          critical: true
+          
+        - name: "kafka_connection"
+          check: "kafka_broker_health"
+          critical: true
+          
+        - name: "report_storage_access"
+          check: "storage_access_test"
+          critical: true
+          
+        - name: "notification_service_connectivity"
+          check: "notification_service_ping"
+          critical: false
+          
+    # Alerting
+    alerting:
+      alert_rules:
+        critical_alerts:
+          - name: "reporting_orchestrator_down"
+            condition: "up == 0"
+            duration: "1m"
+            
+          - name: "critical_report_generation_failure"
+            condition: "rate(reports_generated_total{report_type=\"regulatory\"}[1h]) == 0"
+            duration: "30m"
+            
+          - name: "regulatory_deadline_missed"
+            condition: "regulatory_report_compliance < 1.0"
+            duration: "1m"
+            
+        warning_alerts:
+          - name: "report_generation_backlog"
+            condition: "report_generation_queue > 100"
+            duration: "30m"
+            
+          - name: "dashboard_update_failures"
+            condition: "rate(dashboard_updates_total{result=\"failed\"}[5m]) > 0.05"
+            duration: "15m"
+            
+          - name: "report_storage_full"
+            condition: "report_storage_utilization > 0.9"
+            duration: "1h"
+            
+      notification_channels:
+        critical: ["pagerduty", "slack", "email"]
+        warning: ["slack", "email"]
+        info: ["email"]
+        
+  # Security Configuration
+  security:
+    # Access Control
+    access_control:
+      rbac_enabled: true
+      service_account: "base-reporting-orchestrator"
+      
+      permissions:
+        - apiGroups: ["base.io"]
+          resources: ["agents", "workflows", "reports", "dashboards"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+          
+        - apiGroups: ["apps"]
+          resources: ["deployments", "replicasets"]
+          verbs: ["get", "list", "watch"]
+          
+    # Network Security
+    network_security:
+      network_policies: true
+      allowed_ingress:
+        - from_namespaces: ["base-data-quality", "base-monitoring", "base-business-intelligence"]
+          ports: [8080, 9090]
+          
+      allowed_egress:
+        - to_namespaces: ["base-data-quality", "base-platform", "base-notification"]
+          ports: [5432, 9092, 8080]
+        - to_external: ["regulatory_submission_portals"]
+          ports: [443]
+          
+    # Data Security
+    data_security:
+      encryption_in_transit: true
+      encryption_at_rest: true
+      secret_management: "kubernetes_secrets"
+      report_data_classification: "confidential"
+      
+      audit_logging:
+        enabled: true
+        log_level: "info"
+        retention_days: 365
+        include_report_access_logs: true
+        
+  # Disaster Recovery
+  disaster_recovery:
+    backup_strategy:
+      state_backup:
+        frequency: "every_30m"
+        retention: "90d"
+        destination: "s3://base-backups/reporting-orchestrator-state/"
+        
+      report_archive_backup:
+        frequency: "daily"
+        retention: "7y"  # Long-term regulatory requirement
+        destination: "s3://base-archives/quality-reports/"
+        
+      configuration_backup:
+        frequency: "daily"
+        retention: "365d"
+        version_control: true
+        
+    recovery_procedures:
+      rto_target: "15m"
+      rpo_target: "10m"
+      
+      recovery_steps:
+        - "restore_reporting_configuration"
+        - "restore_reporting_state"
+        - "restore_report_templates"
+        - "verify_agent_connectivity"
+        - "resume_reporting_workflows"
+        - "validate_dashboard_access"
+        - "test_report_generation"
+        
+    failover_configuration:
+      cross_region_failover: true
+      multi_az_deployment: true
+      leader_election_enabled: true
+      report_continuity_validation: true

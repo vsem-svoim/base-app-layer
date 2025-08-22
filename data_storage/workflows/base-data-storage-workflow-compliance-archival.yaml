@@ -1,0 +1,52 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-storage-workflow-compliance-archival
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: compliance-archival-workflow
+    base.io/category: data_storage
+    base.io/type: workflow
+    base.io/function: compliance-archival
+spec:
+  steps:
+    - name: "workflow_initialization"
+      agent: "compliance-manager"
+      action: "initialize_compliance_archival"
+      timeout: "5m"
+      dependencies: []
+      
+    - name: "execution_phase"
+      agent: "compliance-manager"
+      action: "execute_compliance_archival"
+      timeout: "30m"
+      retry_attempts: 3
+      dependencies: ["workflow_initialization"]
+      
+    - name: "validation_phase"
+      agent: "compliance-manager"
+      action: "validate_compliance_archival"
+      timeout: "10m"
+      dependencies: ["execution_phase"]
+      
+    - name: "completion_notification"
+      agent: "external"
+      service: "base-event-coordinator"
+      action: "notify_compliance_archival_completed"
+      timeout: "2m"
+      dependencies: ["validation_phase"]
+      
+  triggers:
+    schedule:
+      cron: "0 3 * * *"  # Daily at 3 AM
+      timezone: "UTC"
+    event:
+      - "compliance_archival_requested"
+      - "compliance_audit_scheduled"
+      
+  dependencies:
+    external_services:
+      - "base-event-coordinator"
+    infrastructure:
+      - "storage_systems"
+      - "backup_infrastructure"

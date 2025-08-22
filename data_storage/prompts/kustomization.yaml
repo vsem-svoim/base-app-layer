@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- base-data-storage-prompt-tier-configmap.yaml
+- base-data-storage-prompt-backup-configmap.yaml
+- base-data-storage-prompt-compression-configmap.yaml
+- base-data-storage-prompt-retrieval-configmap.yaml
+- base-data-storage-prompt-lifecycle-configmap.yaml
+- base-data-storage-prompt-compliance-configmap.yaml
+
+commonLabels:
+  app.kubernetes.io/component: prompts
+  base.io/category: data_storage
+  base.io/type: prompt

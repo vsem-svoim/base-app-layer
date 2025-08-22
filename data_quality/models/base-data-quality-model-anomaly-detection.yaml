@@ -1,0 +1,73 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-quality-anomaly-detection-model
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: anomaly-detection-model
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: model
+    base.io/function: anomaly-detection
+spec:
+  type: "unsupervised"
+  algorithm: "isolation_forest_autoencoder"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/detect-anomalies"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      ensemble_method: "isolation_forest_autoencoder_lstm"
+      contamination_rate: 0.1
+      n_estimators: 200
+      max_samples: "auto"
+      max_features: 1.0
+      bootstrap: false
+      encoding_dim: 32
+      hidden_layers: [64, 32, 16, 32, 64]
+      dropout_rate: 0.2
+      learning_rate: 0.001
+    feature_engineering:
+      feature_types:
+        - name: "statistical_features"
+          features: ["z_score", "modified_z_score", "iqr_outliers", "percentile_ranks", "distribution_skewness"]
+        - name: "temporal_anomalies"
+          features: ["time_series_breaks", "seasonal_deviations", "trend_anomalies", "volatility_spikes"]
+        - name: "multivariate_patterns"
+          features: ["correlation_breaks", "covariance_shifts", "principal_component_outliers", "mahalanobis_distance"]
+        - name: "business_logic_violations"
+          features: ["constraint_violations", "rule_based_outliers", "domain_specific_anomalies"]
+        - name: "contextual_anomalies"
+          features: ["conditional_outliers", "segment_specific_deviations", "peer_comparison_outliers"]
+  inference:
+    anomaly_dimensions:
+      - "point_anomalies"
+      - "contextual_anomalies"
+      - "collective_anomalies"
+      - "temporal_anomalies"
+    prediction_config:
+      anomaly_threshold: 0.05
+      confidence_threshold: 0.90
+      financial_context: true
+      regulatory_weighting: true
+  financial_domain:
+    critical_fields:
+      market_data: ["price_anomalies", "volume_spikes", "spread_outliers", "volatility_breaks", "correlation_shifts"]
+      trade_data: ["settlement_delays", "counterparty_concentrations", "notional_outliers", "execution_anomalies"]
+      reference_data: ["rating_changes", "corporate_action_anomalies", "classification_shifts", "issuer_events"]
+    regulatory_requirements:
+      mifid_ii: ["systematic_internalizer_detection", "dark_pool_anomalies", "order_flow_irregularities"]
+      emir: ["margin_call_anomalies", "collateral_valuation_outliers", "clearing_exception_patterns"]
+      dodd_frank: ["swap_reporting_anomalies", "position_limit_violations", "clearing_mandate_exceptions"]

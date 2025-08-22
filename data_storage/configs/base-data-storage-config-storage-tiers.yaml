@@ -1,0 +1,61 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-storage-storage-tiers
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: storage-tiers
+    base.io/category: data_storage
+    base.io/type: config
+    base.io/function: storage-tiers
+spec:
+  configType: "storage-tiers"
+  data:
+    storage_tiers:
+      hot_tier:
+        name: "hot-tier"
+        performance_class: "ultra_high"
+        cost_per_gb_month: 0.25
+        iops: 10000
+        latency_ms: 1
+        backends: ["nvme-ssd", "memory-cache"]
+        access_pattern: "frequent"
+        retention_limit_days: 30
+      warm_tier:
+        name: "warm-tier"  
+        performance_class: "high"
+        cost_per_gb_month: 0.10
+        iops: 3000
+        latency_ms: 5
+        backends: ["standard-ssd"]
+        access_pattern: "moderate"
+        retention_limit_days: 180
+      cold_tier:
+        name: "cold-tier"
+        performance_class: "standard"
+        cost_per_gb_month: 0.04
+        iops: 500
+        latency_ms: 20
+        backends: ["standard-hdd"]
+        access_pattern: "infrequent" 
+        retention_limit_days: 1095
+      archive_tier:
+        name: "archive-tier"
+        performance_class: "low"
+        cost_per_gb_month: 0.01
+        iops: 100
+        latency_ms: 60000
+        backends: ["tape-storage", "glacier"]
+        access_pattern: "rare"
+        retention_limit_days: 2555  # 7 years
+    financial_compliance:
+      sox_requirements:
+        retention_years: 7
+        immutable_storage: true
+        audit_trail: true
+      gdpr_requirements:
+        personal_data_retention: "business_need"
+        right_to_erasure: true
+      mifid_ii_requirements:
+        transaction_retention_years: 5
+        client_data_retention_years: 5

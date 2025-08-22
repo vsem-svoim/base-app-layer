@@ -4,25 +4,29 @@ kind: Kustomization
 metadata:
   name: base-data-storage
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "6"
 
 namespace: base-data-storage
 
 resources:
+  - namespace.yaml
+  - base-crds.yaml
   - agents/
   - models/
   - orchestrators/
   - workflows/
   - configs/
+  - prompts/
 
 labels:
 - includeSelectors: true
   pairs:
-    app.kubernetes.io/name: base-data_storage
-    app.kubernetes.io/component: data-platform
-    app.kubernetes.io/part-of: base-layer
-    module.type: data_storage
-    deployment.wave: "7"
+  app.kubernetes.io/name: base-data-storage
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: data-storage
+  deployment.wave: "6"
+
 commonAnnotations:
-  argocd.argoproj.io/sync-wave: "4"
-  module.description: "Data storage, lifecycle management, and archival module"
+  argocd.argoproj.io/sync-wave: "6"
+  module.description: "Multi-tier intelligent data storage and lifecycle management module"

@@ -1,0 +1,412 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-quality-quality-thresholds
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: quality-thresholds
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: config
+    base.io/function: quality-thresholds
+spec:
+  configType: "quality-thresholds"
+  data:
+    # Quality Scoring Framework
+    quality_scoring:
+      # Overall Quality Metrics
+      overall_quality:
+        excellent:
+          min_score: 95.0
+          max_score: 100.0
+          color: "green"
+          action: "none"
+          sla_impact: "none"
+        good:
+          min_score: 85.0
+          max_score: 94.9
+          color: "light_green"
+          action: "monitor"
+          sla_impact: "none"
+        acceptable:
+          min_score: 70.0
+          max_score: 84.9
+          color: "yellow"
+          action: "investigate"
+          sla_impact: "warning"
+        poor:
+          min_score: 50.0
+          max_score: 69.9
+          color: "orange"
+          action: "immediate_review"
+          sla_impact: "degraded"
+        critical:
+          min_score: 0.0
+          max_score: 49.9
+          color: "red"
+          action: "block_processing"
+          sla_impact: "breach"
+          
+      # Dimension-Specific Quality Thresholds
+      completeness:
+        excellent: 99.5
+        good: 95.0
+        acceptable: 90.0
+        poor: 80.0
+        critical: 70.0
+        weights:
+          price_data: 0.4
+          reference_data: 0.3
+          transaction_data: 0.2
+          metadata: 0.1
+          
+      accuracy:
+        excellent: 99.9
+        good: 99.0
+        acceptable: 97.0
+        poor: 90.0
+        critical: 85.0
+        validation_methods:
+          - "cross_reference_validation"
+          - "range_validation"
+          - "format_validation"
+          - "business_rule_validation"
+          
+      consistency:
+        excellent: 99.0
+        good: 95.0
+        acceptable: 90.0
+        poor: 80.0
+        critical: 70.0
+        check_types:
+          - "cross_system_consistency"
+          - "temporal_consistency"
+          - "referential_integrity"
+          - "format_standardization"
+          
+      timeliness:
+        excellent: 99.5
+        good: 97.0
+        acceptable: 90.0
+        poor: 80.0
+        critical: 70.0
+        sla_thresholds:
+          real_time_data:
+            target_latency: "< 1s"
+            warning_latency: "< 5s"
+            critical_latency: "> 30s"
+          batch_data:
+            target_window: "< 1h"
+            warning_window: "< 4h"
+            critical_window: "> 24h"
+            
+      validity:
+        excellent: 99.8
+        good: 98.0
+        acceptable: 95.0
+        poor: 90.0
+        critical: 85.0
+        validation_categories:
+          - "data_type_validation"
+          - "domain_validation"
+          - "constraint_validation"
+          - "schema_validation"
+          
+      uniqueness:
+        excellent: 99.9
+        good: 99.5
+        acceptable: 99.0
+        poor: 98.0
+        critical: 95.0
+        duplicate_detection:
+          exact_match_threshold: 100.0
+          fuzzy_match_threshold: 95.0
+          semantic_match_threshold: 90.0
+          
+    # Financial Data Specific Thresholds
+    financial_data_thresholds:
+      # Market Data Quality
+      market_data:
+        price_accuracy:
+          bid_ask_spread_validation: 0.1  # Max 10 basis points deviation
+          price_movement_validation: 0.05  # Max 5% price jump without news
+          volume_consistency: 0.2  # Max 20% volume anomaly
+        
+        reference_data:
+          instrument_master_completeness: 99.9
+          corporate_action_timeliness: 99.5
+          dividend_accuracy: 99.8
+          
+        real_time_feeds:
+          latency_threshold: "500ms"
+          availability_threshold: 99.9
+          message_loss_threshold: 0.01
+          
+      # Portfolio Data Quality
+      portfolio_data:
+        position_reconciliation:
+          tolerance_threshold: 0.01  # $0.01 tolerance
+          break_percentage: 0.1  # Max 0.1% breaks allowed
+          aging_threshold: "24h"  # Max age for unresolved breaks
+          
+        transaction_validation:
+          trade_date_validation: 100.0
+          settlement_validation: 99.9
+          counterparty_validation: 99.5
+          amount_validation: 100.0
+          
+        cash_management:
+          cash_reconciliation_threshold: 0.01
+          currency_validation: 100.0
+          interest_calculation_accuracy: 99.9
+          
+      # Risk Data Quality
+      risk_data:
+        var_calculations:
+          confidence_level: 99.0
+          backtesting_threshold: 95.0
+          stress_test_coverage: 100.0
+          
+        exposure_metrics:
+          position_aggregation_accuracy: 99.9
+          sector_classification_accuracy: 99.5
+          geography_mapping_accuracy: 99.0
+          
+        regulatory_reporting:
+          completeness_threshold: 100.0
+          timeliness_threshold: 100.0
+          accuracy_threshold: 99.9
+          format_compliance: 100.0
+          
+    # Industry Benchmarks
+    industry_benchmarks:
+      # Financial Services Industry Standards
+      tier1_banks:
+        data_quality_score: 95.0
+        availability: 99.9
+        accuracy: 99.5
+        completeness: 98.0
+        
+      hedge_funds:
+        data_quality_score: 92.0
+        availability: 99.5
+        accuracy: 98.5
+        completeness: 95.0
+        
+      asset_managers:
+        data_quality_score: 90.0
+        availability: 99.0
+        accuracy: 97.0
+        completeness: 93.0
+        
+      # Regulatory Benchmarks
+      regulatory_standards:
+        sox_compliance:
+          control_effectiveness: 99.0
+          documentation_completeness: 100.0
+          testing_coverage: 95.0
+          
+        mifid_ii:
+          transaction_reporting_accuracy: 100.0
+          best_execution_coverage: 100.0
+          client_classification_accuracy: 99.9
+          
+        gdpr:
+          data_inventory_completeness: 100.0
+          consent_tracking_accuracy: 100.0
+          retention_policy_compliance: 99.9
+          
+    # Quality Thresholds by Business Function
+    business_function_thresholds:
+      # Trading Operations
+      trading:
+        order_management:
+          order_accuracy: 99.9
+          execution_timeliness: 99.5
+          settlement_accuracy: 99.8
+          
+        position_management:
+          position_accuracy: 99.9
+          reconciliation_timeliness: 99.0
+          break_resolution: 95.0
+          
+        risk_management:
+          limit_monitoring: 99.9
+          exposure_calculation: 99.5
+          var_accuracy: 95.0
+          
+      # Client Services
+      client_services:
+        client_reporting:
+          report_accuracy: 99.5
+          delivery_timeliness: 99.0
+          format_compliance: 99.8
+          
+        performance_attribution:
+          calculation_accuracy: 99.0
+          benchmark_alignment: 98.5
+          factor_attribution: 97.0
+          
+        billing_operations:
+          fee_calculation_accuracy: 100.0
+          invoice_timeliness: 99.5
+          payment_reconciliation: 99.9
+          
+      # Compliance and Risk
+      compliance:
+        regulatory_reporting:
+          submission_timeliness: 100.0
+          data_accuracy: 99.9
+          format_compliance: 100.0
+          
+        surveillance:
+          trade_surveillance_coverage: 100.0
+          alert_accuracy: 95.0
+          false_positive_rate: 5.0
+          
+        audit_trail:
+          completeness: 100.0
+          integrity: 100.0
+          retention_compliance: 100.0
+          
+    # Alert Thresholds
+    alert_thresholds:
+      # Critical Alerts
+      critical_alerts:
+        overall_quality_drop:
+          threshold: 70.0
+          duration: "5m"
+          channels: ["pagerduty", "sms"]
+          escalation: "immediate"
+          
+        data_completeness_failure:
+          threshold: 80.0
+          duration: "1m"
+          channels: ["pagerduty", "slack"]
+          escalation: "15m"
+          
+        accuracy_degradation:
+          threshold: 90.0
+          duration: "10m"
+          channels: ["slack", "email"]
+          escalation: "30m"
+          
+      # Warning Alerts
+      warning_alerts:
+        quality_trend_decline:
+          threshold: 85.0
+          duration: "30m"
+          channels: ["slack"]
+          escalation: "2h"
+          
+        timeliness_issues:
+          threshold: 90.0
+          duration: "15m"
+          channels: ["email"]
+          escalation: "1h"
+          
+        consistency_anomalies:
+          threshold: 90.0
+          duration: "1h"
+          channels: ["slack"]
+          escalation: "4h"
+          
+    # SLA Impact Matrix
+    sla_impact_matrix:
+      quality_score_ranges:
+        95_to_100:
+          sla_compliance: 100.0
+          penalty_factor: 0.0
+          bonus_factor: 1.1
+          
+        90_to_95:
+          sla_compliance: 99.0
+          penalty_factor: 0.1
+          bonus_factor: 1.0
+          
+        80_to_90:
+          sla_compliance: 95.0
+          penalty_factor: 0.2
+          bonus_factor: 0.9
+          
+        70_to_80:
+          sla_compliance: 85.0
+          penalty_factor: 0.4
+          bonus_factor: 0.7
+          
+        below_70:
+          sla_compliance: 0.0
+          penalty_factor: 1.0
+          bonus_factor: 0.0
+          service_degradation: true
+          
+    # Quality Metrics Weights
+    quality_weights:
+      # Overall Quality Calculation
+      dimension_weights:
+        completeness: 0.25
+        accuracy: 0.30
+        consistency: 0.20
+        timeliness: 0.15
+        validity: 0.10
+        
+      # Data Type Weights
+      data_type_weights:
+        price_data: 0.40
+        position_data: 0.25
+        transaction_data: 0.20
+        reference_data: 0.10
+        metadata: 0.05
+        
+      # Business Criticality Weights
+      business_weights:
+        trading_operations: 0.35
+        risk_management: 0.30
+        client_services: 0.20
+        compliance: 0.15
+        
+    # Monitoring Configuration
+    monitoring:
+      quality_assessment:
+        frequency: "5m"
+        batch_size: 1000
+        parallel_workers: 8
+        timeout: "30s"
+        
+      trend_analysis:
+        lookback_period: "7d"
+        analysis_frequency: "1h"
+        trend_detection_sensitivity: 0.05
+        
+      benchmark_comparison:
+        frequency: "1d"
+        peer_group_size: 10
+        statistical_significance: 0.95
+        
+    # Integration Points
+    integration:
+      downstream_services:
+        quality_monitoring:
+          service: "base-quality-monitoring"
+          endpoint: "/assess"
+          timeout: "45s"
+          
+        event_coordination:
+          service: "base-event-coordination"
+          endpoint: "/quality-events"
+          timeout: "10s"
+          
+        compliance_frameworks:
+          service: "base-compliance-frameworks"
+          endpoint: "/validate-compliance"
+          timeout: "60s"
+          
+      upstream_dependencies:
+        data_ingestion:
+          service: "base-data-ingestion"
+          quality_feedback_endpoint: "/quality-feedback"
+          
+        data_storage:
+          service: "base-data-storage"
+          quality_metadata_endpoint: "/quality-metadata"

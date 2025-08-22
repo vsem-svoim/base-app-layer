@@ -1,0 +1,91 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-quality-workflow-regulatory-compliance
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: regulatory-compliance-workflow
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: workflow
+    base.io/function: regulatory-compliance
+spec:
+  steps:
+    - name: "compliance_framework_selection"
+      agent: "compliance-monitor"
+      action: "identify_applicable_regulations"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: []
+      
+    - name: "sox_compliance_validation"
+      agent: "compliance-monitor"
+      action: "validate_sox_requirements"
+      timeout: "15m"
+      retry_attempts: 3
+      parallelizable: true
+      dependencies: ["compliance_framework_selection"]
+      
+    - name: "gdpr_data_protection"
+      agent: "compliance-monitor"
+      action: "verify_gdpr_compliance"
+      timeout: "12m"
+      retry_attempts: 3
+      parallelizable: true
+      dependencies: ["compliance_framework_selection"]
+      
+    - name: "finra_reporting_standards"
+      agent: "compliance-monitor"
+      action: "validate_finra_standards"
+      timeout: "20m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["compliance_framework_selection"]
+      
+    - name: "audit_trail_verification"
+      agent: "data-validator"
+      action: "verify_audit_completeness"
+      timeout: "10m"
+      retry_attempts: 2
+      dependencies: ["sox_compliance_validation", "gdpr_data_protection", "finra_reporting_standards"]
+      
+    - name: "compliance_scoring"
+      agent: "quality-assessor"
+      action: "calculate_compliance_score"
+      timeout: "8m"
+      retry_attempts: 2
+      dependencies: ["audit_trail_verification"]
+      
+    - name: "regulatory_reporting"
+      agent: "quality-reporter"
+      action: "generate_compliance_report"
+      timeout: "15m"
+      retry_attempts: 3
+      dependencies: ["compliance_scoring"]
+      
+    - name: "security_notification"
+      agent: "external"
+      service: "base-data-security"
+      action: "notify_compliance_status"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: ["regulatory_reporting"]
+      
+  triggers:
+    schedule:
+      cron: "0 8 * * 1-5"  # Every weekday at 8 AM
+      timezone: "UTC"
+    event:
+      - "regulatory_audit_requested"
+      - "compliance_validation_required"
+      - "quarterly_compliance_check"
+      
+  dependencies:
+    external_services:
+      - "base-data-security"
+      - "base-metadata-discovery"
+    infrastructure:
+      - "regulatory_apis"
+      - "compliance_database"
+      - "audit_logging_system"

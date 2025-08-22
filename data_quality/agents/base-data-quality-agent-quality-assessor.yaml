@@ -1,0 +1,568 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-quality-assessor-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-quality-agent-quality-assessor
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: agent
+    base.io/function: quality-assessor
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-quality-assessor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-quality-assessor
+        app.kubernetes.io/component: quality
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_quality
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-quality-assessor-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: quality-assessor
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Quality Assessor Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: ASSESSMENT_BATCH_SIZE
+          value: "5000"
+        - name: ML_MODEL_THRESHOLD
+          value: "0.90"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-quality-assessor-config
+      - name: secrets-volume
+        secret:
+          secretName: base-quality-assessor-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-quality-assessor-service
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+    app.kubernetes.io/component: quality
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-quality-assessor
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-quality-assessor-config
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+    app.kubernetes.io/component: quality
+data:
+  assessor.yaml: |
+    # Quality Assessor Agent Configuration
+    assessor:
+      # Agent Identity and Responsibility
+      name: "base-quality-assessor"
+      version: "v2.5.0"
+      responsibility: "ML-powered comprehensive data quality assessment with predictive scoring"
+      
+      # Assessment Capabilities
+      capabilities:
+        assessment_types:
+          - "multi_dimensional_scoring"
+          - "predictive_quality_modeling"
+          - "trend_analysis"
+          - "pattern_recognition"
+          - "quality_forecasting"
+          - "comparative_benchmarking"
+        ml_algorithms:
+          - "random_forest_classifier"
+          - "gradient_boosting"
+          - "neural_network_regression"
+          - "isolation_forest"
+          - "clustering_algorithms"
+          - "time_series_forecasting"
+        assessment_granularity:
+          - "field_level"
+          - "record_level"
+          - "batch_level"
+          - "dataset_level"
+          - "source_system_level"
+        max_concurrent_assessments: 500
+        throughput_target: "25000 assessments/minute"
+        
+      # Financial Data Quality Dimensions
+      quality_dimensions:
+        completeness:
+          weight: 0.25
+          ml_features:
+            - "null_ratio"
+            - "missing_pattern_frequency"
+            - "mandatory_field_coverage"
+            - "temporal_completeness_trend"
+          scoring_algorithm: "weighted_ensemble"
+          threshold_critical: 0.95
+          threshold_warning: 0.85
+        accuracy:
+          weight: 0.30
+          ml_features:
+            - "format_compliance_score"
+            - "range_validation_accuracy"
+            - "cross_reference_match_rate"
+            - "historical_accuracy_trend"
+          models:
+            - "accuracy_prediction_nn"
+            - "outlier_detection_forest"
+          threshold_critical: 0.98
+          threshold_warning: 0.90
+        consistency:
+          weight: 0.20
+          ml_features:
+            - "duplicate_ratio"
+            - "referential_integrity_score"
+            - "temporal_consistency_metric"
+            - "cross_system_alignment"
+          clustering_algorithm: "dbscan"
+          threshold_critical: 0.95
+          threshold_warning: 0.85
+        timeliness:
+          weight: 0.15
+          ml_features:
+            - "arrival_delay_distribution"
+            - "processing_latency_trend"
+            - "freshness_score"
+            - "update_frequency_metric"
+          forecasting_model: "arima_plus"
+          sla_thresholds:
+            market_data: "15 seconds"
+            trade_data: "2 minutes"
+            reference_data: "30 minutes"
+        validity:
+          weight: 0.10
+          ml_features:
+            - "schema_compliance_score"
+            - "constraint_violation_rate"
+            - "business_rule_adherence"
+            - "regulatory_conformance"
+          validation_ensemble: true
+          threshold_critical: 0.99
+          threshold_warning: 0.95
+            
+      # ML Model Configuration
+      ml_models:
+        quality_scoring_model:
+          algorithm: "gradient_boosting_regressor"
+          features: 45
+          training_frequency: "weekly"
+          model_version: "v2.3.1"
+          accuracy_threshold: 0.92
+        anomaly_detection_model:
+          algorithm: "isolation_forest"
+          contamination: 0.05
+          features: 32
+          retraining_trigger: "concept_drift"
+        pattern_recognition_model:
+          algorithm: "lstm_autoencoder"
+          sequence_length: 100
+          latent_dimensions: 16
+          anomaly_threshold: 0.95
+        trend_analysis_model:
+          algorithm: "prophet_forecasting"
+          seasonality_modes: ["daily", "weekly", "monthly"]
+          forecast_horizon: "7 days"
+          
+      # Financial Market Specific Assessment
+      financial_assessment:
+        market_data_quality:
+          price_assessment:
+            stale_price_detection: true
+            price_jump_analysis: true
+            bid_ask_spread_validation: true
+            volume_consistency_check: true
+          market_hours_validation:
+            trading_session_awareness: true
+            holiday_calendar_integration: true
+            after_hours_data_handling: true
+        trade_data_quality:
+          settlement_date_validation: true
+          counterparty_risk_assessment: true
+          regulatory_reporting_completeness: true
+          trade_lifecycle_consistency: true
+        reference_data_quality:
+          corporate_action_impact: true
+          identifier_mapping_accuracy: true
+          classification_consistency: true
+          hierarchical_relationship_validation: true
+          
+      # Performance and Resource Management  
+      performance:
+        worker_threads: 12
+        memory_limit: "8Gi"
+        temp_storage: "20Gi"
+        batch_processing:
+          batch_size: 5000
+          parallel_batches: 6
+          timeout: "8 minutes"
+        caching:
+          model_cache_size: "2Gi"
+          feature_cache_ttl: "1 hour"
+          result_cache_ttl: "30 minutes"
+        monitoring:
+          metrics_interval: 30s
+          health_check_interval: 10s
+          
+      # Integration Points
+      integration:
+        upstream:
+          service: "base-data-validator"
+          endpoint: "/quality/assessed"
+          format: "enhanced_quality_metrics"
+        downstream:
+          service: "base-quality-monitoring" 
+          endpoint: "/quality/scores"
+          format: "quality_dashboard_data"
+        ml_models:
+          quality_scoring_model: "http://base-data-quality-model-quality-scoring:8501"
+          anomaly_detection_model: "http://base-data-quality-model-anomaly:8501"
+          pattern_model: "http://base-data-quality-model-pattern:8501"
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "quality_assessment_started"
+            - "quality_assessment_completed"
+            - "quality_score_below_threshold"
+            - "quality_trend_alert"
+            - "predictive_quality_warning"
+        security:
+          service: "base-data-security"
+          encryption: "AES-256"
+          audit_logging: true
+          
+      # Error Handling and Resilience
+      error_handling:
+        retry_policy:
+          max_attempts: 3
+          backoff: exponential
+          base_delay: 1s
+          max_delay: 30s
+        circuit_breaker:
+          failure_threshold: 5
+          timeout: 30s
+          half_open_requests: 3
+        model_fallback:
+          enabled: true
+          fallback_algorithm: "rule_based_scoring"
+          fallback_threshold: 0.8
+          
+      # Quality Assessment Reporting
+      reporting:
+        dashboard_updates:
+          frequency: "real_time"
+          metrics_aggregation: "5_minute_windows"
+        quality_scorecards:
+          generation_frequency: "hourly"
+          stakeholder_distribution: true
+          trend_analysis: true
+        predictive_alerts:
+          quality_degradation_prediction: true
+          threshold_breach_forecasting: true
+          proactive_notification: true
+          
+      # Regulatory Compliance Assessment
+      compliance_assessment:
+        mifid_ii:
+          data_quality_requirements: true
+          reporting_accuracy_validation: true
+          systematic_internaliser_data: true
+        emir:
+          derivative_data_quality: true
+          clearing_member_reporting: true
+          risk_mitigation_data: true
+        basel_iii:
+          risk_data_quality_standards: true
+          data_lineage_validation: true
+          regulatory_consistency_check: true
+        sox_compliance:
+          financial_reporting_accuracy: true
+          control_effectiveness_assessment: true
+          audit_trail_completeness: true
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "quality_assessment_rate"
+          type: "counter"
+          description: "Rate of quality assessment operations"
+        - name: "assessment_duration"  
+          type: "histogram"
+          description: "Time taken for quality assessment operations"
+        - name: "overall_quality_score"
+          type: "gauge"
+          description: "Overall data quality score"
+        - name: "ml_model_accuracy"
+          type: "gauge" 
+          description: "ML model prediction accuracy"
+        - name: "quality_trend_prediction"
+          type: "gauge"
+          description: "Predicted quality trend score"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-quality-assessor-hpa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-quality-agent-quality-assessor
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: assessment_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "50"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-quality-assessor-netpol
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-quality-assessor
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality-monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: base-event-coordination
+    ports:
+    - protocol: TCP
+      port: 8080
+  - {} # Allow external ML model APIs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-quality-assessor-secrets
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-quality-assessor
+type: Opaque
+stringData:
+  # ML Model API credentials
+  ml_apis.yaml: |
+    model_services:
+      tensorflow_serving:
+        url: "http://tensorflow-serving:8501"
+        model_name: "quality_assessment"
+      mlflow_tracking:
+        url: "http://mlflow-tracking:5000"
+        token: "${MLFLOW_TRACKING_TOKEN}"
+      kubeflow_pipelines:
+        url: "http://kubeflow-pipelines:8080"
+        token: "${KUBEFLOW_TOKEN}"
+        
+  # Database Connection Strings
+  db_connections.yaml: |
+    databases:
+      postgres_quality:
+        host: "${POSTGRES_HOST}"
+        port: "${POSTGRES_PORT}"
+        database: "${POSTGRES_DB}"
+        username: "${POSTGRES_USER}"
+        password: "${POSTGRES_PASSWORD}"
+        ssl_mode: "require"
+      timescaledb_metrics:
+        host: "${TIMESCALE_HOST}"
+        port: "${TIMESCALE_PORT}"
+        database: "${TIMESCALE_DB}"
+        username: "${TIMESCALE_USER}"
+        password: "${TIMESCALE_PASSWORD}"
+        
+  # External Service API Keys
+  external_apis.yaml: |
+    quality_benchmarks:
+      industry_standards:
+        url: "https://api.dataqualitystandards.org"
+        api_key: "${DQ_STANDARDS_API_KEY}"
+      financial_benchmarks:
+        bloomberg_quality:
+          api_key: "${BLOOMBERG_QUALITY_API_KEY}"
+        refinitiv_quality:
+          token: "${REFINITIV_QUALITY_TOKEN}"

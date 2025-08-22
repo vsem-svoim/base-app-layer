@@ -1,0 +1,315 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-backup-manager-sa
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-backup-manager
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-storage-agent-backup-manager
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-backup-manager
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_storage
+    base.io/type: agent
+    base.io/function: backup-manager
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-backup-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-backup-manager
+        app.kubernetes.io/component: storage
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_storage
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-backup-manager-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: backup-manager
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Storage Backup Manager Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: BACKUP_SCHEDULE_INTERVAL
+          value: "3600"  # 1 hour
+        - name: FULL_BACKUP_FREQUENCY_HOURS
+          value: "168"   # Weekly
+        - name: INCREMENTAL_BACKUP_FREQUENCY_HOURS
+          value: "6"     # Every 6 hours
+        - name: BACKUP_RETENTION_DAYS
+          value: "2555"  # 7 years for financial compliance
+        - name: CROSS_REGION_REPLICATION
+          value: "true"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+            ephemeral-storage: "10Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+            ephemeral-storage: "50Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: backup-staging
+          mountPath: /app/staging
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-backup-manager-config
+      - name: secrets-volume
+        secret:
+          secretName: base-backup-manager-secrets
+      - name: backup-staging
+        emptyDir:
+          sizeLimit: "100Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-backup-manager-service
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-backup-manager
+    app.kubernetes.io/component: storage
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-backup-manager
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-backup-manager-config
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-backup-manager
+    app.kubernetes.io/component: storage
+data:
+  backup-manager.yaml: |
+    # Backup Manager Agent Configuration
+    backup_manager:
+      name: "base-backup-manager"
+      version: "v2.5.0"
+      responsibility: "Comprehensive backup, recovery, and disaster preparedness management"
+      
+      backup_strategies:
+        financial_data:
+          trading_data:
+            backup_frequency: "every_15_minutes"
+            retention_years: 7
+            backup_type: "incremental"
+            encryption: "AES-256"
+            compliance: ["SOX", "MiFID_II"]
+          market_data:
+            backup_frequency: "hourly"
+            retention_years: 5
+            backup_type: "differential"
+            compression: true
+            real_time_replication: true
+          regulatory_data:
+            backup_frequency: "daily"
+            retention_years: 10
+            backup_type: "full"
+            immutable: true
+            legal_hold_support: true
+            
+      backup_types:
+        full_backup:
+          description: "Complete dataset backup"
+          schedule: "0 2 * * 0"  # Weekly Sunday 2 AM
+          parallel_streams: 10
+          compression_algorithm: "lz4"
+          verification_required: true
+          
+        incremental_backup:
+          description: "Changes since last backup"
+          schedule: "0 */6 * * *"  # Every 6 hours
+          change_detection: "timestamp_based"
+          deduplication: true
+          
+        differential_backup:
+          description: "Changes since last full backup"
+          schedule: "0 1 * * *"  # Daily 1 AM
+          baseline_tracking: true
+          
+      recovery_strategies:
+        point_in_time_recovery:
+          granularity_minutes: 15
+          max_recovery_time_hours: 4
+          automated_testing: true
+          
+        cross_region_failover:
+          rpo_minutes: 15  # Recovery Point Objective
+          rto_minutes: 60  # Recovery Time Objective
+          automated_failover: false
+          manual_approval_required: true
+          
+      financial_compliance:
+        sox_requirements:
+          backup_retention_years: 7
+          backup_integrity_verification: "daily"
+          change_auditing: true
+          access_logging: true
+          
+        gdpr_requirements:
+          personal_data_identification: true
+          right_to_erasure: true
+          data_portability: true
+          
+      monitoring:
+        backup_success_rate_target: 99.9
+        recovery_test_frequency: "monthly"
+        alert_on_failure: true
+        dashboard_metrics:
+          - "backup_completion_time"
+          - "backup_size_trends"
+          - "recovery_point_age"
+          - "storage_utilization"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-backup-manager-hpa
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-backup-manager
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-storage-agent-backup-manager
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-backup-manager-netpol
+  namespace: base-data-storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-backup-manager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+  egress:
+  - {} # Allow external backup destinations
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-backup-manager-secrets
+  namespace: base-data-storage
+type: Opaque
+stringData:
+  backup_credentials.yaml: |
+    aws:
+      backup_vault: "${AWS_BACKUP_VAULT}"
+      cross_region_vault: "${AWS_CROSS_REGION_VAULT}"
+    azure:
+      backup_vault: "${AZURE_BACKUP_VAULT}"
+    encryption:
+      backup_key: "${BACKUP_ENCRYPTION_KEY}"

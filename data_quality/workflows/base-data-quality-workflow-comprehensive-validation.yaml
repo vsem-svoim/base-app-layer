@@ -1,0 +1,89 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-quality-workflow-comprehensive-validation
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: comprehensive-validation-workflow
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: workflow
+    base.io/function: comprehensive-validation
+spec:
+  steps:
+    - name: "data_profiling"
+      agent: "data-validator"
+      action: "profile_incoming_data"
+      timeout: "10m"
+      retry_attempts: 3
+      dependencies: []
+      
+    - name: "schema_validation"
+      agent: "data-validator"
+      action: "validate_schema_conformance"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: ["data_profiling"]
+      
+    - name: "business_rules_check"
+      agent: "rule-enforcer"
+      action: "validate_business_rules"
+      timeout: "15m"
+      retry_attempts: 3
+      parallelizable: true
+      dependencies: ["schema_validation"]
+      
+    - name: "anomaly_detection"
+      agent: "anomaly-detector"
+      action: "detect_statistical_anomalies"
+      timeout: "20m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["schema_validation"]
+      
+    - name: "quality_assessment"
+      agent: "quality-assessor"
+      action: "calculate_quality_metrics"
+      timeout: "8m"
+      retry_attempts: 2
+      dependencies: ["business_rules_check", "anomaly_detection"]
+      
+    - name: "compliance_verification"
+      agent: "compliance-monitor"
+      action: "verify_regulatory_compliance"
+      timeout: "12m"
+      retry_attempts: 3
+      dependencies: ["quality_assessment"]
+      
+    - name: "validation_reporting"
+      agent: "quality-reporter"
+      action: "generate_validation_report"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: ["compliance_verification"]
+      
+    - name: "storage_update"
+      agent: "external"
+      service: "base-data-storage"
+      action: "update_quality_metadata"
+      timeout: "10m"
+      retry_attempts: 3
+      dependencies: ["validation_reporting"]
+      
+  triggers:
+    schedule:
+      cron: "0 */4 * * *"  # Every 4 hours
+      timezone: "UTC"
+    event:
+      - "new_data_ingested"
+      - "quality_validation_requested"
+      
+  dependencies:
+    external_services:
+      - "base-data-storage"
+      - "base-data-security"
+    infrastructure:
+      - "ml_models"
+      - "regulatory_apis"
+      - "quality_database"

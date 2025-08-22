@@ -1,0 +1,28 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-storage-backup-policies
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: backup-policies
+    base.io/category: data_storage
+    base.io/type: config
+    base.io/function: backup-policies
+spec:
+  configType: "backup-policies"
+  data:
+    backup_policies:
+      financial_requirements:
+        sox_compliance: true
+        gdpr_compliance: true
+        retention_years: 7
+        backup_frequency: "daily"
+        cross_region_replication: true
+      performance_targets:
+        backup_completion_time: "4_hours"
+        recovery_time_objective: "1_hour"
+        recovery_point_objective: "15_minutes"
+      monitoring:
+        success_rate_threshold: 99.9
+        alert_on_failure: true
+        dashboard_metrics: true

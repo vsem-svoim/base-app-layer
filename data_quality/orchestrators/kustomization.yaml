@@ -2,13 +2,16 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- base-data-quality-orchestrator-audit-manager.yaml
-- base-data-quality-orchestrator-cleaning-manager.yaml
-- base-data-quality-orchestrator-qa-manager.yaml
-- base-data-quality-orchestrator-quality-manager.yaml
-- base-data-quality-orchestrator-validation-manager.yaml
+  - base-data-quality-orchestrator-quality-manager.yaml
+  - base-data-quality-orchestrator-validation-coordinator.yaml
+  - base-data-quality-orchestrator-compliance-manager.yaml
+  - base-data-quality-orchestrator-anomaly-coordinator.yaml
+  - base-data-quality-orchestrator-reporting-manager.yaml
 
-labels:
-- includeSelectors: true
-  pairs:
-    app.kubernetes.io/part-of: base-platform
+commonLabels:
+  app.kubernetes.io/component: orchestrator
+  app.kubernetes.io/part-of: base-system
+  base.io/category: data_quality
+  base.io/type: orchestrator
+
+namespace: base-data-quality

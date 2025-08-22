@@ -1,0 +1,73 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-quality-completeness-prediction-model
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: completeness-prediction-model
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: model
+    base.io/function: completeness-prediction
+spec:
+  type: "classification"
+  algorithm: "gradient_boosting_ensemble"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/predict-completeness"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      ensemble_method: "xgboost_lightgbm_catboost"
+      boosting_rounds: 1000
+      early_stopping: 50
+      learning_rate: 0.05
+      max_depth: 8
+      min_child_weight: 3
+      subsample: 0.8
+      colsample_bytree: 0.8
+      regularization_alpha: 0.1
+      regularization_lambda: 0.2
+    feature_engineering:
+      feature_types:
+        - name: "schema_features"
+          features: ["field_count", "required_fields_ratio", "nullable_fields_ratio", "complex_type_ratio"]
+        - name: "historical_patterns"
+          features: ["avg_completeness_7d", "completeness_trend", "seasonality_patterns"]
+        - name: "source_characteristics"
+          features: ["source_reliability_score", "data_volume", "ingestion_frequency"]
+        - name: "business_context"
+          features: ["regulatory_importance", "business_criticality", "downstream_dependencies"]
+        - name: "data_lineage"
+          features: ["transformation_complexity", "source_hop_count", "data_age_hours"]
+  inference:
+    completeness_dimensions:
+      - "field_level_completeness"
+      - "record_level_completeness"
+      - "semantic_completeness"
+      - "temporal_completeness"
+    prediction_config:
+      completeness_threshold: 0.85
+      confidence_threshold: 0.80
+      financial_context: true
+      regulatory_weighting: true
+  financial_domain:
+    critical_fields:
+      market_data: ["instrument_id", "price", "volume", "timestamp", "currency"]
+      trade_data: ["trade_id", "counterparty", "settlement_date", "notional", "currency"]
+      reference_data: ["isin", "lei", "classification", "issuer"]
+    regulatory_requirements:
+      mifid_ii: ["transaction_reference", "venue", "timestamp", "price", "quantity"]
+      emir: ["uti", "counterparty_lei", "notional_amount", "maturity_date"]
+      dodd_frank: ["usi", "swap_category", "clearing_status", "execution_venue"]

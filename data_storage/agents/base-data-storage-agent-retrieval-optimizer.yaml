@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-storage-agent-retrieval-optimizer
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-retrieval-optimizer
+    base.io/category: data_storage
+    base.io/type: agent
+    base.io/function: retrieval-optimizer
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-retrieval-optimizer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-retrieval-optimizer
+        base.io/category: data_storage
+        base.io/type: agent
+    spec:
+      containers:
+      - name: retrieval-optimizer
+        image: python:3.13.7-slim
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Retrieval Optimizer Agent Starting...' && python -m http.server 8080"]
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CACHE_SIZE_GB
+          value: "10"
+        - name: INDEX_OPTIMIZATION
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-retrieval-optimizer-service
+  namespace: base-data-storage
+spec:
+  selector:
+    app.kubernetes.io/name: base-retrieval-optimizer
+  ports:
+  - port: 8080

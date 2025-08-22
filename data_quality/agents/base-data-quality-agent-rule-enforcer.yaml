@@ -1,0 +1,612 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-rule-enforcer-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-quality-agent-rule-enforcer
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: agent
+    base.io/function: rule-enforcer
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-rule-enforcer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-rule-enforcer
+        app.kubernetes.io/component: quality
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_quality
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-rule-enforcer-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: rule-enforcer
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Quality Rule Enforcer Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: RULE_EXECUTION_BATCH_SIZE
+          value: "15000"
+        - name: RULE_ENGINE_THREADS
+          value: "16"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-rule-enforcer-config
+      - name: secrets-volume
+        secret:
+          secretName: base-rule-enforcer-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-rule-enforcer-service
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+    app.kubernetes.io/component: quality
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-rule-enforcer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-rule-enforcer-config
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+    app.kubernetes.io/component: quality
+data:
+  enforcer.yaml: |
+    # Rule Enforcer Agent Configuration
+    enforcer:
+      # Agent Identity and Responsibility
+      name: "base-rule-enforcer"
+      version: "v2.5.0"
+      responsibility: "Business rule enforcement with real-time policy compliance and automated remediation"
+      
+      # Rule Engine Capabilities
+      capabilities:
+        rule_types:
+          - "business_logic_rules"
+          - "regulatory_compliance_rules"
+          - "data_governance_policies"
+          - "security_access_rules"
+          - "quality_threshold_rules"
+          - "operational_constraints"
+        execution_modes:
+          - "real_time_enforcement"
+          - "batch_rule_processing"
+          - "scheduled_compliance_check"
+          - "event_driven_validation"
+        rule_engines:
+          - "drools_business_rules"
+          - "python_rule_engine"
+          - "sql_constraint_engine"
+          - "regex_pattern_matcher"
+          - "ml_based_rule_inference"
+        max_concurrent_rules: 2000
+        throughput_target: "75000 rule_executions/minute"
+        
+      # Financial Business Rules
+      financial_rules:
+        market_data_rules:
+          price_validation:
+            rule_id: "MDR001"
+            description: "Market data price reasonableness check"
+            conditions:
+              - "price > 0"
+              - "price < max_historical_price * 2.0"
+              - "bid_price <= ask_price"
+              - "spread <= max_allowed_spread"
+            actions:
+              violation: ["quarantine_data", "alert_traders", "log_violation"]
+            priority: "critical"
+            regulatory_ref: "MiFID_II_Article_27"
+          volume_consistency:
+            rule_id: "MDR002"
+            description: "Trading volume consistency validation"
+            conditions:
+              - "volume >= 0"
+              - "volume <= daily_volume_limit"
+              - "unusual_volume_detection(volume, historical_avg) < 5.0"
+            actions:
+              violation: ["flag_for_review", "notify_compliance"]
+        trade_data_rules:
+          settlement_date_validation:
+            rule_id: "TDR001"
+            description: "Trade settlement date business rules"
+            conditions:
+              - "settlement_date >= trade_date"
+              - "settlement_cycle_valid(instrument_type, settlement_date)"
+              - "holiday_calendar_check(settlement_date, currency)"
+            actions:
+              violation: ["reject_trade", "alert_operations"]
+            priority: "critical"
+          counterparty_rules:
+            rule_id: "TDR002"
+            description: "Counterparty validation and limits"
+            conditions:
+              - "counterparty_lei != null"
+              - "counterparty_not_sanctioned(counterparty_id)"
+              - "exposure_limit_check(counterparty_id, trade_amount)"
+            actions:
+              violation: ["block_trade", "escalate_to_risk"]
+        regulatory_rules:
+          best_execution:
+            rule_id: "REG001"
+            description: "MiFID II Best Execution compliance"
+            conditions:
+              - "execution_venue_analysis_complete == true"
+              - "price_improvement_documented == true"
+              - "client_instruction_followed == true"
+            actions:
+              violation: ["compliance_alert", "audit_trail_flag"]
+          position_limits:
+            rule_id: "REG002"
+            description: "Position limit compliance (EMIR/Dodd-Frank)"
+            conditions:
+              - "position_size <= regulatory_limit"
+              - "concentration_risk_check(position, portfolio)"
+              - "large_exposure_reporting_triggered == false"
+            actions:
+              violation: ["position_limit_alert", "regulatory_report"]
+              
+      # Data Governance Rules
+      governance_rules:
+        data_lineage:
+          rule_id: "DGR001"
+          description: "Data lineage documentation requirement"
+          conditions:
+            - "source_system_documented == true"
+            - "transformation_logic_recorded == true"
+            - "data_owner_assigned == true"
+          actions:
+            violation: ["governance_alert", "metadata_update_required"]
+        data_retention:
+          rule_id: "DGR002"
+          description: "Data retention policy enforcement"
+          conditions:
+            - "retention_period_defined == true"
+            - "purge_date <= current_date + retention_period"
+            - "legal_hold_check(record_id) == false"
+          actions:
+            violation: ["extend_retention", "legal_review_required"]
+        data_classification:
+          rule_id: "DGR003"
+          description: "Data classification and handling requirements"
+          conditions:
+            - "sensitivity_level_assigned == true"
+            - "access_control_applied == true"
+            - "encryption_required_check(sensitivity_level)"
+          actions:
+            violation: ["security_alert", "access_revocation"]
+            
+      # Quality Threshold Rules
+      quality_rules:
+        completeness_thresholds:
+          critical_fields:
+            rule_id: "QTR001"
+            description: "Critical field completeness requirements"
+            conditions:
+              - "completeness_score >= 0.99"
+              - "mandatory_field_null_count == 0"
+            actions:
+              violation: ["data_quality_alert", "processing_halt"]
+        accuracy_requirements:
+          financial_calculations:
+            rule_id: "QTR002"
+            description: "Financial calculation accuracy requirements"
+            conditions:
+              - "calculation_precision >= required_decimal_places"
+              - "rounding_method == approved_method"
+              - "mathematical_consistency_check == true"
+            actions:
+              violation: ["recalculation_required", "audit_flag"]
+              
+      # Rule Execution Engine
+      execution_engine:
+        rule_evaluation:
+          engine: "hybrid_rule_engine"
+          modes:
+            - "eager_evaluation"
+            - "lazy_evaluation"
+            - "parallel_execution"
+          optimization:
+            rule_indexing: true
+            condition_caching: true
+            result_memoization: true
+        performance:
+          rule_compilation: "jit_compilation"
+          execution_threads: 16
+          memory_pool_size: "4Gi"
+          rule_cache_size: 50000
+        conflict_resolution:
+          strategy: "priority_based"
+          default_priority: "medium"
+          conflict_detection: true
+          resolution_logging: true
+          
+      # Performance and Resource Management  
+      performance:
+        worker_threads: 16
+        memory_limit: "8Gi"
+        temp_storage: "20Gi"
+        batch_processing:
+          batch_size: 15000
+          parallel_batches: 8
+          timeout: "10 minutes"
+        rule_optimization:
+          rule_compilation: "ahead_of_time"
+          index_optimization: true
+          cache_strategies: ["lru", "frequency_based"]
+        monitoring:
+          metrics_interval: 30s
+          health_check_interval: 10s
+          
+      # Integration Points
+      integration:
+        upstream:
+          service: "base-quality-assessor"
+          endpoint: "/rules/enforced"
+          format: "rule_execution_results"
+        downstream:
+          service: "base-compliance-monitor" 
+          endpoint: "/compliance/violations"
+          format: "violation_reports"
+        rule_repositories:
+          business_rules_repo: "http://base-schema-contracts:8080/rules/business"
+          regulatory_rules_repo: "http://base-schema-contracts:8080/rules/regulatory"
+          governance_rules_repo: "http://base-schema-contracts:8080/rules/governance"
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "rule_enforcement_started"
+            - "rule_violation_detected"
+            - "compliance_breach_identified"
+            - "automatic_remediation_applied"
+        security:
+          service: "base-data-security"
+          encryption: "AES-256"
+          audit_logging: true
+          
+      # Error Handling and Resilience
+      error_handling:
+        retry_policy:
+          max_attempts: 3
+          backoff: exponential
+          base_delay: 1s
+          max_delay: 30s
+        circuit_breaker:
+          failure_threshold: 5
+          timeout: 30s
+          half_open_requests: 3
+        rule_failure_handling:
+          continue_on_non_critical: true
+          escalation_on_critical: true
+          fallback_to_manual_review: true
+          
+      # Automated Remediation
+      remediation:
+        automatic_fixes:
+          data_format_correction: true
+          missing_value_imputation: true
+          reference_data_lookup: true
+          constraint_violation_adjustment: false
+        escalation_matrix:
+          level_1: "automatic_fix"
+          level_2: "operations_team_alert"
+          level_3: "compliance_escalation"
+          level_4: "executive_notification"
+        remediation_tracking:
+          success_rate_monitoring: true
+          impact_analysis: true
+          rollback_capability: true
+          
+      # Regulatory Compliance Integration
+      regulatory_integration:
+        mifid_ii:
+          transaction_reporting_rules: true
+          best_execution_monitoring: true
+          systematic_internaliser_rules: true
+          client_categorisation_rules: true
+        emir:
+          derivative_reporting_rules: true
+          clearing_obligation_rules: true
+          risk_mitigation_rules: true
+          margin_requirements: true
+        dodd_frank:
+          swap_dealer_rules: true
+          volcker_rule_compliance: true
+          systemic_risk_rules: true
+        basel_iii:
+          capital_adequacy_rules: true
+          leverage_ratio_rules: true
+          liquidity_coverage_rules: true
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "rule_execution_rate"
+          type: "counter"
+          description: "Rate of rule execution operations"
+        - name: "rule_execution_duration"  
+          type: "histogram"
+          description: "Time taken for rule execution"
+        - name: "rule_violation_rate"
+          type: "counter"
+          description: "Rate of rule violations detected"
+        - name: "automatic_remediation_rate"
+          type: "counter" 
+          description: "Rate of successful automatic remediations"
+        - name: "compliance_score"
+          type: "gauge"
+          description: "Overall compliance score"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-rule-enforcer-hpa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-quality-agent-rule-enforcer
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: rule_execution_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "200"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-rule-enforcer-netpol
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-rule-enforcer
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-compliance-monitor
+    - namespaceSelector:
+        matchLabels:
+          name: base-schema-contracts
+    - namespaceSelector:
+        matchLabels:
+          name: base-event-coordination
+    ports:
+    - protocol: TCP
+      port: 8080
+  - {} # Allow external regulatory APIs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-rule-enforcer-secrets
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-rule-enforcer
+type: Opaque
+stringData:
+  # Rule Repository credentials
+  rule_repositories.yaml: |
+    repositories:
+      business_rules:
+        url: "http://business-rules-repo:8080"
+        auth_token: "${BUSINESS_RULES_TOKEN}"
+      regulatory_rules:
+        url: "http://regulatory-rules-repo:8080"
+        auth_token: "${REGULATORY_RULES_TOKEN}"
+      governance_policies:
+        url: "http://governance-policies-repo:8080"
+        auth_token: "${GOVERNANCE_TOKEN}"
+        
+  # Database Connection Strings
+  db_connections.yaml: |
+    databases:
+      postgres_rules:
+        host: "${POSTGRES_HOST}"
+        port: "${POSTGRES_PORT}"
+        database: "${POSTGRES_DB}"
+        username: "${POSTGRES_USER}"
+        password: "${POSTGRES_PASSWORD}"
+        ssl_mode: "require"
+      redis_cache:
+        host: "${REDIS_HOST}"
+        port: "${REDIS_PORT}"
+        password: "${REDIS_PASSWORD}"
+        
+  # External Regulatory APIs
+  regulatory_apis.yaml: |
+    regulatory_services:
+      sanctions_screening:
+        url: "https://api.sanctions.gov"
+        api_key: "${SANCTIONS_API_KEY}"
+      lei_validation:
+        url: "https://api.gleif.org/api/v1"
+        api_key: "${LEI_API_KEY}"
+      market_surveillance:
+        esma_api:
+          url: "https://registers.esma.europa.eu/api"
+          api_key: "${ESMA_API_KEY}"
+        cftc_api:
+          url: "https://publicreporting.cftc.gov/api"
+          api_key: "${CFTC_API_KEY}"

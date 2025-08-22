@@ -1,0 +1,108 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: qualityvalidations.base.io
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-data-quality
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+spec:
+  group: base.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              validationRules:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    condition:
+                      type: string
+                    severity:
+                      type: string
+                      enum: ["CRITICAL", "ERROR", "WARNING", "INFO"]
+              dataSource:
+                type: string
+              qualityThreshold:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+          status:
+            type: object
+            properties:
+              validationStatus:
+                type: string
+                enum: ["PENDING", "PASSED", "FAILED", "ERROR"]
+              qualityScore:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              violationsCount:
+                type: integer
+              lastValidation:
+                type: string
+                format: date-time
+  scope: Namespaced
+  names:
+    plural: qualityvalidations
+    singular: qualityvalidation
+    kind: QualityValidation
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: qualitymetrics.base.io
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-data-quality
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+spec:
+  group: base.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              dataSource:
+                type: string
+              metricType:
+                type: string
+                enum: ["COMPLETENESS", "ACCURACY", "CONSISTENCY", "TIMELINESS", "VALIDITY"]
+              aggregationWindow:
+                type: string
+              threshold:
+                type: number
+          status:
+            type: object
+            properties:
+              currentValue:
+                type: number
+              trend:
+                type: string
+                enum: ["IMPROVING", "STABLE", "DECLINING"]
+              lastUpdated:
+                type: string
+                format: date-time
+  scope: Namespaced
+  names:
+    plural: qualitymetrics
+    singular: qualitymetric
+    kind: QualityMetric

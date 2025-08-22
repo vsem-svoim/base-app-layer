@@ -1,0 +1,487 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-quality-orchestrator-quality-manager
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: quality-manager
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: orchestrator
+    base.io/function: quality-coordination
+spec:
+  type: "master_coordinator"
+  coordination:
+    # Saga Pattern Implementation
+    orchestration_pattern: "saga"
+    coordination_model: "centralized"
+    state_coordination: "persistent"
+    transaction_boundaries: "per_dataset"
+    
+    # Workflow Coordination
+    workflow_management:
+      workflow_engine: "kubernetes_workflows"
+      parallel_execution: true
+      max_concurrent_workflows: 75
+      workflow_timeout: "6h"
+      retry_failed_workflows: true
+      
+    # Agent Coordination
+    agent_coordination:
+      coordination_protocol: "grpc"
+      service_discovery: "kubernetes_dns"
+      load_balancing: "round_robin"
+      health_check_interval: "30s"
+      
+      managed_agents:
+        - name: "data-validator"
+          instances: 4
+          coordination_endpoint: "base-data-validator-service:9000"
+          responsibilities: ["data_validation", "schema_validation", "constraint_checking"]
+          
+        - name: "quality-assessor" 
+          instances: 3
+          coordination_endpoint: "base-quality-assessor-service:9000"
+          responsibilities: ["quality_scoring", "completeness_analysis", "accuracy_assessment"]
+          
+        - name: "anomaly-detector"
+          instances: 5
+          coordination_endpoint: "base-anomaly-detector-service:9000"
+          responsibilities: ["anomaly_detection", "outlier_identification", "pattern_analysis"]
+          
+        - name: "rule-enforcer"
+          instances: 2
+          coordination_endpoint: "base-rule-enforcer-service:9000"
+          responsibilities: ["business_rule_enforcement", "policy_application"]
+          
+        - name: "quality-reporter"
+          instances: 2
+          coordination_endpoint: "base-quality-reporter-service:9000"
+          responsibilities: ["quality_reporting", "metrics_aggregation", "dashboard_updates"]
+          
+        - name: "compliance-monitor"
+          instances: 3
+          coordination_endpoint: "base-compliance-monitor-service:9000"
+          responsibilities: ["regulatory_compliance", "audit_trail", "violation_tracking"]
+    
+    # State Management
+    state_management:
+      persistence_backend: "postgresql"
+      state_store_connection: "postgres://state-db:5432/quality_orchestrator_state"
+      state_retention_days: 90
+      checkpoint_interval: "3m"
+      state_consistency: "strong"
+      
+    # Event-Driven Coordination
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "quality.validation.started"
+          partitions: 16
+          replication_factor: 3
+        - name: "quality.validation.completed"
+          partitions: 16
+          replication_factor: 3
+        - name: "quality.validation.failed"
+          partitions: 8
+          replication_factor: 3
+        - name: "quality.anomaly.detected"
+          partitions: 12
+          replication_factor: 3
+        - name: "quality.compliance.violation"
+          partitions: 6
+          replication_factor: 3
+        - name: "quality.agent.health"
+          partitions: 6
+          replication_factor: 3
+      
+      event_processing:
+        consumer_group: "quality-orchestrator"
+        batch_size: 150
+        processing_timeout: "45s"
+        retry_attempts: 5
+        dead_letter_queue: "quality.dlq"
+        
+  resources:
+    # Deployment Configuration
+    deployment:
+      replicas: 3  # High availability for critical quality coordination
+      deployment_strategy: "blue_green"
+      leader_election: true
+      leader_lease_duration: "30s"
+      leader_renew_deadline: "20s"
+      
+    # Resource Allocation
+    resource_allocation:
+      cpu:
+        requests: "2"
+        limits: "6"
+      memory:
+        requests: "4Gi"
+        limits: "12Gi"
+      storage:
+        requests: "20Gi"
+        limits: "100Gi"
+        
+    # Auto-scaling Configuration
+    auto_scaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 8
+      scaling_metrics:
+        - type: "cpu"
+          target_utilization: 65
+        - type: "memory"
+          target_utilization: 75
+        - type: "custom"
+          metric_name: "active_quality_workflows"
+          target_value: 120
+          
+    # Performance Optimization
+    performance:
+      connection_pooling:
+        database_connections: 30
+        agent_connections: 150
+        connection_timeout: "30s"
+        idle_timeout: "5m"
+        
+      caching:
+        workflow_cache_size: "2GB"
+        state_cache_ttl: "5m"
+        agent_status_cache_ttl: "30s"
+        quality_rules_cache_ttl: "1h"
+        
+      batch_processing:
+        batch_size: 75
+        batch_timeout: "15s"
+        max_batch_wait: "45s"
+        
+  # Workflow Management Configuration
+  workflow_orchestration:
+    # Workflow Types
+    supported_workflows:
+      - name: "comprehensive_quality_assessment"
+        description: "Complete data quality assessment workflow"
+        steps: 
+          - "dataset_profiling"
+          - "schema_validation"
+          - "data_validation"
+          - "quality_scoring"
+          - "anomaly_detection"
+          - "compliance_checking"
+          - "quality_reporting"
+        parallelizable_steps: ["data_validation", "anomaly_detection", "quality_scoring"]
+        retry_strategy: "exponential_backoff"
+        timeout: "4h"
+        
+      - name: "realtime_quality_monitoring"
+        description: "Continuous quality monitoring for streaming data"
+        steps:
+          - "stream_quality_validation"
+          - "realtime_anomaly_detection"
+          - "immediate_violation_alerting"
+          - "quality_metrics_update"
+        continuous: true
+        latency_target: "< 500ms"
+        
+      - name: "regulatory_compliance_audit"
+        description: "Comprehensive regulatory compliance validation"
+        steps:
+          - "compliance_framework_selection"
+          - "regulation_specific_validation"
+          - "audit_trail_generation"
+          - "compliance_report_creation"
+          - "violation_remediation_planning"
+        security_level: "high"
+        audit_required: true
+        timeout: "8h"
+        
+      - name: "data_quality_remediation"
+        description: "Automated data quality issue remediation"
+        steps:
+          - "issue_classification"
+          - "remediation_strategy_selection"
+          - "automated_correction"
+          - "manual_review_flagging"
+          - "post_remediation_validation"
+        failure_tolerance: "medium"
+        human_intervention_required: true
+        
+      - name: "cross_dataset_quality_analysis"
+        description: "Quality analysis across multiple related datasets"
+        steps:
+          - "dataset_relationship_mapping"
+          - "cross_reference_validation"
+          - "consistency_checking"
+          - "referential_integrity_validation"
+          - "consolidated_quality_scoring"
+        parallel_workers: 12
+        timeout: "10h"
+        
+    # Workflow Execution Engine
+    execution_engine:
+      engine_type: "kubernetes_native"
+      workflow_crd: "Workflow"
+      step_execution: "containers"
+      
+      execution_options:
+        parallel_execution: true
+        pipeline_optimization: true
+        resource_optimization: true
+        failure_isolation: true
+        quality_gates: true
+        
+      monitoring:
+        step_level_monitoring: true
+        performance_tracking: true
+        resource_utilization_tracking: true
+        quality_metrics_tracking: true
+        
+    # Workflow Scheduling
+    workflow_scheduling:
+      scheduling_strategy: "quality_priority_based"
+      priority_levels:
+        critical_compliance: 1
+        data_integrity: 2
+        business_critical: 3
+        standard_quality: 4
+        exploratory: 5
+        
+      scheduling_constraints:
+        resource_constraints: true
+        dependency_constraints: true
+        time_window_constraints: true
+        sla_constraints: true
+        compliance_constraints: true
+        
+      queue_management:
+        max_queue_size: 1500
+        queue_overflow_strategy: "reject_lowest_priority"
+        queue_monitoring: true
+        priority_aging: true
+        
+  # Integration Configuration
+  integration:
+    # Upstream Integrations
+    upstream_services:
+      data_ingestion:
+        service: "base-data-ingestion"
+        endpoint: "/api/v1/datasets"
+        timeout: "30s"
+        
+      schema_registry:
+        service: "base-schema-contracts"
+        endpoint: "/api/v1/schemas"
+        timeout: "10s"
+        
+      policy_engine:
+        service: "base-policy-engine"
+        endpoint: "/api/v1/quality-policies"
+        timeout: "15s"
+        
+    # Downstream Integrations
+    downstream_services:
+      feature_engineering:
+        service: "base-feature-engineering"
+        endpoint: "/api/v1/quality-validated"
+        timeout: "60s"
+        quality_gating: true
+        
+      data_security:
+        service: "base-data-security"
+        endpoint: "/api/v1/quality-classification"
+        timeout: "30s"
+        
+      data_storage:
+        service: "base-data-storage"
+        endpoint: "/api/v1/quality-metadata"
+        timeout: "45s"
+        
+      quality_monitoring:
+        service: "base-quality-monitoring"
+        endpoint: "/api/v1/quality-metrics"
+        timeout: "20s"
+        
+    # Cross-cutting Integrations
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        kafka_brokers: "${KAFKA_BROKERS}"
+        
+      metadata_discovery:
+        service: "base-metadata-discovery"
+        endpoint: "/api/v1/quality-catalog"
+        
+      monitoring_service:
+        service: "base-monitoring"
+        metrics_endpoint: "/metrics"
+        alerts_endpoint: "/alerts"
+        
+  # Monitoring and Observability
+  observability:
+    # Metrics Collection
+    metrics:
+      business_metrics:
+        - name: "quality_assessments_total"
+          type: "counter"
+          description: "Total number of quality assessments performed"
+          labels: ["dataset_type", "assessment_result", "priority"]
+          
+        - name: "quality_assessment_duration"
+          type: "histogram"
+          description: "Time taken to complete quality assessments"
+          buckets: [60, 300, 900, 1800, 3600, 7200, 14400]
+          
+        - name: "data_quality_score"
+          type: "gauge"
+          description: "Overall data quality score"
+          labels: ["dataset", "dimension"]
+          
+        - name: "quality_violations_detected"
+          type: "counter"
+          description: "Number of quality violations detected"
+          labels: ["violation_type", "severity", "dataset"]
+          
+        - name: "compliance_checks_passed"
+          type: "gauge"
+          description: "Percentage of compliance checks passed"
+          labels: ["regulation", "dataset"]
+          
+      technical_metrics:
+        - name: "quality_orchestrator_cpu_utilization"
+          type: "gauge"
+          description: "CPU utilization of quality orchestrator"
+          
+        - name: "quality_orchestrator_memory_utilization"
+          type: "gauge"
+          description: "Memory utilization of quality orchestrator"
+          
+        - name: "quality_event_processing_lag"
+          type: "gauge"
+          description: "Lag in quality event processing"
+          
+    # Health Checks
+    health_checks:
+      liveness_check:
+        endpoint: "/health/live"
+        interval: "10s"
+        timeout: "5s"
+        failure_threshold: 3
+        
+      readiness_check:
+        endpoint: "/health/ready"
+        interval: "5s"
+        timeout: "3s"
+        failure_threshold: 3
+        
+      dependency_checks:
+        - name: "database_connection"
+          check: "postgres_ping"
+          critical: true
+          
+        - name: "kafka_connection"
+          check: "kafka_broker_health"
+          critical: true
+          
+        - name: "quality_agent_connectivity"
+          check: "agent_ping_all"
+          critical: false
+          
+    # Alerting
+    alerting:
+      alert_rules:
+        critical_alerts:
+          - name: "quality_orchestrator_down"
+            condition: "up == 0"
+            duration: "1m"
+            
+          - name: "critical_quality_violations"
+            condition: "rate(quality_violations_detected{severity=\"critical\"}[5m]) > 0"
+            duration: "30s"
+            
+          - name: "compliance_check_failures"
+            condition: "compliance_checks_passed < 0.95"
+            duration: "5m"
+            
+        warning_alerts:
+          - name: "quality_assessment_queue_high"
+            condition: "quality_workflow_queue_size > 750"
+            duration: "10m"
+            
+          - name: "quality_score_degradation"
+            condition: "avg(data_quality_score) < 0.8"
+            duration: "15m"
+            
+      notification_channels:
+        critical: ["pagerduty", "slack", "email"]
+        warning: ["slack", "email"]
+        info: ["email"]
+        
+  # Security Configuration
+  security:
+    # Access Control
+    access_control:
+      rbac_enabled: true
+      service_account: "base-quality-orchestrator"
+      
+      permissions:
+        - apiGroups: ["base.io"]
+          resources: ["agents", "workflows", "configs", "quality-policies"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+          
+        - apiGroups: ["apps"]
+          resources: ["deployments", "replicasets"]
+          verbs: ["get", "list", "watch"]
+          
+    # Network Security
+    network_security:
+      network_policies: true
+      allowed_ingress:
+        - from_namespaces: ["base-data-quality", "base-monitoring", "base-data-ingestion"]
+          ports: [8080, 9090]
+          
+      allowed_egress:
+        - to_namespaces: ["base-data-quality", "base-platform", "base-feature-engineering"]
+          ports: [5432, 9092, 8080]
+          
+    # Data Security
+    data_security:
+      encryption_in_transit: true
+      encryption_at_rest: true
+      secret_management: "kubernetes_secrets"
+      pii_detection: true
+      
+      audit_logging:
+        enabled: true
+        log_level: "info"
+        retention_days: 365  # Extended for compliance
+        
+  # Disaster Recovery
+  disaster_recovery:
+    backup_strategy:
+      state_backup:
+        frequency: "every_30m"
+        retention: "30d"
+        destination: "s3://base-backups/quality-orchestrator-state/"
+        
+      configuration_backup:
+        frequency: "daily"
+        retention: "90d"
+        version_control: true
+        
+    recovery_procedures:
+      rto_target: "10m"
+      rpo_target: "2m"
+      
+      recovery_steps:
+        - "restore_configuration"
+        - "restore_quality_state"
+        - "verify_agent_connectivity"
+        - "resume_quality_workflows"
+        - "validate_compliance_continuity"
+        
+    failover_configuration:
+      cross_region_failover: true
+      multi_az_deployment: true
+      leader_election_enabled: true

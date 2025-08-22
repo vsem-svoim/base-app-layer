@@ -1,0 +1,518 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-quality-orchestrator-anomaly-coordinator
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: anomaly-coordinator
+    app.kubernetes.io/component: anomaly-detection
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: orchestrator
+    base.io/function: anomaly-coordination
+spec:
+  type: "anomaly_coordinator"
+  coordination:
+    # Saga Pattern Implementation
+    orchestration_pattern: "choreography"
+    coordination_model: "event_driven"
+    state_coordination: "persistent"
+    transaction_boundaries: "per_anomaly_detection"
+    
+    # Workflow Coordination
+    workflow_management:
+      workflow_engine: "kubernetes_workflows"
+      parallel_execution: true
+      max_concurrent_workflows: 150
+      workflow_timeout: "2h"
+      retry_failed_workflows: true
+      real_time_processing: true
+      
+    # Agent Coordination
+    agent_coordination:
+      coordination_protocol: "grpc"
+      service_discovery: "kubernetes_dns"
+      load_balancing: "adaptive"
+      health_check_interval: "15s"
+      
+      managed_agents:
+        - name: "anomaly-detector"
+          instances: 8
+          coordination_endpoint: "base-anomaly-detector-service:9000"
+          responsibilities: ["statistical_anomaly_detection", "pattern_anomaly_detection", "time_series_anomaly_detection"]
+          detection_algorithms: ["isolation_forest", "one_class_svm", "autoencoder", "lstm_anomaly"]
+          
+        - name: "outlier-analyzer"
+          instances: 4
+          coordination_endpoint: "base-outlier-analyzer-service:9000"
+          responsibilities: ["outlier_identification", "outlier_scoring", "outlier_explanation"]
+          
+        - name: "pattern-matcher"
+          instances: 5
+          coordination_endpoint: "base-pattern-matcher-service:9000"
+          responsibilities: ["pattern_recognition", "behavioral_analysis", "trend_detection"]
+          
+        - name: "drift-detector"
+          instances: 3
+          coordination_endpoint: "base-drift-detector-service:9000"
+          responsibilities: ["concept_drift_detection", "data_drift_detection", "model_drift_detection"]
+          
+        - name: "threshold-monitor"
+          instances: 6
+          coordination_endpoint: "base-threshold-monitor-service:9000"
+          responsibilities: ["threshold_based_detection", "adaptive_thresholding", "multi_variate_monitoring"]
+          
+        - name: "correlation-analyzer"
+          instances: 2
+          coordination_endpoint: "base-correlation-analyzer-service:9000"
+          responsibilities: ["correlation_anomaly_detection", "cross_feature_analysis", "dependency_monitoring"]
+    
+    # State Management
+    state_management:
+      persistence_backend: "postgresql"
+      state_store_connection: "postgres://state-db:5432/anomaly_orchestrator_state"
+      state_retention_days: 180
+      checkpoint_interval: "30s"
+      state_consistency: "eventual"
+      anomaly_history_tracking: true
+      
+    # Event-Driven Coordination
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "anomaly.detection.started"
+          partitions: 24
+          replication_factor: 3
+        - name: "anomaly.detection.completed"
+          partitions: 24
+          replication_factor: 3
+        - name: "anomaly.detected"
+          partitions: 16
+          replication_factor: 3
+        - name: "anomaly.severity.critical"
+          partitions: 8
+          replication_factor: 3
+        - name: "anomaly.pattern.identified"
+          partitions: 12
+          replication_factor: 3
+        - name: "anomaly.drift.detected"
+          partitions: 6
+          replication_factor: 3
+      
+      event_processing:
+        consumer_group: "anomaly-coordinator"
+        batch_size: 250
+        processing_timeout: "20s"
+        retry_attempts: 3
+        dead_letter_queue: "anomaly.dlq"
+        
+  resources:
+    # Deployment Configuration
+    deployment:
+      replicas: 5  # High availability for real-time anomaly detection
+      deployment_strategy: "rolling_update"
+      leader_election: false  # Event-driven coordination
+      max_surge: 3
+      max_unavailable: 1
+      
+    # Resource Allocation
+    resource_allocation:
+      cpu:
+        requests: "3"
+        limits: "8"
+      memory:
+        requests: "6Gi"
+        limits: "20Gi"
+      storage:
+        requests: "30Gi"
+        limits: "150Gi"
+        
+    # Auto-scaling Configuration
+    auto_scaling:
+      enabled: true
+      min_replicas: 5
+      max_replicas: 15
+      scaling_metrics:
+        - type: "cpu"
+          target_utilization: 75
+        - type: "memory"
+          target_utilization: 85
+        - type: "custom"
+          metric_name: "anomaly_detection_queue_depth"
+          target_value: 200
+        - type: "custom"
+          metric_name: "realtime_detection_latency"
+          target_value: 100  # milliseconds
+          
+    # Performance Optimization
+    performance:
+      connection_pooling:
+        database_connections: 50
+        agent_connections: 200
+        connection_timeout: "20s"
+        idle_timeout: "2m"
+        
+      caching:
+        model_cache_size: "4GB"
+        pattern_cache_ttl: "1h"
+        threshold_cache_ttl: "15m"
+        historical_data_cache_ttl: "6h"
+        
+      batch_processing:
+        batch_size: 200
+        batch_timeout: "5s"
+        max_batch_wait: "15s"
+        streaming_processing: true
+        
+  # Workflow Management Configuration
+  workflow_orchestration:
+    # Workflow Types
+    supported_workflows:
+      - name: "realtime_anomaly_detection"
+        description: "Real-time streaming anomaly detection"
+        steps: 
+          - "data_ingestion_monitoring"
+          - "real_time_feature_extraction"
+          - "anomaly_score_calculation"
+          - "threshold_comparison"
+          - "immediate_alerting"
+          - "anomaly_classification"
+        continuous: true
+        latency_target: "< 50ms"
+        throughput_target: "50000 events/sec"
+        
+      - name: "batch_anomaly_detection"
+        description: "Batch processing for historical anomaly detection"
+        steps:
+          - "historical_data_retrieval"
+          - "feature_engineering"
+          - "model_application"
+          - "anomaly_scoring"
+          - "result_aggregation"
+          - "trend_analysis"
+        batch_size: "10GB"
+        timeout: "1h"
+        
+      - name: "multi_variate_anomaly_detection"
+        description: "Complex multi-dimensional anomaly detection"
+        steps:
+          - "feature_correlation_analysis"
+          - "dimensionality_reduction"
+          - "multi_variate_modeling"
+          - "ensemble_anomaly_detection"
+          - "correlation_anomaly_identification"
+          - "complex_pattern_analysis"
+        parallel_workers: 12
+        timeout: "2h"
+        
+      - name: "time_series_anomaly_detection"
+        description: "Time series specific anomaly detection"
+        steps:
+          - "time_series_decomposition"
+          - "seasonality_analysis"
+          - "trend_anomaly_detection"
+          - "forecast_based_anomaly_detection"
+          - "temporal_pattern_analysis"
+        time_series_specific: true
+        lookback_window: "30d"
+        timeout: "90m"
+        
+      - name: "drift_detection_workflow"
+        description: "Data and concept drift detection"
+        steps:
+          - "baseline_model_comparison"
+          - "statistical_drift_testing"
+          - "feature_distribution_comparison"
+          - "model_performance_degradation_check"
+          - "drift_severity_assessment"
+          - "retraining_recommendation"
+        drift_sensitivity: "medium"
+        comparison_window: "7d"
+        
+    # Workflow Execution Engine
+    execution_engine:
+      engine_type: "kubernetes_native"
+      workflow_crd: "AnomalyWorkflow"
+      step_execution: "containers"
+      
+      execution_options:
+        parallel_execution: true
+        pipeline_optimization: true
+        resource_optimization: true
+        failure_isolation: true
+        real_time_processing: true
+        gpu_acceleration: true
+        
+      monitoring:
+        step_level_monitoring: true
+        performance_tracking: true
+        resource_utilization_tracking: true
+        anomaly_metrics_tracking: true
+        latency_tracking: true
+        
+    # Workflow Scheduling
+    workflow_scheduling:
+      scheduling_strategy: "anomaly_severity_based"
+      priority_levels:
+        critical_anomaly: 1
+        high_severity_anomaly: 2
+        real_time_detection: 3
+        batch_detection: 4
+        exploratory_analysis: 5
+        
+      scheduling_constraints:
+        resource_constraints: true
+        dependency_constraints: true
+        latency_constraints: true
+        data_freshness_constraints: true
+        
+      queue_management:
+        max_queue_size: 3000
+        queue_overflow_strategy: "drop_oldest_low_priority"
+        queue_monitoring: true
+        dynamic_prioritization: true
+        
+  # Integration Configuration
+  integration:
+    # Upstream Integrations
+    upstream_services:
+      data_ingestion:
+        service: "base-data-ingestion"
+        endpoint: "/api/v1/streaming-data"
+        timeout: "10s"
+        streaming: true
+        
+      validation_coordinator:
+        service: "base-data-quality-orchestrator-validation-coordinator"
+        endpoint: "/api/v1/validated-data"
+        timeout: "30s"
+        
+      feature_engineering:
+        service: "base-feature-engineering"
+        endpoint: "/api/v1/features"
+        timeout: "45s"
+        
+    # Downstream Integrations
+    downstream_services:
+      quality_manager:
+        service: "base-data-quality-orchestrator-quality-manager"
+        endpoint: "/api/v1/anomaly-results"
+        timeout: "30s"
+        
+      reporting_manager:
+        service: "base-data-quality-orchestrator-reporting-manager"
+        endpoint: "/api/v1/anomaly-reports"
+        timeout: "60s"
+        
+      alerting_service:
+        service: "base-alerting"
+        endpoint: "/api/v1/anomaly-alerts"
+        timeout: "5s"
+        
+      model_management:
+        service: "base-mlops"
+        endpoint: "/api/v1/anomaly-models"
+        timeout: "120s"
+        
+    # Cross-cutting Integrations
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        kafka_brokers: "${KAFKA_BROKERS}"
+        
+      metadata_discovery:
+        service: "base-metadata-discovery"
+        endpoint: "/api/v1/anomaly-catalog"
+        
+      monitoring_service:
+        service: "base-monitoring"
+        metrics_endpoint: "/metrics"
+        alerts_endpoint: "/alerts"
+        
+  # Monitoring and Observability
+  observability:
+    # Metrics Collection
+    metrics:
+      business_metrics:
+        - name: "anomalies_detected_total"
+          type: "counter"
+          description: "Total number of anomalies detected"
+          labels: ["anomaly_type", "severity", "dataset", "detection_method"]
+          
+        - name: "anomaly_detection_duration"
+          type: "histogram"
+          description: "Time taken to detect anomalies"
+          buckets: [0.01, 0.05, 0.1, 0.5, 1, 5, 15, 30]
+          
+        - name: "anomaly_detection_accuracy"
+          type: "gauge"
+          description: "Accuracy of anomaly detection models"
+          labels: ["model_type", "dataset"]
+          
+        - name: "false_positive_rate"
+          type: "gauge"
+          description: "False positive rate in anomaly detection"
+          labels: ["detection_method", "threshold_setting"]
+          
+        - name: "anomaly_severity_distribution"
+          type: "histogram"
+          description: "Distribution of anomaly severities"
+          buckets: [0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95, 1.0]
+          
+      technical_metrics:
+        - name: "anomaly_coordinator_cpu_utilization"
+          type: "gauge"
+          description: "CPU utilization of anomaly coordinator"
+          
+        - name: "anomaly_coordinator_memory_utilization"
+          type: "gauge"
+          description: "Memory utilization of anomaly coordinator"
+          
+        - name: "anomaly_detection_queue_depth"
+          type: "gauge"
+          description: "Current depth of anomaly detection queue"
+          
+        - name: "realtime_detection_latency"
+          type: "histogram"
+          description: "Latency of real-time anomaly detection"
+          buckets: [1, 5, 10, 25, 50, 100, 250, 500]
+          
+    # Health Checks
+    health_checks:
+      liveness_check:
+        endpoint: "/health/live"
+        interval: "10s"
+        timeout: "5s"
+        failure_threshold: 3
+        
+      readiness_check:
+        endpoint: "/health/ready"
+        interval: "5s"
+        timeout: "3s"
+        failure_threshold: 3
+        
+      dependency_checks:
+        - name: "database_connection"
+          check: "postgres_ping"
+          critical: true
+          
+        - name: "kafka_connection"
+          check: "kafka_broker_health"
+          critical: true
+          
+        - name: "anomaly_agent_connectivity"
+          check: "agent_ping_all"
+          critical: true
+          
+        - name: "model_service_connectivity"
+          check: "model_service_health"
+          critical: false
+          
+    # Alerting
+    alerting:
+      alert_rules:
+        critical_alerts:
+          - name: "anomaly_coordinator_down"
+            condition: "up == 0"
+            duration: "1m"
+            
+          - name: "critical_anomaly_detected"
+            condition: "anomalies_detected_total{severity=\"critical\"} > 0"
+            duration: "0s"  # Immediate alert
+            
+          - name: "high_false_positive_rate"
+            condition: "false_positive_rate > 0.2"
+            duration: "10m"
+            
+          - name: "anomaly_detection_latency_high"
+            condition: "histogram_quantile(0.95, realtime_detection_latency) > 100"
+            duration: "5m"
+            
+        warning_alerts:
+          - name: "anomaly_detection_accuracy_degradation"
+            condition: "anomaly_detection_accuracy < 0.8"
+            duration: "30m"
+            
+          - name: "anomaly_queue_buildup"
+            condition: "anomaly_detection_queue_depth > 1500"
+            duration: "15m"
+            
+      notification_channels:
+        critical: ["pagerduty", "slack"]
+        warning: ["slack", "email"]
+        info: ["email"]
+        
+  # Security Configuration
+  security:
+    # Access Control
+    access_control:
+      rbac_enabled: true
+      service_account: "base-anomaly-coordinator"
+      
+      permissions:
+        - apiGroups: ["base.io"]
+          resources: ["agents", "workflows", "anomaly-models", "detection-rules"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+          
+        - apiGroups: ["apps"]
+          resources: ["deployments", "replicasets"]
+          verbs: ["get", "list", "watch"]
+          
+    # Network Security
+    network_security:
+      network_policies: true
+      allowed_ingress:
+        - from_namespaces: ["base-data-quality", "base-monitoring", "base-data-ingestion"]
+          ports: [8080, 9090]
+          
+      allowed_egress:
+        - to_namespaces: ["base-data-quality", "base-platform", "base-feature-engineering"]
+          ports: [5432, 9092, 8080]
+          
+    # Data Security
+    data_security:
+      encryption_in_transit: true
+      encryption_at_rest: true
+      secret_management: "kubernetes_secrets"
+      
+      audit_logging:
+        enabled: true
+        log_level: "info"
+        retention_days: 180
+        include_anomaly_details: true
+        
+  # Disaster Recovery
+  disaster_recovery:
+    backup_strategy:
+      state_backup:
+        frequency: "every_5m"
+        retention: "30d"
+        destination: "s3://base-backups/anomaly-coordinator-state/"
+        
+      model_backup:
+        frequency: "hourly"
+        retention: "90d"
+        destination: "s3://base-backups/anomaly-models/"
+        
+      configuration_backup:
+        frequency: "daily"
+        retention: "60d"
+        version_control: true
+        
+    recovery_procedures:
+      rto_target: "3m"
+      rpo_target: "30s"
+      
+      recovery_steps:
+        - "restore_anomaly_configuration"
+        - "restore_anomaly_state"
+        - "restore_anomaly_models"
+        - "verify_agent_connectivity"
+        - "resume_anomaly_workflows"
+        - "validate_detection_continuity"
+        
+    failover_configuration:
+      cross_region_failover: false
+      multi_az_deployment: true
+      leader_election_enabled: false  # Event-driven coordination
+      real_time_failover: true

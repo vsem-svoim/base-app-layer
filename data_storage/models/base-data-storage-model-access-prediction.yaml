@@ -1,0 +1,64 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-storage-access-prediction-model
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: access-prediction-model
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_storage
+    base.io/type: model
+    base.io/function: access-prediction
+spec:
+  type: "regression"
+  algorithm: "lstm_neural_network"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/predict-access"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      network_type: "lstm"
+      sequence_length: 30
+      hidden_units: [128, 64]
+      dropout_rate: 0.2
+      learning_rate: 0.001
+      epochs: 100
+    feature_engineering:
+      feature_types:
+        - name: "access_patterns"
+          features: ["frequency", "timing", "user_type", "data_size"]
+        - name: "temporal_features"
+          features: ["hour_of_day", "day_of_week", "month", "quarter"]
+        - name: "business_context"
+          features: ["market_hours", "trading_volume", "volatility"]
+  inference:
+    prediction_parameters:
+      - "next_access_probability"
+      - "access_frequency_forecast"
+      - "optimal_tier_placement"
+      - "cache_recommendation"
+    prediction_config:
+      forecast_horizon_days: 30
+      confidence_threshold: 0.80
+      financial_context: true
+  financial_domain:
+    access_patterns:
+      market_data: ["real_time", "end_of_day", "historical_analysis"]
+      trade_data: ["settlement_cycle", "regulatory_reporting", "audit"]
+      reference_data: ["daily_updates", "corporate_actions", "rate_changes"]
+    business_rules:
+      market_hours_impact: true
+      regulatory_reporting_cycles: true
+      month_end_processing: true

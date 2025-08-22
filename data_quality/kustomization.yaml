@@ -4,25 +4,29 @@ kind: Kustomization
 metadata:
   name: base-data-quality
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "5"
 
 namespace: base-data-quality
 
 resources:
+  - namespace.yaml
+  - base-crds.yaml
   - agents/
   - models/
   - orchestrators/
   - workflows/
   - configs/
+  - prompts/
 
 labels:
 - includeSelectors: true
   pairs:
-    app.kubernetes.io/name: base-data_quality
-    app.kubernetes.io/component: data-platform
-    app.kubernetes.io/part-of: base-layer
-    module.type: data_quality
-    deployment.wave: "7"
+  app.kubernetes.io/name: base-data-quality
+  app.kubernetes.io/component: data-platform
+  app.kubernetes.io/part-of: base-layer
+  module.type: data-quality
+  deployment.wave: "5"
+
 commonAnnotations:
-  argocd.argoproj.io/sync-wave: "4"
-  module.description: "Data quality validation and cleansing module"
+  argocd.argoproj.io/sync-wave: "5"
+  module.description: "Comprehensive data quality validation and monitoring module"

@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/component: data-platform
     app.kubernetes.io/part-of: base-layer
     module.type: data-storage
-    deployment.wave: "4"
+    deployment.wave: "6"
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
-    module.description: "Distributed storage with lifecycle management"
+    argocd.argoproj.io/sync-wave: "6"
+    module.description: "Multi-tier intelligent data storage and lifecycle management module"

@@ -1,0 +1,73 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-quality-accuracy-assessment-model
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: accuracy-assessment-model
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: model
+    base.io/function: accuracy-assessment
+spec:
+  type: "regression"
+  algorithm: "ensemble_regressor"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/predict-accuracy"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      ensemble_method: "random_forest_svr_neural_net"
+      n_estimators: 500
+      max_depth: 12
+      learning_rate: 0.03
+      min_samples_split: 5
+      min_samples_leaf: 2
+      subsample: 0.85
+      feature_fraction: 0.9
+      regularization_alpha: 0.05
+      regularization_lambda: 0.1
+    feature_engineering:
+      feature_types:
+        - name: "data_validation_features"
+          features: ["format_compliance_rate", "type_consistency_score", "range_validation_rate", "pattern_match_score"]
+        - name: "reference_comparison"
+          features: ["master_data_match_rate", "cross_reference_accuracy", "golden_source_deviation"]
+        - name: "temporal_consistency"
+          features: ["time_series_smoothness", "lag_correlation", "temporal_outlier_ratio"]
+        - name: "business_rule_adherence"
+          features: ["business_rule_pass_rate", "constraint_violation_count", "domain_specific_checks"]
+        - name: "external_validation"
+          features: ["third_party_validation_score", "regulatory_benchmark_match", "market_data_consistency"]
+  inference:
+    accuracy_dimensions:
+      - "syntactic_accuracy"
+      - "semantic_accuracy"
+      - "temporal_accuracy"
+      - "referential_accuracy"
+    prediction_config:
+      accuracy_threshold: 0.90
+      confidence_threshold: 0.85
+      financial_context: true
+      regulatory_weighting: true
+  financial_domain:
+    critical_fields:
+      market_data: ["price_accuracy", "volume_consistency", "bid_ask_spread", "volatility_metrics", "currency_rates"]
+      trade_data: ["settlement_accuracy", "counterparty_validation", "notional_verification", "trade_lifecycle_status"]
+      reference_data: ["instrument_classification", "issuer_verification", "rating_consistency", "corporate_actions"]
+    regulatory_requirements:
+      mifid_ii: ["best_execution_validation", "venue_accuracy", "timestamp_precision", "price_improvement_calc"]
+      emir: ["collateral_valuation_accuracy", "margin_calculation", "risk_metrics_validation", "exposure_calculation"]
+      dodd_frank: ["swap_valuation_accuracy", "clearing_member_verification", "position_reporting_accuracy"]

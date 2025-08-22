@@ -1,0 +1,90 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-quality-workflow-anomaly-investigation
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: anomaly-investigation-workflow
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: workflow
+    base.io/function: anomaly-investigation
+spec:
+  steps:
+    - name: "anomaly_classification"
+      agent: "anomaly-detector"
+      action: "classify_anomaly_type"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: []
+      
+    - name: "historical_pattern_analysis"
+      agent: "anomaly-detector"
+      action: "analyze_historical_patterns"
+      timeout: "15m"
+      retry_attempts: 3
+      parallelizable: true
+      dependencies: ["anomaly_classification"]
+      
+    - name: "root_cause_investigation"
+      agent: "data-validator"
+      action: "investigate_data_source"
+      timeout: "20m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["anomaly_classification"]
+      
+    - name: "impact_assessment"
+      agent: "quality-assessor"
+      action: "assess_downstream_impact"
+      timeout: "12m"
+      retry_attempts: 2
+      dependencies: ["historical_pattern_analysis", "root_cause_investigation"]
+      
+    - name: "remediation_strategy"
+      agent: "rule-enforcer"
+      action: "determine_remediation_approach"
+      timeout: "8m"
+      retry_attempts: 2
+      dependencies: ["impact_assessment"]
+      
+    - name: "quality_restoration"
+      agent: "data-validator"
+      action: "execute_data_correction"
+      timeout: "25m"
+      retry_attempts: 3
+      dependencies: ["remediation_strategy"]
+      
+    - name: "investigation_report"
+      agent: "quality-reporter"
+      action: "generate_investigation_report"
+      timeout: "10m"
+      retry_attempts: 2
+      dependencies: ["quality_restoration"]
+      
+    - name: "prevention_update"
+      agent: "external"
+      service: "base-pipeline-management"
+      action: "update_prevention_rules"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: ["investigation_report"]
+      
+  triggers:
+    schedule:
+      cron: "0 */12 * * *"  # Every 12 hours
+      timezone: "UTC"
+    event:
+      - "anomaly_detected"
+      - "quality_threshold_exceeded"
+      - "manual_investigation_triggered"
+      
+  dependencies:
+    external_services:
+      - "base-pipeline-management"
+      - "base-data-ingestion"
+    infrastructure:
+      - "ml_models"
+      - "historical_database"
+      - "notification_system"

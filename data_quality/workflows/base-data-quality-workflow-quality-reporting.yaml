@@ -1,0 +1,91 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-quality-workflow-quality-reporting
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: quality-reporting-workflow
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: workflow
+    base.io/function: quality-reporting
+spec:
+  steps:
+    - name: "metrics_aggregation"
+      agent: "quality-reporter"
+      action: "aggregate_quality_metrics"
+      timeout: "10m"
+      retry_attempts: 3
+      dependencies: []
+      
+    - name: "trend_analysis"
+      agent: "quality-assessor"
+      action: "analyze_quality_trends"
+      timeout: "15m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["metrics_aggregation"]
+      
+    - name: "compliance_summary"
+      agent: "compliance-monitor"
+      action: "summarize_compliance_status"
+      timeout: "12m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["metrics_aggregation"]
+      
+    - name: "anomaly_statistics"
+      agent: "anomaly-detector"
+      action: "compile_anomaly_statistics"
+      timeout: "8m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["metrics_aggregation"]
+      
+    - name: "sla_performance"
+      agent: "quality-assessor"
+      action: "evaluate_sla_performance"
+      timeout: "6m"
+      retry_attempts: 2
+      dependencies: ["trend_analysis", "compliance_summary", "anomaly_statistics"]
+      
+    - name: "executive_dashboard"
+      agent: "quality-reporter"
+      action: "generate_executive_dashboard"
+      timeout: "8m"
+      retry_attempts: 2
+      dependencies: ["sla_performance"]
+      
+    - name: "stakeholder_reports"
+      agent: "quality-reporter"
+      action: "generate_stakeholder_reports"
+      timeout: "12m"
+      retry_attempts: 3
+      dependencies: ["executive_dashboard"]
+      
+    - name: "distribution_delivery"
+      agent: "external"
+      service: "base-data-distribution"
+      action: "distribute_quality_reports"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: ["stakeholder_reports"]
+      
+  triggers:
+    schedule:
+      cron: "0 9 * * 1"  # Every Monday at 9 AM
+      timezone: "UTC"
+    event:
+      - "monthly_reporting_cycle"
+      - "quality_report_requested"
+      - "regulatory_reporting_deadline"
+      
+  dependencies:
+    external_services:
+      - "base-data-distribution"
+      - "base-metadata-discovery"
+    infrastructure:
+      - "reporting_database"
+      - "dashboard_system"
+      - "email_service"

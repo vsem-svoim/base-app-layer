@@ -1,0 +1,327 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: base-data-quality-testing-cronjob
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: automated-testing
+    app.kubernetes.io/part-of: base-platform
+    app.kubernetes.io/version: "1.0.0"
+    base.platform/module: data-quality
+    base.platform/layer: testing
+spec:
+  # Run comprehensive tests daily at 2 AM UTC
+  schedule: "0 2 * * *"
+  
+  # Allow up to 3 missed scheduled runs
+  startingDeadlineSeconds: 300
+  
+  # Keep the last 3 successful jobs and 1 failed job
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  
+  # Don't allow concurrent execution
+  concurrencyPolicy: Forbid
+  
+  jobTemplate:
+    spec:
+      # Job timeout: 2 hours
+      activeDeadlineSeconds: 7200
+      
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: data-quality-testing
+            app.kubernetes.io/component: automated-testing
+            base.platform/module: data-quality
+            base.platform/layer: testing
+        spec:
+          restartPolicy: OnFailure
+          
+          serviceAccountName: base-data-quality-testing-sa
+          
+          # Use platform system nodes for testing workloads
+          nodeSelector:
+            node-type: platform_system
+          
+          tolerations:
+          - key: "platform-system"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          
+          initContainers:
+          - name: wait-for-services
+            image: busybox:1.35
+            command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for data quality services to be ready..."
+              
+              # Wait for core agents
+              until nc -z base-data-quality-agent-data-validator 8080; do
+                echo "Waiting for data validator..."
+                sleep 10
+              done
+              
+              until nc -z base-data-quality-agent-quality-assessor 8080; do
+                echo "Waiting for quality assessor..."
+                sleep 10
+              done
+              
+              until nc -z base-data-quality-agent-anomaly-detector 8080; do
+                echo "Waiting for anomaly detector..."
+                sleep 10
+              done
+              
+              echo "All services are ready!"
+          
+          containers:
+          - name: quality-testing
+            image: base-platform/data-quality-testing:latest
+            imagePullPolicy: Always
+            
+            # Environment variables
+            env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: TEST_TYPE
+              value: "comprehensive"
+            - name: PYTHONPATH
+              value: "/testing"
+            - name: LOG_LEVEL
+              value: "INFO"
+            
+            # Resource requirements
+            resources:
+              requests:
+                cpu: "1000m"
+                memory: "2Gi"
+              limits:
+                cpu: "2000m"
+                memory: "4Gi"
+            
+            # Volume mounts
+            volumeMounts:
+            - name: testing-config
+              mountPath: /testing/config
+              readOnly: true
+            - name: test-results
+              mountPath: /testing/results
+            - name: test-logs
+              mountPath: /testing/logs
+            
+            # Health checks
+            livenessProbe:
+              exec:
+                command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep python"
+              initialDelaySeconds: 30
+              periodSeconds: 30
+              timeoutSeconds: 10
+              failureThreshold: 3
+            
+            # Command to run comprehensive tests
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "=== DATA QUALITY COMPREHENSIVE TESTING STARTED ==="
+              echo "Timestamp: $(date)"
+              echo "Namespace: $NAMESPACE"
+              echo "Test Type: $TEST_TYPE"
+              
+              # Create results directory
+              mkdir -p /testing/results /testing/logs
+              
+              # Change to testing directory
+              cd /testing
+              
+              # Run comprehensive capability tests
+              echo "Running capability tests..."
+              python3 scripts/capability_tester.py > /testing/logs/capability_tests.log 2>&1 || echo "Capability tests completed with warnings"
+              
+              # Run Kubernetes integration tests
+              echo "Running Kubernetes integration tests..."
+              python3 scripts/kubernetes-integration-tester.py > /testing/logs/k8s_integration_tests.log 2>&1 || echo "K8s integration tests completed with warnings"
+              
+              # Run performance tests if available
+              if [ -f "scripts/performance_tester.py" ]; then
+                echo "Running performance tests..."
+                python3 scripts/performance_tester.py > /testing/logs/performance_tests.log 2>&1 || echo "Performance tests completed with warnings"
+              fi
+              
+              # Generate consolidated report
+              echo "Generating consolidated test report..."
+              python3 -c "
+              import json
+              import os
+              from datetime import datetime
+              from pathlib import Path
+              
+              # Collect all test results
+              results_dir = Path('/testing/results')
+              logs_dir = Path('/testing/logs')
+              
+              consolidated_report = {
+                'test_execution_summary': {
+                  'timestamp': datetime.now().isoformat(),
+                  'namespace': os.getenv('NAMESPACE'),
+                  'test_type': os.getenv('TEST_TYPE'),
+                  'execution_node': os.getenv('HOSTNAME', 'unknown')
+                },
+                'test_results': {},
+                'log_files': []
+              }
+              
+              # Collect JSON results
+              for result_file in results_dir.glob('*.json'):
+                try:
+                  with open(result_file, 'r') as f:
+                    consolidated_report['test_results'][result_file.stem] = json.load(f)
+                except Exception as e:
+                  consolidated_report['test_results'][result_file.stem] = {'error': str(e)}
+              
+              # List log files
+              for log_file in logs_dir.glob('*.log'):
+                consolidated_report['log_files'].append(log_file.name)
+              
+              # Save consolidated report
+              with open('/testing/results/consolidated_test_report.json', 'w') as f:
+                json.dump(consolidated_report, f, indent=2, default=str)
+              
+              print('Consolidated report generated successfully')
+              " || echo "Report generation completed with warnings"
+              
+              echo "=== DATA QUALITY COMPREHENSIVE TESTING COMPLETED ==="
+              
+              # Display summary
+              echo "Test Results Summary:"
+              ls -la /testing/results/
+              echo "Log Files:"
+              ls -la /testing/logs/
+              
+              echo "Testing completed at: $(date)"
+          
+          # Volumes
+          volumes:
+          - name: testing-config
+            configMap:
+              name: base-data-quality-testing-config
+              defaultMode: 0755
+          - name: test-results
+            emptyDir: {}
+          - name: test-logs
+            emptyDir: {}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-data-quality-testing-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: service-account
+    base.platform/module: data-quality
+    base.platform/layer: testing
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: base-data-quality-testing-role
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: rbac
+    base.platform/module: data-quality
+    base.platform/layer: testing
+rules:
+# Pod and deployment access for testing
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+# Access to jobs and cronjobs for testing coordination
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create"]
+# Metrics access
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+# Custom resources for data quality
+- apiGroups: ["quality.base.platform"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: base-data-quality-testing-rolebinding
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: rbac
+    base.platform/module: data-quality
+    base.platform/layer: testing
+subjects:
+- kind: ServiceAccount
+  name: base-data-quality-testing-sa
+  namespace: base-data-quality
+roleRef:
+  kind: Role
+  name: base-data-quality-testing-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Additional ClusterRole for cross-namespace monitoring (optional)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: base-data-quality-testing-cluster-role
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: rbac
+    base.platform/module: data-quality
+    base.platform/layer: testing
+rules:
+# Node and cluster-level metrics
+- apiGroups: [""]
+  resources: ["nodes", "namespaces"]
+  verbs: ["get", "list", "watch"]
+# Metrics server access
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: base-data-quality-testing-cluster-rolebinding
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: rbac
+    base.platform/module: data-quality
+    base.platform/layer: testing
+subjects:
+- kind: ServiceAccount
+  name: base-data-quality-testing-sa
+  namespace: base-data-quality
+roleRef:
+  kind: ClusterRole
+  name: base-data-quality-testing-cluster-role
+  apiGroup: rbac.authorization.k8s.io

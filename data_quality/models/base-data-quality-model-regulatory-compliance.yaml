@@ -1,0 +1,74 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-quality-regulatory-compliance-model
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: regulatory-compliance-model
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: model
+    base.io/function: regulatory-compliance
+spec:
+  type: "multi_class_classification"
+  algorithm: "hierarchical_classification"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/predict-compliance"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      ensemble_method: "hierarchical_xgboost_neural_net"
+      hierarchy_levels: ["jurisdiction", "regulation", "requirement"]
+      n_estimators: 1000
+      max_depth: 15
+      learning_rate: 0.01
+      min_child_weight: 5
+      subsample: 0.8
+      colsample_bytree: 0.7
+      gamma: 0.1
+      reg_alpha: 0.05
+      reg_lambda: 0.1
+    feature_engineering:
+      feature_types:
+        - name: "regulatory_mapping"
+          features: ["jurisdiction_coverage", "regulation_applicability", "requirement_mapping", "exemption_eligibility"]
+        - name: "compliance_metrics"
+          features: ["field_compliance_rate", "timeliness_compliance", "format_adherence", "content_validation"]
+        - name: "risk_indicators"
+          features: ["non_compliance_risk_score", "penalty_exposure", "audit_readiness", "remediation_complexity"]
+        - name: "business_context"
+          features: ["entity_classification", "activity_scope", "geographic_coverage", "product_categorization"]
+        - name: "temporal_compliance"
+          features: ["reporting_frequency_compliance", "deadline_adherence", "historical_compliance_trend"]
+  inference:
+    compliance_dimensions:
+      - "field_level_compliance"
+      - "record_level_compliance"
+      - "regulatory_requirement_compliance"
+      - "jurisdiction_specific_compliance"
+    prediction_config:
+      compliance_threshold: 0.95
+      confidence_threshold: 0.90
+      financial_context: true
+      regulatory_weighting: true
+  financial_domain:
+    critical_fields:
+      market_data: ["trade_transparency_requirements", "market_data_publication", "reference_data_standards", "timestamp_synchronization"]
+      trade_data: ["transaction_reporting_obligations", "trade_repository_requirements", "clearing_determination", "margin_requirements"]
+      reference_data: ["legal_entity_identification", "instrument_classification", "issuer_disclosure", "corporate_actions_reporting"]
+    regulatory_requirements:
+      mifid_ii: ["transaction_reporting_rts22", "market_data_unbundling", "best_execution_rts27", "investment_firm_reporting"]
+      emir: ["trade_reporting_rts149", "risk_mitigation_rts153", "clearing_obligation_rts148", "margin_requirements_rts285"]
+      dodd_frank: ["swap_data_reporting", "clearing_determination", "margin_requirements", "capital_requirements", "volcker_rule_compliance"]

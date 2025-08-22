@@ -1,0 +1,83 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-quality-workflow-real-time-assessment
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: real-time-assessment-workflow
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: workflow
+    base.io/function: real-time-assessment
+spec:
+  steps:
+    - name: "stream_monitoring"
+      agent: "quality-assessor"
+      action: "monitor_incoming_streams"
+      timeout: "30s"
+      retry_attempts: 2
+      dependencies: []
+      
+    - name: "instant_validation"
+      agent: "data-validator"
+      action: "validate_streaming_data"
+      timeout: "1m"
+      retry_attempts: 3
+      parallelizable: true
+      dependencies: ["stream_monitoring"]
+      
+    - name: "real_time_anomalies"
+      agent: "anomaly-detector"
+      action: "detect_real_time_anomalies"
+      timeout: "2m"
+      retry_attempts: 2
+      parallelizable: true
+      dependencies: ["stream_monitoring"]
+      
+    - name: "quality_scoring"
+      agent: "quality-assessor"
+      action: "calculate_real_time_scores"
+      timeout: "30s"
+      retry_attempts: 2
+      dependencies: ["instant_validation", "real_time_anomalies"]
+      
+    - name: "threshold_evaluation"
+      agent: "rule-enforcer"
+      action: "evaluate_quality_thresholds"
+      timeout: "15s"
+      retry_attempts: 1
+      dependencies: ["quality_scoring"]
+      
+    - name: "alert_generation"
+      agent: "quality-reporter"
+      action: "generate_quality_alerts"
+      timeout: "30s"
+      retry_attempts: 2
+      dependencies: ["threshold_evaluation"]
+      
+    - name: "stream_routing"
+      agent: "external"
+      service: "base-data-streaming"
+      action: "route_quality_classified_data"
+      timeout: "1m"
+      retry_attempts: 3
+      dependencies: ["alert_generation"]
+      
+  triggers:
+    schedule:
+      cron: "*/1 * * * *"  # Every minute
+      timezone: "UTC"
+    event:
+      - "streaming_data_received"
+      - "quality_threshold_breach"
+      - "real_time_validation_required"
+      
+  dependencies:
+    external_services:
+      - "base-data-streaming"
+      - "base-pipeline-management"
+    infrastructure:
+      - "kafka_cluster"
+      - "redis_cache"
+      - "alert_system"

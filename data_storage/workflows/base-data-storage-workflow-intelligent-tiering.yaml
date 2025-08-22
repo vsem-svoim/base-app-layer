@@ -1,0 +1,69 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-storage-workflow-intelligent-tiering
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: intelligent-tiering-workflow
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_storage
+    base.io/type: workflow
+    base.io/function: intelligent-tiering
+spec:
+  steps:
+    - name: "access_pattern_analysis"
+      agent: "tier-manager"
+      action: "analyze_access_patterns"
+      timeout: "10m"
+      retry_attempts: 2
+      dependencies: []
+      
+    - name: "cost_benefit_analysis" 
+      agent: "tier-manager"
+      action: "calculate_cost_benefits"
+      timeout: "5m"
+      retry_attempts: 2
+      dependencies: ["access_pattern_analysis"]
+      
+    - name: "tier_recommendation"
+      agent: "external"
+      service: "base-data-storage-model-tier-recommendation"
+      action: "predict_optimal_tier"
+      timeout: "3m"
+      dependencies: ["cost_benefit_analysis"]
+      
+    - name: "migration_execution"
+      agent: "tier-manager"  
+      action: "execute_tier_migration"
+      timeout: "60m"
+      retry_attempts: 3
+      dependencies: ["tier_recommendation"]
+      
+    - name: "migration_validation"
+      agent: "retrieval-optimizer"
+      action: "validate_data_accessibility"
+      timeout: "10m"
+      retry_attempts: 2
+      dependencies: ["migration_execution"]
+      
+    - name: "cost_tracking"
+      agent: "tier-manager"
+      action: "update_cost_metrics"
+      timeout: "2m"
+      dependencies: ["migration_validation"]
+      
+  triggers:
+    schedule:
+      cron: "0 2 * * *"  # Daily at 2 AM
+      timezone: "UTC"
+    event:
+      - "storage_threshold_exceeded"
+      - "cost_optimization_requested"
+      
+  dependencies:
+    external_services:
+      - "base-data-storage-model-tier-recommendation"
+    infrastructure:
+      - "storage_backends"
+      - "cost_monitoring_system"

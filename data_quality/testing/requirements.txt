@@ -1,0 +1,104 @@
+# Data Quality Testing Dependencies
+# Core dependencies with compatible versions for comprehensive testing
+
+# Data processing and analysis
+numpy>=1.24.0,<1.27.0
+pandas>=2.0.0,<2.2.0
+
+# Web framework for testing dashboard
+streamlit>=1.28.0,<1.35.0
+flask>=2.3.0,<3.0.0
+
+# Machine learning for quality model testing
+scikit-learn>=1.3.0,<1.5.0
+
+# HTTP requests for API testing
+requests>=2.31.0,<3.0.0
+
+# Configuration and data formats
+PyYAML>=6.0,<7.0
+
+# Async support for concurrent testing
+aiohttp>=3.8.0,<4.0.0
+asyncio-mqtt>=0.13.0,<1.0.0
+
+# Data visualization for quality dashboards
+plotly>=5.15.0,<6.0.0
+matplotlib>=3.7.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
+
+# Kubernetes integration testing
+kubernetes>=30.0.0,<34.0.0
+
+# Database connectivity for quality testing
+sqlalchemy>=2.0.0,<3.0.0
+psycopg2-binary>=2.9.0,<3.0.0
+
+# Testing frameworks
+pytest>=7.4.0,<8.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-cov>=4.1.0,<5.0.0
+
+# Data quality specific libraries
+great-expectations>=0.17.0,<1.0.0
+pandas-profiling>=3.6.0,<4.0.0
+
+# Financial data processing
+yfinance>=0.2.0,<1.0.0
+quantlib>=1.32,<2.0.0
+
+# Statistical analysis for quality metrics
+scipy>=1.11.0,<2.0.0
+statsmodels>=0.14.0,<1.0.0
+
+# Logging and monitoring
+structlog>=23.1.0,<24.0.0
+prometheus-client>=0.17.0,<1.0.0
+
+# Performance profiling
+memory-profiler>=0.61.0,<1.0.0
+line-profiler>=4.1.0,<5.0.0
+
+# Time series analysis for quality trending
+prophet>=1.1.4,<2.0.0
+
+# Configuration management
+python-decouple>=3.8,<4.0.0
+
+# Data validation and schema checking
+cerberus>=1.3.0,<2.0.0
+jsonschema>=4.19.0,<5.0.0
+
+# Cryptography for security testing
+cryptography>=41.0.0,<42.0.0
+
+# Network testing utilities
+ping3>=4.0.0,<5.0.0
+
+# Development and debugging utilities
+ipython>=8.14.0,<9.0.0
+jupyter>=1.0.0,<2.0.0
+
+# Data streaming for real-time quality testing
+kafka-python>=2.0.0,<3.0.0
+
+# Caching for performance optimization
+redis>=4.6.0,<6.0.0
+
+# API documentation and testing
+swagger-ui-bundle>=0.1.0,<1.0.0
+fastapi>=0.103.0,<1.0.0
+uvicorn>=0.23.0,<1.0.0
+
+# Data format support
+avro-python3>=1.11.0,<2.0.0
+pyarrow>=13.0.0,<14.0.0
+
+# Compliance and audit logging
+audit-log>=1.1.0,<2.0.0
+
+# Financial compliance libraries
+findspark>=2.0.0,<3.0.0
+
+# Quality metrics calculation
+dqc-utils>=0.1.0,<1.0.0

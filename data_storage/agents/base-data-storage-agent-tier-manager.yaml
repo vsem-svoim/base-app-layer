@@ -1,0 +1,549 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-tier-manager-sa
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-storage-agent-tier-manager
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_storage
+    base.io/type: agent
+    base.io/function: tier-manager
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-tier-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-tier-manager
+        app.kubernetes.io/component: storage
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_storage
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-tier-manager-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: tier-manager
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Storage Tier Manager Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: TIER_EVALUATION_INTERVAL
+          value: "3600"  # 1 hour
+        - name: HOT_TIER_THRESHOLD_DAYS
+          value: "7"
+        - name: WARM_TIER_THRESHOLD_DAYS
+          value: "30"
+        - name: COLD_TIER_THRESHOLD_DAYS
+          value: "90"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-tier-manager-config
+      - name: secrets-volume
+        secret:
+          secretName: base-tier-manager-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-tier-manager-service
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+    app.kubernetes.io/component: storage
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-tier-manager
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-tier-manager-config
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+    app.kubernetes.io/component: storage
+data:
+  tier-manager.yaml: |
+    # Tier Manager Agent Configuration
+    tier_manager:
+      # Agent Identity and Responsibility
+      name: "base-tier-manager"
+      version: "v2.5.0"
+      responsibility: "Intelligent multi-tier storage management with ML-driven optimization"
+      
+      # Storage Tier Definitions
+      storage_tiers:
+        hot:
+          name: "hot-tier"
+          description: "High-performance storage for frequently accessed data"
+          storage_class: "premium-ssd"
+          performance_characteristics:
+            iops: 10000
+            throughput_mbps: 500
+            latency_ms: 1
+          cost_per_gb_month: 0.25
+          access_pattern: "frequent"
+          retention_limit_days: 30
+          backends:
+            - "nvme-ssd"
+            - "memory-cache"
+            
+        warm:
+          name: "warm-tier"
+          description: "Balanced storage for moderately accessed data"
+          storage_class: "standard-ssd"
+          performance_characteristics:
+            iops: 3000
+            throughput_mbps: 250
+            latency_ms: 5
+          cost_per_gb_month: 0.10
+          access_pattern: "moderate"
+          retention_limit_days: 180
+          backends:
+            - "standard-ssd"
+            - "intelligent-tiering"
+            
+        cold:
+          name: "cold-tier"
+          description: "Low-cost storage for infrequently accessed data"
+          storage_class: "standard-hdd"
+          performance_characteristics:
+            iops: 500
+            throughput_mbps: 100
+            latency_ms: 20
+          cost_per_gb_month: 0.04
+          access_pattern: "infrequent"
+          retention_limit_days: 1095  # 3 years
+          backends:
+            - "standard-hdd"
+            - "object-storage"
+            
+        archive:
+          name: "archive-tier"
+          description: "Deep archive storage for compliance and long-term retention"
+          storage_class: "archive"
+          performance_characteristics:
+            iops: 100
+            throughput_mbps: 50
+            latency_ms: 60000  # 1 minute retrieval time
+          cost_per_gb_month: 0.01
+          access_pattern: "rare"
+          retention_limit_days: 2555  # 7 years for financial compliance
+          backends:
+            - "tape-storage"
+            - "glacier-storage"
+            - "azure-archive"
+      
+      # Tiering Decision Engine
+      tiering_rules:
+        access_frequency_rules:
+          - name: "frequent_access_hot"
+            condition: "access_count_7d > 50 OR last_access_hours < 24"
+            target_tier: "hot"
+            priority: 1
+            
+          - name: "moderate_access_warm"
+            condition: "access_count_30d > 10 AND access_count_7d <= 50"
+            target_tier: "warm"
+            priority: 2
+            
+          - name: "infrequent_access_cold"
+            condition: "access_count_90d > 0 AND access_count_30d <= 10"
+            target_tier: "cold"
+            priority: 3
+            
+          - name: "no_access_archive"
+            condition: "last_access_days > 90 AND compliance_retain = true"
+            target_tier: "archive"
+            priority: 4
+        
+        business_rules:
+          - name: "trading_data_hot"
+            condition: "data_type = 'trading' AND trade_date >= today - 5"
+            target_tier: "hot"
+            priority: 1
+            override: true
+            
+          - name: "regulatory_data_archive"
+            condition: "data_classification = 'regulatory' AND age_days > 365"
+            target_tier: "archive"
+            priority: 2
+            
+          - name: "pii_data_secure"
+            condition: "contains_pii = true"
+            target_tier: "hot"  # Keep in secure, performant tier
+            priority: 1
+            encryption_required: true
+        
+        cost_optimization_rules:
+          - name: "large_datasets_cold"
+            condition: "dataset_size_gb > 1000 AND access_count_30d < 5"
+            target_tier: "cold"
+            priority: 3
+            
+          - name: "duplicate_data_archive"
+            condition: "duplicate_score > 0.9 AND age_days > 30"
+            target_tier: "archive"
+            priority: 4
+      
+      # ML-Powered Optimization
+      ml_optimization:
+        access_prediction_model:
+          enabled: true
+          model_endpoint: "http://base-data-storage-model-access-prediction:8501"
+          prediction_window_days: 30
+          confidence_threshold: 0.85
+          
+        cost_optimization_model:
+          enabled: true
+          model_endpoint: "http://base-data-storage-model-storage-cost:8501"
+          optimization_target: "minimize_cost"
+          performance_constraint: "maintain_sla"
+          
+        lifecycle_prediction_model:
+          enabled: true
+          model_endpoint: "http://base-data-storage-model-lifecycle-prediction:8501"
+          prediction_horizon_days: 90
+          
+      # Financial Industry Specific Rules
+      financial_compliance:
+        sox_requirements:
+          financial_records_retention_years: 7
+          audit_trail_required: true
+          immutable_storage: true
+          
+        mifid_ii_requirements:
+          transaction_data_retention_years: 5
+          telephone_recordings_retention_years: 5
+          client_data_retention_years: 5
+          
+        gdpr_requirements:
+          personal_data_retention_policy: "business_need"
+          right_to_erasure: true
+          data_minimization: true
+          
+        pci_dss_requirements:
+          cardholder_data_retention_months: 3
+          secure_deletion_required: true
+          encryption_at_rest: true
+      
+      # Performance Monitoring
+      performance:
+        tier_migration_batch_size: 1000
+        concurrent_migrations: 5
+        migration_bandwidth_limit_mbps: 100
+        health_check_interval_minutes: 5
+        
+        sla_targets:
+          hot_tier_latency_ms: 10
+          warm_tier_latency_ms: 100
+          cold_tier_latency_ms: 1000
+          migration_completion_hours: 24
+          
+      # Integration Points
+      integration:
+        upstream:
+          service: "base-data-quality"
+          endpoint: "/quality/enhanced-data"
+          format: "quality_scored"
+        downstream:
+          services:
+            - name: "base-feature-engineering"
+              endpoint: "/retrieve/features"
+            - name: "base-data-security"
+              endpoint: "/classify/data"
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "tier_migration_started"
+            - "tier_migration_completed"
+            - "storage_threshold_exceeded"
+            - "compliance_violation_detected"
+        security:
+          service: "base-data-security"
+          encryption_at_rest: "AES-256"
+          key_management: "vault"
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "tier_migration_rate"
+          type: "counter"
+          description: "Rate of tier migrations"
+        - name: "storage_utilization"
+          type: "gauge"
+          description: "Storage utilization by tier"
+        - name: "access_pattern_accuracy"
+          type: "gauge"
+          description: "ML model prediction accuracy"
+        - name: "cost_optimization_savings"
+          type: "counter"
+          description: "Cost savings from tier optimization"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-tier-manager-hpa
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-storage-agent-tier-manager
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: tier_migration_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "100"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-tier-manager-netpol
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-tier-manager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-feature-engineering
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-security
+    ports:
+    - protocol: TCP
+      port: 8080
+  - {} # Allow external storage backends (S3, Azure, GCS)
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-tier-manager-secrets
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-tier-manager
+type: Opaque
+stringData:
+  # Cloud Storage Credentials
+  cloud_storage.yaml: |
+    aws:
+      access_key_id: "${AWS_ACCESS_KEY_ID}"
+      secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+      region: "${AWS_REGION}"
+      s3_buckets:
+        hot_tier: "${S3_HOT_BUCKET}"
+        warm_tier: "${S3_WARM_BUCKET}"
+        cold_tier: "${S3_COLD_BUCKET}"
+        archive_tier: "${S3_ARCHIVE_BUCKET}"
+    azure:
+      storage_account: "${AZURE_STORAGE_ACCOUNT}"
+      access_key: "${AZURE_STORAGE_KEY}"
+      containers:
+        hot_tier: "${AZURE_HOT_CONTAINER}"
+        warm_tier: "${AZURE_WARM_CONTAINER}"
+        cold_tier: "${AZURE_COLD_CONTAINER}"
+        archive_tier: "${AZURE_ARCHIVE_CONTAINER}"
+    gcp:
+      service_account_json: "${GCP_SERVICE_ACCOUNT_JSON}"
+      project_id: "${GCP_PROJECT_ID}"
+      buckets:
+        hot_tier: "${GCS_HOT_BUCKET}"
+        warm_tier: "${GCS_WARM_BUCKET}"
+        cold_tier: "${GCS_COLD_BUCKET}"
+        archive_tier: "${GCS_ARCHIVE_BUCKET}"
+        
+  # Database Connections
+  database_connections.yaml: |
+    metadata_db:
+      host: "${POSTGRES_HOST}"
+      port: "${POSTGRES_PORT}"
+      database: "${POSTGRES_DB}"
+      username: "${POSTGRES_USER}"
+      password: "${POSTGRES_PASSWORD}"
+      ssl_mode: "require"
+    cache_db:
+      host: "${REDIS_HOST}"
+      port: "${REDIS_PORT}"
+      password: "${REDIS_PASSWORD}"
+      
+  # Encryption Keys
+  encryption_keys.yaml: |
+    tier_encryption:
+      hot_tier_key: "${HOT_TIER_ENCRYPTION_KEY}"
+      warm_tier_key: "${WARM_TIER_ENCRYPTION_KEY}"
+      cold_tier_key: "${COLD_TIER_ENCRYPTION_KEY}"
+      archive_tier_key: "${ARCHIVE_TIER_ENCRYPTION_KEY}"

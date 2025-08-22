@@ -1,0 +1,87 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-storage-orchestrator-storage-manager
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: storage-manager
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_storage
+    base.io/type: orchestrator
+    base.io/function: storage-coordination
+spec:
+  type: "master_coordinator"
+  coordination:
+    orchestration_pattern: "choreography"
+    coordination_model: "distributed"
+    state_coordination: "eventual_consistent"
+    
+    agent_coordination:
+      coordination_protocol: "grpc"
+      managed_agents:
+        - name: "tier-manager"
+          instances: 3
+          coordination_endpoint: "base-tier-manager-service:9000"
+          responsibilities: ["tier_optimization", "cost_management"]
+        - name: "backup-manager"
+          instances: 2
+          coordination_endpoint: "base-backup-manager-service:9000"
+          responsibilities: ["backup_scheduling", "disaster_recovery"]
+        - name: "compression-optimizer"
+          instances: 3
+          coordination_endpoint: "base-compression-optimizer-service:9000"
+          responsibilities: ["compression_optimization", "storage_efficiency"]
+        - name: "retrieval-optimizer"
+          instances: 3
+          coordination_endpoint: "base-retrieval-optimizer-service:9000"
+          responsibilities: ["query_optimization", "cache_management"]
+        - name: "lifecycle-manager"
+          instances: 2
+          coordination_endpoint: "base-lifecycle-manager-service:9000"
+          responsibilities: ["retention_management", "data_archival"]
+        - name: "compliance-archiver"
+          instances: 2
+          coordination_endpoint: "base-compliance-archiver-service:9000"
+          responsibilities: ["regulatory_archival", "legal_hold"]
+    
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "storage.tier.migration"
+          partitions: 12
+          replication_factor: 3
+        - name: "storage.backup.completed"
+          partitions: 6
+          replication_factor: 3
+        - name: "storage.compliance.violation"
+          partitions: 6
+          replication_factor: 3
+  
+  resources:
+    deployment:
+      replicas: 2
+      deployment_strategy: "blue_green"
+    resource_allocation:
+      cpu:
+        requests: "1"
+        limits: "4"
+      memory:
+        requests: "2Gi"
+        limits: "8Gi"
+    
+  integration:
+    upstream_services:
+      data_quality:
+        service: "base-data-quality"
+        endpoint: "/api/v1/validated-data"
+        timeout: "60s"
+    downstream_services:
+      feature_engineering:
+        service: "base-feature-engineering"
+        endpoint: "/api/v1/retrieve"
+        timeout: "30s"
+      data_security:
+        service: "base-data-security"
+        endpoint: "/api/v1/classify"
+        timeout: "15s"

@@ -1,0 +1,257 @@
+# Data Storage Testing Configuration
+# ================================
+
+# Test environment configuration
+test_environment:
+  namespace: "base-data-storage"
+  cluster_name: "base-app-layer-dev"
+  region: "us-east-1"
+  
+# Kubernetes testing parameters
+kubernetes:
+  timeout_seconds: 300
+  retry_attempts: 3
+  retry_delay_seconds: 5
+  
+# Agent testing configuration
+agents:
+  tier_manager:
+    endpoint: "/api/v1/tier-management"
+    health_check: "/health"
+    performance_thresholds:
+      response_time_ms: 500
+      throughput_ops_per_second: 1000
+      success_rate_percent: 99.5
+      
+  backup_manager:
+    endpoint: "/api/v1/backup"
+    health_check: "/health"
+    performance_thresholds:
+      backup_speed_mbps: 100
+      recovery_time_minutes: 5
+      success_rate_percent: 99.9
+      
+  compression_optimizer:
+    endpoint: "/api/v1/compression"
+    health_check: "/health"
+    performance_thresholds:
+      compression_ratio: 3.0
+      compression_speed_mbps: 200
+      storage_savings_percent: 60
+      
+  retrieval_optimizer:
+    endpoint: "/api/v1/retrieval"
+    health_check: "/health"
+    performance_thresholds:
+      query_time_ms: 100
+      cache_hit_rate_percent: 85
+      throughput_qps: 5000
+      
+  lifecycle_manager:
+    endpoint: "/api/v1/lifecycle"
+    health_check: "/health"
+    performance_thresholds:
+      automation_accuracy_percent: 95
+      policy_compliance_percent: 98
+      
+  compliance_archiver:
+    endpoint: "/api/v1/compliance"
+    health_check: "/health"
+    performance_thresholds:
+      compliance_score_percent: 95
+      audit_coverage_percent: 99
+      retention_accuracy_percent: 98
+
+# ML Model testing configuration
+models:
+  access_prediction:
+    model_type: "tensorflow"
+    endpoint: "/predict"
+    performance_thresholds:
+      accuracy_percent: 90
+      inference_time_ms: 50
+      throughput_predictions_per_second: 1000
+      
+  compression_optimization:
+    model_type: "tensorflow"
+    endpoint: "/optimize"
+    performance_thresholds:
+      accuracy_percent: 87
+      inference_time_ms: 100
+      compression_improvement_percent: 25
+      
+  storage_cost:
+    model_type: "tensorflow"
+    endpoint: "/cost-predict"
+    performance_thresholds:
+      accuracy_percent: 92
+      inference_time_ms: 75
+      cost_prediction_variance: 5
+      
+  lifecycle_prediction:
+    model_type: "tensorflow"
+    endpoint: "/lifecycle-predict"
+    performance_thresholds:
+      accuracy_percent: 88
+      inference_time_ms: 150
+      
+  tier_recommendation:
+    model_type: "tensorflow"
+    endpoint: "/recommend"
+    performance_thresholds:
+      accuracy_percent: 91
+      inference_time_ms: 80
+
+# Load testing configuration
+load_testing:
+  concurrent_users: 100
+  test_duration_seconds: 300
+  ramp_up_seconds: 60
+  data_size_ranges:
+    small: "1MB-10MB"
+    medium: "10MB-100MB"
+    large: "100MB-1GB"
+    
+# Financial data simulation
+financial_data:
+  trading_data:
+    volume_gb_per_hour: 50
+    retention_days: 90
+    access_pattern: "high_frequency"
+    compliance_requirements: ["MiFID II", "FINRA"]
+    
+  market_data:
+    volume_gb_per_hour: 25
+    retention_days: 365
+    access_pattern: "real_time"
+    compliance_requirements: ["GDPR", "SEC"]
+    
+  regulatory_data:
+    volume_gb_per_hour: 10
+    retention_days: 2555  # 7 years
+    access_pattern: "archive"
+    compliance_requirements: ["SOX", "Basel III"]
+    
+  risk_data:
+    volume_gb_per_hour: 15
+    retention_days: 1825  # 5 years
+    access_pattern: "periodic"
+    compliance_requirements: ["Basel III", "CCAR"]
+
+# Storage tier configuration for testing
+storage_tiers:
+  hot:
+    cost_per_gb_month: 0.25
+    access_time_ms: 1
+    throughput_mbps: 1000
+    availability_percent: 99.99
+    
+  warm:
+    cost_per_gb_month: 0.15
+    access_time_ms: 50
+    throughput_mbps: 500
+    availability_percent: 99.9
+    
+  cold:
+    cost_per_gb_month: 0.05
+    access_time_ms: 1000
+    throughput_mbps: 100
+    availability_percent: 99.5
+    
+  archive:
+    cost_per_gb_month: 0.01
+    access_time_ms: 12000  # 12 seconds
+    throughput_mbps: 50
+    availability_percent: 99.0
+
+# Compliance testing requirements
+compliance_requirements:
+  sox:
+    retention_years: 7
+    encryption_required: true
+    audit_trail_required: true
+    immutable_storage: true
+    
+  gdpr:
+    retention_max_years: 6
+    right_to_erasure: true
+    data_portability: true
+    consent_tracking: true
+    
+  mifid_ii:
+    retention_years: 5
+    transaction_reporting: true
+    best_execution_reporting: true
+    systematic_internaliser_reporting: true
+    
+  basel_iii:
+    retention_years: 5
+    stress_testing_data: true
+    liquidity_coverage_ratio: true
+    capital_adequacy_reporting: true
+
+# Performance benchmarks
+performance_benchmarks:
+  throughput:
+    ingestion_gb_per_hour: 100
+    query_operations_per_second: 10000
+    backup_speed_mbps: 500
+    
+  latency:
+    tier_decision_ms: 100
+    data_retrieval_ms: 250
+    compression_operation_ms: 500
+    
+  availability:
+    service_uptime_percent: 99.9
+    data_durability_percent: 99.999999999  # 11 9's
+    
+  scalability:
+    max_concurrent_operations: 10000
+    auto_scaling_response_time_seconds: 30
+    horizontal_scaling_max_replicas: 20
+
+# Monitoring and alerting thresholds
+monitoring:
+  cpu_usage_threshold_percent: 80
+  memory_usage_threshold_percent: 85
+  disk_usage_threshold_percent: 90
+  network_latency_threshold_ms: 100
+  error_rate_threshold_percent: 1
+
+# Test data generation
+test_data:
+  synthetic_data_size_gb: 10
+  file_size_distributions:
+    - size_range: "1KB-1MB"
+      percentage: 60
+    - size_range: "1MB-10MB" 
+      percentage: 30
+    - size_range: "10MB-100MB"
+      percentage: 8
+    - size_range: "100MB-1GB"
+      percentage: 2
+      
+# Integration testing
+integration_tests:
+  cross_module_communication: true
+  data_flow_validation: true
+  error_handling_resilience: true
+  disaster_recovery_simulation: true
+  
+# Security testing
+security_tests:
+  encryption_at_rest: true
+  encryption_in_transit: true
+  access_control_validation: true
+  audit_logging_verification: true
+  vulnerability_scanning: true
+
+# Report generation
+reporting:
+  output_format: "json"
+  include_detailed_logs: true
+  generate_performance_charts: true
+  export_metrics_to_prometheus: true
+  slack_notifications: false
+  email_notifications: false

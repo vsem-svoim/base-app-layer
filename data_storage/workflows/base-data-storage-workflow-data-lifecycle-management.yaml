@@ -1,0 +1,52 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-storage-workflow-data-lifecycle-management
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: data-lifecycle-management-workflow
+    base.io/category: data_storage
+    base.io/type: workflow
+    base.io/function: data-lifecycle-management
+spec:
+  steps:
+    - name: "workflow_initialization"
+      agent: "data-lifecycle-manager"
+      action: "initialize_data_lifecycle_management"
+      timeout: "5m"
+      dependencies: []
+      
+    - name: "execution_phase"
+      agent: "data-lifecycle-manager"
+      action: "execute_data_lifecycle_management"
+      timeout: "30m"
+      retry_attempts: 3
+      dependencies: ["workflow_initialization"]
+      
+    - name: "validation_phase"
+      agent: "data-lifecycle-manager"
+      action: "validate_data_lifecycle_management"
+      timeout: "10m"
+      dependencies: ["execution_phase"]
+      
+    - name: "completion_notification"
+      agent: "external"
+      service: "base-event-coordinator"
+      action: "notify_data_lifecycle_management_completed"
+      timeout: "2m"
+      dependencies: ["validation_phase"]
+      
+  triggers:
+    schedule:
+      cron: "0 3 * * *"  # Daily at 3 AM
+      timezone: "UTC"
+    event:
+      - "data_lifecycle_management_requested"
+      - "compliance_audit_scheduled"
+      
+  dependencies:
+    external_services:
+      - "base-event-coordinator"
+    infrastructure:
+      - "storage_systems"
+      - "backup_infrastructure"

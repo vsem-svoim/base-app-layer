@@ -2,13 +2,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- base-data-quality-model-consistency-check.yaml
-- base-data-quality-model-duplicate-matching.yaml
-- base-data-quality-model-outlier-detection.yaml
+- base-data-quality-model-completeness-prediction.yaml
+- base-data-quality-model-accuracy-assessment.yaml
+- base-data-quality-model-anomaly-detection.yaml
 - base-data-quality-model-quality-scoring.yaml
-- base-data-quality-model-schema-validation.yaml
+- base-data-quality-model-regulatory-compliance.yaml
 
-labels:
-- includeSelectors: true
-  pairs:
-    app.kubernetes.io/part-of: base-platform
+commonLabels:
+  app.kubernetes.io/component: quality
+  base.io/category: data_quality
+  base.io/type: model

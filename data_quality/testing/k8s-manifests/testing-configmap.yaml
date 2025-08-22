@@ -1,0 +1,349 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-data-quality-testing-config
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: data-quality-testing
+    app.kubernetes.io/component: configuration
+    app.kubernetes.io/part-of: base-platform
+    app.kubernetes.io/version: "1.0.0"
+    base.platform/module: data-quality
+    base.platform/layer: testing
+data:
+  # Testing Configuration
+  testing-config.yaml: |
+    # Data Quality Testing Configuration
+    testing:
+      namespace: "base-data-quality"
+      test_execution_timeout: "3600s"
+      concurrent_test_limit: 10
+      retry_attempts: 3
+      
+    # Agent Testing Parameters
+    agents:
+      test_endpoints:
+        data_validator: "http://base-data-quality-agent-data-validator:8080"
+        quality_assessor: "http://base-data-quality-agent-quality-assessor:8080"
+        rule_enforcer: "http://base-data-quality-agent-rule-enforcer:8080"
+        anomaly_detector: "http://base-data-quality-agent-anomaly-detector:8080"
+        compliance_monitor: "http://base-data-quality-agent-compliance-monitor:8080"
+        quality_reporter: "http://base-data-quality-agent-quality-reporter:8080"
+      
+      performance_thresholds:
+        max_response_time: "500ms"
+        min_throughput: "10k_records/second"
+        max_error_rate: "0.1%"
+        min_availability: "99.9%"
+    
+    # ML Model Testing Parameters
+    models:
+      test_endpoints:
+        completeness_prediction: "http://base-data-quality-model-completeness-prediction:8080/predict"
+        accuracy_assessment: "http://base-data-quality-model-accuracy-assessment:8080/predict"
+        anomaly_detection: "http://base-data-quality-model-anomaly-detection:8080/predict"
+        quality_scoring: "http://base-data-quality-model-quality-scoring:8080/predict"
+        regulatory_compliance: "http://base-data-quality-model-regulatory-compliance:8080/predict"
+      
+      model_performance_requirements:
+        min_accuracy: 0.90
+        max_inference_time: "100ms"
+        max_memory_usage: "512MB"
+        min_throughput: "1k_predictions/second"
+    
+    # Workflow Testing Parameters
+    workflows:
+      test_workflows:
+        - name: "comprehensive-validation-test"
+          workflow_type: "comprehensive_validation_workflow"
+          test_data_size: 1000
+          expected_duration: "5min"
+        - name: "real-time-assessment-test"
+          workflow_type: "real_time_assessment_workflow"
+          test_data_rate: "1k_records/second"
+          test_duration: "10min"
+        - name: "regulatory-compliance-test"
+          workflow_type: "regulatory_compliance_workflow"
+          compliance_frameworks: ["SOX", "FINRA"]
+          expected_score: "100%"
+    
+    # Load Testing Parameters
+    load_testing:
+      scenarios:
+        light_load:
+          concurrent_users: 50
+          requests_per_second: 100
+          duration: "5min"
+        moderate_load:
+          concurrent_users: 200
+          requests_per_second: 500
+          duration: "10min"
+        heavy_load:
+          concurrent_users: 500
+          requests_per_second: 1000
+          duration: "15min"
+      
+      performance_targets:
+        max_response_time_p95: "1s"
+        min_success_rate: "99%"
+        max_error_rate: "1%"
+    
+    # Quality Metrics Testing
+    quality_metrics:
+      test_dimensions:
+        - completeness
+        - accuracy
+        - consistency
+        - timeliness
+        - validity
+      
+      metric_thresholds:
+        completeness_threshold: 0.95
+        accuracy_threshold: 0.98
+        consistency_threshold: 0.96
+        timeliness_threshold: 0.99
+        validity_threshold: 0.97
+    
+    # Compliance Testing
+    compliance:
+      frameworks:
+        - name: "SOX"
+          requirements: ["financial_reporting", "internal_controls", "audit_trails"]
+        - name: "GDPR"
+          requirements: ["data_encryption", "consent_management", "retention_policies"]
+        - name: "FINRA"
+          requirements: ["trade_surveillance", "market_data_validation", "reporting"]
+      
+      compliance_targets:
+        sox_compliance_score: "100%"
+        gdpr_compliance_score: "100%"
+        finra_compliance_score: "100%"
+
+  # Test Data Samples
+  sample-financial-data.json: |
+    {
+      "market_data": {
+        "equities": [
+          {
+            "symbol": "AAPL",
+            "price": 150.25,
+            "volume": 1000000,
+            "timestamp": "2024-01-15T09:30:00Z",
+            "market": "NASDAQ"
+          },
+          {
+            "symbol": "GOOGL",
+            "price": 2800.50,
+            "volume": 500000,
+            "timestamp": "2024-01-15T09:30:00Z",
+            "market": "NASDAQ"
+          }
+        ],
+        "bonds": [
+          {
+            "isin": "US912828XG55",
+            "price": 98.75,
+            "yield": 4.25,
+            "maturity": "2034-02-15",
+            "rating": "AAA"
+          }
+        ]
+      },
+      "test_scenarios": {
+        "data_quality_issues": [
+          {
+            "issue_type": "missing_data",
+            "field": "volume",
+            "frequency": "5%"
+          },
+          {
+            "issue_type": "outlier",
+            "field": "price",
+            "threshold": "3_standard_deviations"
+          }
+        ]
+      }
+    }
+
+  # Quality Rules Configuration
+  quality-rules.yaml: |
+    validation_rules:
+      price_validation:
+        - rule: "price > 0"
+          severity: "critical"
+          action: "reject"
+        - rule: "price < max_daily_price * 1.2"
+          severity: "warning"
+          action: "flag"
+      
+      volume_validation:
+        - rule: "volume >= 0"
+          severity: "critical"
+          action: "reject"
+        - rule: "volume < average_volume * 10"
+          severity: "warning"
+          action: "flag"
+      
+      timestamp_validation:
+        - rule: "timestamp is not null"
+          severity: "critical"
+          action: "reject"
+        - rule: "timestamp within market_hours"
+          severity: "warning"
+          action: "flag"
+    
+    quality_thresholds:
+      completeness:
+        critical_fields: 98%
+        important_fields: 95%
+        optional_fields: 90%
+      
+      accuracy:
+        price_accuracy: 99.9%
+        volume_accuracy: 99%
+        reference_data_accuracy: 100%
+      
+      timeliness:
+        real_time_data: "< 100ms"
+        batch_data: "< 1hour"
+        reference_data: "< 1day"
+
+  # Performance Benchmarks
+  performance-benchmarks.yaml: |
+    performance_targets:
+      validation_throughput:
+        target: "50k_records/second"
+        minimum: "30k_records/second"
+      
+      quality_assessment_latency:
+        target: "200ms"
+        maximum: "500ms"
+      
+      anomaly_detection_latency:
+        target: "100ms"
+        maximum: "300ms"
+      
+      compliance_check_time:
+        target: "1s"
+        maximum: "5s"
+    
+    resource_utilization:
+      cpu_target: "70%"
+      cpu_maximum: "85%"
+      memory_target: "60%"
+      memory_maximum: "80%"
+    
+    scalability_targets:
+      horizontal_scaling:
+        min_replicas: 2
+        max_replicas: 10
+        scale_up_threshold: "80%_cpu"
+        scale_down_threshold: "30%_cpu"
+
+  # Test Execution Script
+  run-tests.sh: |
+    #!/bin/bash
+    
+    # Data Quality Testing Execution Script
+    set -euo pipefail
+    
+    NAMESPACE=${NAMESPACE:-"base-data-quality"}
+    TEST_TYPE=${TEST_TYPE:-"comprehensive"}
+    
+    echo "Starting Data Quality Testing in namespace: $NAMESPACE"
+    echo "Test Type: $TEST_TYPE"
+    
+    # Set up test environment
+    echo "Setting up test environment..."
+    kubectl config set-context --current --namespace=$NAMESPACE
+    
+    # Run capability tests
+    if [[ "$TEST_TYPE" == "comprehensive" || "$TEST_TYPE" == "capability" ]]; then
+      echo "Running capability tests..."
+      python3 /testing/scripts/capability_tester.py
+    fi
+    
+    # Run Kubernetes integration tests
+    if [[ "$TEST_TYPE" == "comprehensive" || "$TEST_TYPE" == "k8s" ]]; then
+      echo "Running Kubernetes integration tests..."
+      python3 /testing/scripts/kubernetes-integration-tester.py
+    fi
+    
+    # Run performance tests
+    if [[ "$TEST_TYPE" == "comprehensive" || "$TEST_TYPE" == "performance" ]]; then
+      echo "Running performance tests..."
+      python3 /testing/scripts/performance_tester.py
+    fi
+    
+    # Generate test report
+    echo "Generating comprehensive test report..."
+    python3 /testing/scripts/generate_report.py
+    
+    echo "Data Quality testing completed successfully!"
+
+  # Monitoring and Alerting Configuration
+  monitoring-config.yaml: |
+    monitoring:
+      metrics_collection:
+        enabled: true
+        interval: "30s"
+        retention: "7d"
+      
+      quality_metrics:
+        - name: "data_completeness"
+          type: "gauge"
+          description: "Data completeness percentage"
+        - name: "validation_throughput"
+          type: "counter"
+          description: "Number of records validated per second"
+        - name: "anomaly_detection_rate"
+          type: "gauge"
+          description: "Rate of anomalies detected"
+        - name: "compliance_score"
+          type: "gauge"
+          description: "Overall compliance score"
+      
+      alerts:
+        - name: "quality_degradation"
+          condition: "data_completeness < 95"
+          severity: "warning"
+          notification: ["slack", "email"]
+        - name: "validation_failure"
+          condition: "validation_error_rate > 5"
+          severity: "critical"
+          notification: ["pagerduty", "slack"]
+
+  # Environment Configuration
+  env-config.properties: |
+    # Environment Configuration for Data Quality Testing
+    
+    # Database Configuration
+    DB_HOST=postgresql.base-data-quality.svc.cluster.local
+    DB_PORT=5432
+    DB_NAME=data_quality_test
+    DB_USER=quality_tester
+    
+    # Redis Configuration
+    REDIS_HOST=redis.base-data-quality.svc.cluster.local
+    REDIS_PORT=6379
+    
+    # Kafka Configuration
+    KAFKA_BROKERS=kafka.base-data-quality.svc.cluster.local:9092
+    
+    # Monitoring Configuration
+    PROMETHEUS_URL=http://prometheus.monitoring.svc.cluster.local:9090
+    GRAFANA_URL=http://grafana.monitoring.svc.cluster.local:3000
+    
+    # External Services
+    BLOOMBERG_API_URL=https://api.bloomberg.com
+    REUTERS_API_URL=https://api.reuters.com
+    
+    # Testing Configuration
+    TEST_TIMEOUT=3600
+    MAX_CONCURRENT_TESTS=10
+    TEST_RETRY_COUNT=3
+    
+    # Quality Thresholds
+    MIN_DATA_COMPLETENESS=0.95
+    MAX_VALIDATION_LATENCY=500
+    MIN_ACCURACY_SCORE=0.98

@@ -2,13 +2,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- base-data-storage-workflow-automated-archiving.yaml
-- base-data-storage-workflow-cross-region-replication.yaml
-- base-data-storage-workflow-index-optimization.yaml
-- base-data-storage-workflow-intelligent-partitioning.yaml
-- base-data-storage-workflow-storage-lifecycle.yaml
+- base-data-storage-workflow-intelligent-tiering.yaml
+- base-data-storage-workflow-automated-backup.yaml
+- base-data-storage-workflow-data-lifecycle-management.yaml
+- base-data-storage-workflow-performance-optimization.yaml
+- base-data-storage-workflow-compliance-archival.yaml
 
-labels:
-- includeSelectors: true
-  pairs:
-    app.kubernetes.io/part-of: base-platform
+commonLabels:
+  app.kubernetes.io/component: storage
+  base.io/category: data_storage
+  base.io/type: workflow

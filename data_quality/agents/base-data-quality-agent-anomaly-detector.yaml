@@ -1,0 +1,640 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-anomaly-detector-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-quality-agent-anomaly-detector
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: agent
+    base.io/function: anomaly-detector
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-anomaly-detector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-anomaly-detector
+        app.kubernetes.io/component: quality
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_quality
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-anomaly-detector-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: anomaly-detector
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Quality Anomaly Detector Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: ANOMALY_DETECTION_BATCH_SIZE
+          value: "20000"
+        - name: ML_MODEL_CONFIDENCE_THRESHOLD
+          value: "0.95"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-anomaly-detector-config
+      - name: secrets-volume
+        secret:
+          secretName: base-anomaly-detector-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-anomaly-detector-service
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+    app.kubernetes.io/component: quality
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-anomaly-detector
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-anomaly-detector-config
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+    app.kubernetes.io/component: quality
+data:
+  detector.yaml: |
+    # Anomaly Detector Agent Configuration
+    detector:
+      # Agent Identity and Responsibility
+      name: "base-anomaly-detector"
+      version: "v2.5.0"
+      responsibility: "Advanced ML-powered anomaly detection with real-time pattern analysis and financial market awareness"
+      
+      # Anomaly Detection Capabilities
+      capabilities:
+        detection_types:
+          - "statistical_outliers"
+          - "temporal_anomalies"
+          - "pattern_deviations"
+          - "contextual_anomalies"
+          - "collective_anomalies"
+          - "behavioral_anomalies"
+        ml_algorithms:
+          - "isolation_forest"
+          - "one_class_svm"
+          - "autoencoder_neural_network"
+          - "lstm_time_series"
+          - "gaussian_mixture_model"
+          - "local_outlier_factor"
+          - "dbscan_clustering"
+        detection_granularity:
+          - "field_level_anomalies"
+          - "record_level_anomalies"
+          - "batch_level_anomalies"
+          - "stream_level_anomalies"
+          - "cross_system_anomalies"
+        max_concurrent_detections: 1000
+        throughput_target: "100000 anomaly_checks/minute"
+        
+      # Financial Market Anomaly Detection
+      financial_anomalies:
+        market_data_anomalies:
+          price_anomalies:
+            sudden_price_jumps:
+              threshold: "3_standard_deviations"
+              time_window: "5_minutes"
+              detection_algorithm: "isolation_forest"
+            stale_price_detection:
+              max_age: "30_seconds"
+              price_change_threshold: 0.0001
+              volume_correlation: true
+            bid_ask_spread_anomalies:
+              spread_threshold: "10x_historical_average"
+              market_conditions_context: true
+          volume_anomalies:
+            unusual_trading_volume:
+              threshold: "5_standard_deviations"
+              historical_window: "30_days"
+              algorithm: "seasonal_decomposition"
+            zero_volume_detection:
+              trading_hours_only: true
+              instrument_activity_context: true
+        trade_data_anomalies:
+          trade_timing_anomalies:
+            after_hours_trading:
+              market_hours_validation: true
+              instrument_specific_rules: true
+            settlement_date_anomalies:
+              business_days_only: true
+              currency_specific_cycles: true
+          counterparty_anomalies:
+            new_counterparty_detection:
+              risk_assessment: true
+              due_diligence_check: true
+            concentration_risk:
+              exposure_threshold: "portfolio_percentage"
+              correlation_analysis: true
+        reference_data_anomalies:
+          corporate_action_impact:
+            dividend_date_consistency: true
+            split_ratio_validation: true
+          identifier_mapping_inconsistencies:
+            cross_reference_validation: true
+            historical_mapping_consistency: true
+            
+      # ML Model Configuration
+      ml_models:
+        isolation_forest:
+          contamination: 0.1
+          n_estimators: 200
+          max_samples: "auto"
+          random_state: 42
+          retraining_frequency: "weekly"
+        autoencoder:
+          architecture: [128, 64, 32, 16, 32, 64, 128]
+          activation: "relu"
+          optimizer: "adam"
+          learning_rate: 0.001
+          epochs: 100
+          batch_size: 256
+          reconstruction_threshold: 0.05
+        lstm_time_series:
+          sequence_length: 100
+          hidden_units: 64
+          dropout_rate: 0.2
+          lookback_window: "7_days"
+          forecast_horizon: "1_hour"
+        one_class_svm:
+          kernel: "rbf"
+          gamma: "scale"
+          nu: 0.1
+          cache_size: 500
+        gaussian_mixture:
+          n_components: 5
+          covariance_type: "full"
+          max_iterations: 100
+          convergence_tolerance: 1e-3
+          
+      # Anomaly Scoring and Classification
+      scoring:
+        anomaly_score_calculation:
+          ensemble_method: "weighted_average"
+          model_weights:
+            isolation_forest: 0.3
+            autoencoder: 0.25
+            lstm: 0.2
+            one_class_svm: 0.15
+            gaussian_mixture: 0.1
+          confidence_thresholds:
+            critical: 0.95
+            high: 0.85
+            medium: 0.70
+            low: 0.50
+        severity_classification:
+          critical_anomalies:
+            score_threshold: 0.95
+            immediate_alert: true
+            automatic_quarantine: true
+          high_severity:
+            score_threshold: 0.85
+            escalation_required: true
+            enhanced_monitoring: true
+          medium_severity:
+            score_threshold: 0.70
+            investigation_recommended: true
+            logging_enhanced: true
+          low_severity:
+            score_threshold: 0.50
+            monitoring_only: true
+            
+      # Real-time Stream Processing
+      stream_processing:
+        kafka_integration:
+          consumer_group: "anomaly-detector-group"
+          topics:
+            - "market-data-stream"
+            - "trade-data-stream"
+            - "reference-data-updates"
+          batch_size: 1000
+          poll_timeout: 5000
+        processing_windows:
+          sliding_window: "5_minutes"
+          tumbling_window: "1_hour"
+          session_window: "30_minutes"
+        real_time_algorithms:
+          - "sliding_window_isolation_forest"
+          - "incremental_clustering"
+          - "online_one_class_svm"
+          
+      # Performance and Resource Management  
+      performance:
+        worker_threads: 20
+        memory_limit: "8Gi"
+        temp_storage: "20Gi"
+        batch_processing:
+          batch_size: 20000
+          parallel_batches: 10
+          timeout: "15 minutes"
+        model_optimization:
+          model_caching: true
+          prediction_caching: true
+          feature_preprocessing_cache: true
+        gpu_acceleration:
+          enabled: false  # Set to true if GPU nodes available
+          device_type: "cuda"
+          memory_fraction: 0.8
+        monitoring:
+          metrics_interval: 30s
+          health_check_interval: 10s
+          
+      # Integration Points
+      integration:
+        upstream:
+          service: "base-rule-enforcer"
+          endpoint: "/anomalies/detected"
+          format: "anomaly_enriched_data"
+        downstream:
+          service: "base-quality-monitoring" 
+          endpoint: "/anomalies/alerts"
+          format: "anomaly_alert_data"
+        ml_models:
+          isolation_forest_model: "http://base-data-quality-model-isolation:8501"
+          autoencoder_model: "http://base-data-quality-model-autoencoder:8501"
+          lstm_model: "http://base-data-quality-model-lstm:8501"
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "anomaly_detection_started"
+            - "critical_anomaly_detected"
+            - "anomaly_pattern_identified"
+            - "anomaly_cluster_discovered"
+        security:
+          service: "base-data-security"
+          encryption: "AES-256"
+          audit_logging: true
+          
+      # Error Handling and Resilience
+      error_handling:
+        retry_policy:
+          max_attempts: 3
+          backoff: exponential
+          base_delay: 1s
+          max_delay: 30s
+        circuit_breaker:
+          failure_threshold: 5
+          timeout: 30s
+          half_open_requests: 3
+        model_fallback:
+          enabled: true
+          fallback_algorithm: "statistical_z_score"
+          fallback_threshold: 3.0
+          
+      # Historical Analysis and Learning
+      historical_analysis:
+        baseline_establishment:
+          historical_window: "90_days"
+          seasonality_detection: true
+          trend_analysis: true
+          regime_change_detection: true
+        concept_drift_detection:
+          drift_detection_algorithm: "page_hinkley"
+          sensitivity: 0.05
+          min_samples: 1000
+          adaptation_strategy: "retrain_model"
+        feedback_loop:
+          false_positive_learning: true
+          analyst_feedback_integration: true
+          model_improvement_tracking: true
+          
+      # Alert Management
+      alerting:
+        alert_channels:
+          - "real_time_dashboard"
+          - "email_notifications"
+          - "slack_integration"
+          - "sms_critical_alerts"
+          - "webhook_notifications"
+        alert_aggregation:
+          time_window: "5_minutes"
+          similarity_threshold: 0.8
+          max_alerts_per_window: 10
+        escalation_rules:
+          level_1: "operations_team"
+          level_2: "data_quality_manager"
+          level_3: "chief_data_officer"
+          level_4: "executive_leadership"
+          
+      # Regulatory and Compliance
+      regulatory_compliance:
+        market_abuse_detection:
+          insider_trading_patterns: true
+          market_manipulation_detection: true
+          spoofing_algorithm_detection: true
+        transaction_monitoring:
+          suspicious_activity_reporting: true
+          aml_pattern_detection: true
+          unusual_transaction_flagging: true
+        regulatory_reporting:
+          mifid_ii_reporting: true
+          mar_compliance: true
+          systematic_internaliser_monitoring: true
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "anomaly_detection_rate"
+          type: "counter"
+          description: "Rate of anomaly detection operations"
+        - name: "anomaly_detection_duration"  
+          type: "histogram"
+          description: "Time taken for anomaly detection"
+        - name: "anomaly_score_distribution"
+          type: "histogram"
+          description: "Distribution of anomaly scores"
+        - name: "critical_anomalies_detected"
+          type: "counter" 
+          description: "Number of critical anomalies detected"
+        - name: "model_accuracy"
+          type: "gauge"
+          description: "ML model accuracy metrics"
+        - name: "false_positive_rate"
+          type: "gauge"
+          description: "False positive rate of anomaly detection"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-anomaly-detector-hpa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-quality-agent-anomaly-detector
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: anomaly_detection_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "100"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-anomaly-detector-netpol
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-anomaly-detector
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality-monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: base-event-coordination
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-streaming
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9092  # Kafka
+  - {} # Allow external ML model APIs and market data feeds
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-anomaly-detector-secrets
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-anomaly-detector
+type: Opaque
+stringData:
+  # ML Model API credentials
+  ml_services.yaml: |
+    model_services:
+      tensorflow_serving:
+        url: "http://tensorflow-serving:8501"
+        models:
+          - "isolation_forest"
+          - "autoencoder_anomaly"
+          - "lstm_time_series"
+      mlflow_tracking:
+        url: "http://mlflow-tracking:5000"
+        token: "${MLFLOW_TRACKING_TOKEN}"
+      kubeflow_pipelines:
+        url: "http://kubeflow-pipelines:8080"
+        token: "${KUBEFLOW_TOKEN}"
+        
+  # Real-time Data Stream credentials
+  streaming_services.yaml: |
+    kafka:
+      bootstrap_servers: "${KAFKA_BOOTSTRAP_SERVERS}"
+      security_protocol: "SASL_SSL"
+      sasl_mechanism: "PLAIN"
+      sasl_username: "${KAFKA_USERNAME}"
+      sasl_password: "${KAFKA_PASSWORD}"
+    redis_streams:
+      host: "${REDIS_HOST}"
+      port: "${REDIS_PORT}"
+      password: "${REDIS_PASSWORD}"
+      
+  # Database Connection Strings
+  db_connections.yaml: |
+    databases:
+      timescaledb_anomalies:
+        host: "${TIMESCALE_HOST}"
+        port: "${TIMESCALE_PORT}"
+        database: "${TIMESCALE_DB}"
+        username: "${TIMESCALE_USER}"
+        password: "${TIMESCALE_PASSWORD}"
+        ssl_mode: "require"
+      elasticsearch_anomalies:
+        hosts: ["${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}"]
+        username: "${ELASTICSEARCH_USER}"
+        password: "${ELASTICSEARCH_PASSWORD}"
+        
+  # External Market Data APIs
+  market_data_apis.yaml: |
+    market_data_providers:
+      bloomberg:
+        api_key: "${BLOOMBERG_API_KEY}"
+        secret: "${BLOOMBERG_API_SECRET}"
+        real_time_endpoint: "https://api.bloomberg.com/v1/real-time"
+      refinitiv:
+        token: "${REFINITIV_API_TOKEN}"
+        real_time_endpoint: "https://api.refinitiv.com/streaming/pricing"
+      alpha_vantage:
+        api_key: "${ALPHA_VANTAGE_API_KEY}"
+        endpoint: "https://www.alphavantage.co/query"

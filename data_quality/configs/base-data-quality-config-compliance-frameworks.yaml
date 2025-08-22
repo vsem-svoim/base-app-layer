@@ -1,0 +1,537 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-quality-compliance-frameworks
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: compliance-frameworks
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: config
+    base.io/function: compliance-frameworks
+spec:
+  configType: "compliance-frameworks"
+  data:
+    # Global Regulatory Frameworks
+    regulatory_frameworks:
+      # United States Regulations
+      us_regulations:
+        sox_compliance:
+          framework_id: "US_SOX_404"
+          name: "Sarbanes-Oxley Act Section 404"
+          jurisdiction: "united_states"
+          regulatory_body: "SEC"
+          effective_date: "2004-07-15"
+          last_updated: "2023-06-01"
+          compliance_level: "mandatory"
+          scope: "public_companies"
+          
+          # Data Quality Requirements
+          data_quality_requirements:
+            data_integrity:
+              requirement_id: "SOX_DI_001"
+              description: "Maintain complete audit trail of all financial data changes"
+              validation_rules:
+                - "All data modifications must be logged with user ID and timestamp"
+                - "Data changes must be approved by authorized personnel"
+                - "Segregation of duties must be enforced in data processing"
+              data_retention: "7_years"
+              
+            change_management:
+              requirement_id: "SOX_CM_001"
+              description: "All data processing changes must follow formal change control"
+              validation_rules:
+                - "Change requests must be documented and approved"
+                - "Testing evidence must be maintained"
+                - "Production deployments must be authorized"
+              documentation_requirements:
+                - "change_request_form"
+                - "impact_assessment"
+                - "test_results"
+                - "approval_records"
+                
+            access_controls:
+              requirement_id: "SOX_AC_001"
+              description: "Data access must be properly controlled and monitored"
+              validation_rules:
+                - "Principle of least privilege enforced"
+                - "Regular access reviews conducted"
+                - "Privileged access monitoring in place"
+              monitoring_frequency: "quarterly"
+              
+          # Control Testing
+          control_testing:
+            frequency: "quarterly"
+            sample_size: "statistical_sample"
+            testing_procedures:
+              - "walkthrough_testing"
+              - "design_effectiveness_testing"
+              - "operating_effectiveness_testing"
+            documentation_requirements:
+              - "test_procedures"
+              - "test_results"
+              - "deficiency_identification"
+              - "remediation_plans"
+              
+        finra_compliance:
+          framework_id: "US_FINRA_4511"
+          name: "FINRA Rule 4511 - General Requirements"
+          jurisdiction: "united_states"
+          regulatory_body: "FINRA"
+          effective_date: "2011-12-05"
+          last_updated: "2023-01-15"
+          compliance_level: "mandatory"
+          scope: "broker_dealers"
+          
+          data_quality_requirements:
+            record_keeping:
+              requirement_id: "FINRA_RK_001"
+              description: "Maintain accurate and complete books and records"
+              validation_rules:
+                - "All transactions must be recorded accurately"
+                - "Customer information must be current and complete"
+                - "Trade confirmations must be accurate and timely"
+              data_retention: "3_years_readily_accessible_plus_3_years_storage"
+              
+            trade_reporting:
+              requirement_id: "FINRA_TR_001"
+              description: "Accurate and timely trade reporting to FINRA systems"
+              validation_rules:
+                - "Trades reported within required timeframes"
+                - "All required trade details included"
+                - "Error corrections submitted promptly"
+              reporting_deadline: "T+1_by_6:30_PM_ET"
+              
+        cftc_compliance:
+          framework_id: "US_CFTC_45"
+          name: "CFTC Part 45 - Swap Data Reporting"
+          jurisdiction: "united_states"
+          regulatory_body: "CFTC"
+          effective_date: "2012-12-31"
+          last_updated: "2022-11-14"
+          compliance_level: "mandatory"
+          scope: "swap_dealers"
+          
+          data_quality_requirements:
+            swap_data_reporting:
+              requirement_id: "CFTC_SDR_001"
+              description: "Accurate swap transaction and valuation reporting"
+              validation_rules:
+                - "All swap data elements must be complete and accurate"
+                - "Lifecycle events must be reported timely"
+                - "Valuation data must be current and reliable"
+              reporting_frequency: "daily"
+              data_quality_threshold: "99.0%"
+              
+      # European Union Regulations
+      eu_regulations:
+        mifid_ii:
+          framework_id: "EU_MIFID_II"
+          name: "Markets in Financial Instruments Directive II"
+          jurisdiction: "european_union"
+          regulatory_body: "ESMA"
+          effective_date: "2018-01-03"
+          last_updated: "2023-03-28"
+          compliance_level: "mandatory"
+          scope: "investment_firms"
+          
+          data_quality_requirements:
+            transaction_reporting:
+              requirement_id: "MIFID_TR_001"
+              description: "Comprehensive transaction reporting to competent authorities"
+              validation_rules:
+                - "All reportable transactions must include required fields"
+                - "Data quality checks must be performed before submission"
+                - "Corrections must be submitted within 1 business day"
+              required_fields:
+                - "trading_venue"
+                - "instrument_identification"
+                - "buyer_seller_identification"
+                - "transmission_of_order_indicator"
+                - "price"
+                - "quantity"
+                - "trading_date_time"
+              data_quality_threshold: "99.5%"
+              
+            best_execution:
+              requirement_id: "MIFID_BE_001"
+              description: "Demonstrate best execution through quality data"
+              validation_rules:
+                - "Execution venue data must be complete and accurate"
+                - "Price improvement analysis requires quality price data"
+                - "Client order handling data must be comprehensive"
+              monitoring_frequency: "continuous"
+              
+        gdpr:
+          framework_id: "EU_GDPR"
+          name: "General Data Protection Regulation"
+          jurisdiction: "european_union"
+          regulatory_body: "European Commission"
+          effective_date: "2018-05-25"
+          last_updated: "2022-06-21"
+          compliance_level: "mandatory"
+          scope: "all_entities_processing_personal_data"
+          
+          data_quality_requirements:
+            data_accuracy:
+              requirement_id: "GDPR_DA_001"
+              description: "Personal data must be accurate and kept up to date"
+              validation_rules:
+                - "Inaccurate personal data must be erased or rectified without delay"
+                - "Regular accuracy reviews must be conducted"
+                - "Data subjects have right to rectification"
+              accuracy_threshold: "99.9%"
+              
+            data_minimization:
+              requirement_id: "GDPR_DM_001"
+              description: "Personal data processing must be adequate, relevant, and limited"
+              validation_rules:
+                - "Only necessary personal data should be processed"
+                - "Purpose limitation must be enforced"
+                - "Storage limitation must be respected"
+              regular_reviews: "annual"
+              
+            consent_management:
+              requirement_id: "GDPR_CM_001"
+              description: "Consent records must be accurate and demonstrable"
+              validation_rules:
+                - "Consent records must be complete and unambiguous"
+                - "Withdrawal of consent must be processed immediately"
+                - "Consent audit trail must be maintained"
+              
+        emir:
+          framework_id: "EU_EMIR"
+          name: "European Market Infrastructure Regulation"
+          jurisdiction: "european_union"
+          regulatory_body: "ESMA"
+          effective_date: "2012-08-16"
+          last_updated: "2023-01-02"
+          compliance_level: "mandatory"
+          scope: "derivatives_market_participants"
+          
+          data_quality_requirements:
+            derivatives_reporting:
+              requirement_id: "EMIR_DR_001"
+              description: "Accurate reporting of derivative contracts to trade repositories"
+              validation_rules:
+                - "All derivative contracts must be reported with complete data"
+                - "Lifecycle events must be reported accurately and timely"
+                - "Data reconciliation between counterparties required"
+              data_quality_threshold: "99.0%"
+              
+      # Asia-Pacific Regulations
+      apac_regulations:
+        jfsa_compliance:
+          framework_id: "JP_FIEA"
+          name: "Financial Instruments and Exchange Act"
+          jurisdiction: "japan"
+          regulatory_body: "JFSA"
+          effective_date: "2007-09-30"
+          last_updated: "2023-04-01"
+          compliance_level: "mandatory"
+          scope: "financial_institutions"
+          
+          data_quality_requirements:
+            trade_reporting:
+              requirement_id: "JFSA_TR_001"
+              description: "Accurate trade reporting and record keeping"
+              validation_rules:
+                - "All trades must be recorded with complete information"
+                - "Customer information must be accurate and current"
+                - "Risk management data must be reliable"
+              data_retention: "5_years"
+              
+        mas_compliance:
+          framework_id: "SG_SFA"
+          name: "Securities and Futures Act"
+          jurisdiction: "singapore"
+          regulatory_body: "MAS"
+          effective_date: "2002-07-01"
+          last_updated: "2023-02-15"
+          compliance_level: "mandatory"
+          scope: "capital_markets_intermediaries"
+          
+          data_quality_requirements:
+            client_asset_protection:
+              requirement_id: "MAS_CAP_001"
+              description: "Accurate segregation and recording of client assets"
+              validation_rules:
+                - "Client assets must be properly segregated and recorded"
+                - "Daily reconciliation of client money and assets"
+                - "Accurate reporting to MAS on client asset positions"
+              reconciliation_frequency: "daily"
+              
+    # Industry Standards and Best Practices
+    industry_standards:
+      # International Standards
+      iso_standards:
+        iso_8000:
+          standard_id: "ISO_8000"
+          name: "Data quality"
+          organization: "ISO"
+          latest_version: "ISO 8000-8:2015"
+          scope: "data_quality_management"
+          
+          data_quality_dimensions:
+            accuracy:
+              definition: "Data correctly represents the real-world entity"
+              measurement_methods:
+                - "data_profiling"
+                - "reference_data_validation"
+                - "cross_validation"
+              target_threshold: "99.5%"
+              
+            completeness:
+              definition: "All required data is present"
+              measurement_methods:
+                - "field_population_analysis"
+                - "record_completeness_check"
+                - "relationship_completeness_validation"
+              target_threshold: "99.0%"
+              
+            consistency:
+              definition: "Data is uniform across systems and time"
+              measurement_methods:
+                - "cross_system_comparison"
+                - "format_standardization_check"
+                - "referential_integrity_validation"
+              target_threshold: "98.5%"
+              
+            timeliness:
+              definition: "Data is available when needed"
+              measurement_methods:
+                - "data_age_analysis"
+                - "update_frequency_monitoring"
+                - "sla_compliance_tracking"
+              target_threshold: "99.0%"
+              
+            validity:
+              definition: "Data conforms to defined formats and ranges"
+              measurement_methods:
+                - "format_validation"
+                - "range_validation"
+                - "business_rule_validation"
+              target_threshold: "99.8%"
+              
+        iso_27001:
+          standard_id: "ISO_27001"
+          name: "Information security management"
+          organization: "ISO"
+          latest_version: "ISO/IEC 27001:2022"
+          scope: "information_security_management"
+          
+          data_security_controls:
+            access_control:
+              control_id: "A.9"
+              description: "Access to information and information processing facilities"
+              implementation_requirements:
+                - "Access control policy established"
+                - "User access management procedures"
+                - "System and application access control"
+              
+            cryptography:
+              control_id: "A.10"
+              description: "Cryptographic controls for data protection"
+              implementation_requirements:
+                - "Cryptographic controls policy"
+                - "Key management procedures"
+                - "Data encryption in transit and at rest"
+              
+      # Financial Industry Standards
+      financial_standards:
+        swift_standards:
+          standard_id: "SWIFT_MT"
+          name: "SWIFT Message Types"
+          organization: "SWIFT"
+          latest_version: "2023"
+          scope: "financial_messaging"
+          
+          message_quality_requirements:
+            format_compliance:
+              requirement: "All messages must conform to SWIFT MT format"
+              validation_rules:
+                - "Field format validation"
+                - "Message structure validation"
+                - "Mandatory field presence check"
+              error_tolerance: "0.01%"
+              
+            content_accuracy:
+              requirement: "Message content must be accurate and complete"
+              validation_rules:
+                - "Amount and currency validation"
+                - "Account number validation"
+                - "Reference number uniqueness"
+              accuracy_threshold: "99.99%"
+              
+        fis_standards:
+          standard_id: "FIS_DQM"
+          name: "Financial Data Quality Management"
+          organization: "FIS"
+          latest_version: "2023.1"
+          scope: "financial_data_management"
+          
+          quality_frameworks:
+            data_governance:
+              framework_components:
+                - "data_quality_council"
+                - "data_stewardship_program"
+                - "data_quality_metrics"
+                - "issue_management_process"
+              
+            operational_controls:
+              framework_components:
+                - "automated_validation_rules"
+                - "exception_handling_procedures"
+                - "quality_monitoring_dashboard"
+                - "remediation_workflows"
+              
+    # Compliance Monitoring and Reporting
+    compliance_monitoring:
+      # Automated Monitoring
+      automated_monitoring:
+        regulatory_rule_monitoring:
+          monitoring_frequency: "real_time"
+          alert_thresholds:
+            critical_violations: "immediate"
+            high_priority_violations: "within_15_minutes"
+            medium_priority_violations: "within_1_hour"
+          escalation_procedures:
+            level_1: "operations_team"
+            level_2: "compliance_officer"
+            level_3: "chief_risk_officer"
+            
+        data_quality_kpis:
+          accuracy_kpi:
+            measurement: "percentage_of_accurate_records"
+            target: "99.5%"
+            reporting_frequency: "daily"
+            
+          completeness_kpi:
+            measurement: "percentage_of_complete_records"
+            target: "99.0%"
+            reporting_frequency: "daily"
+            
+          timeliness_kpi:
+            measurement: "percentage_on_time_delivery"
+            target: "99.0%"
+            reporting_frequency: "hourly"
+            
+      # Regulatory Reporting
+      regulatory_reporting:
+        sox_reporting:
+          report_type: "quarterly_certification"
+          report_frequency: "quarterly"
+          required_content:
+            - "control_testing_results"
+            - "deficiency_identification"
+            - "remediation_status"
+            - "management_certification"
+          submission_deadline: "45_days_after_quarter_end"
+          
+        mifid_reporting:
+          report_type: "transaction_reporting"
+          report_frequency: "daily"
+          required_content:
+            - "all_reportable_transactions"
+            - "data_quality_metrics"
+            - "exception_reports"
+            - "correction_submissions"
+          submission_deadline: "T+1_by_COB"
+          
+        gdpr_reporting:
+          report_type: "data_protection_impact_assessment"
+          report_frequency: "as_needed"
+          required_content:
+            - "processing_activities"
+            - "risk_assessment"
+            - "mitigation_measures"
+            - "compliance_evidence"
+          retention_period: "3_years"
+          
+    # Framework Integration
+    framework_integration:
+      # Cross-Framework Mapping
+      cross_framework_mapping:
+        data_accuracy_requirements:
+          sox_requirement: "SOX_DI_001"
+          mifid_requirement: "MIFID_TR_001"
+          gdpr_requirement: "GDPR_DA_001"
+          iso_standard: "ISO_8000_accuracy"
+          common_controls:
+            - "automated_validation_rules"
+            - "exception_handling"
+            - "audit_trail_maintenance"
+            
+        access_control_requirements:
+          sox_requirement: "SOX_AC_001"
+          gdpr_requirement: "GDPR_CM_001"
+          iso_standard: "ISO_27001_A.9"
+          common_controls:
+            - "role_based_access_control"
+            - "regular_access_reviews"
+            - "privileged_access_monitoring"
+            
+      # Unified Compliance Dashboard
+      unified_dashboard:
+        compliance_metrics:
+          overall_compliance_score:
+            calculation: "weighted_average_of_framework_scores"
+            weights:
+              sox_compliance: 0.30
+              mifid_compliance: 0.25
+              gdpr_compliance: 0.25
+              iso_compliance: 0.20
+            target_score: "95.0%"
+            
+          framework_specific_scores:
+            sox_score:
+              calculation: "percentage_of_controls_effective"
+              target: "100%"
+              
+            mifid_score:
+              calculation: "data_quality_threshold_compliance"
+              target: "99.5%"
+              
+            gdpr_score:
+              calculation: "data_protection_compliance_percentage"
+              target: "100%"
+              
+    # Integration Points
+    integration:
+      downstream_services:
+        quality_monitoring:
+          service: "base-quality-monitoring"
+          endpoint: "/compliance-check"
+          timeout: "60s"
+          
+        event_coordination:
+          service: "base-event-coordination"
+          endpoint: "/compliance-events"
+          timeout: "10s"
+          
+        validation_rules:
+          service: "base-validation-rules"
+          endpoint: "/regulatory-validation"
+          timeout: "45s"
+          
+      external_systems:
+        regulatory_systems:
+          trade_repositories:
+            - "dtcc_gtr"
+            - "ice_trade_vault"
+            - "cme_trade_repository"
+          reporting_systems:
+            - "finra_trace"
+            - "esma_firds"
+            - "cftc_swap_data_repositories"
+            
+        audit_systems:
+          audit_trail_systems:
+            - "enterprise_audit_log"
+            - "database_audit_logs"
+            - "application_audit_logs"
+          compliance_monitoring:
+            - "compliance_dashboard"
+            - "risk_monitoring_system"
+            - "regulatory_reporting_system"

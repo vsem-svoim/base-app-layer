@@ -1,0 +1,514 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-quality-orchestrator-compliance-manager
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: compliance-manager
+    app.kubernetes.io/component: compliance
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: orchestrator
+    base.io/function: compliance-coordination
+spec:
+  type: "compliance_coordinator"
+  coordination:
+    # Saga Pattern Implementation
+    orchestration_pattern: "saga"
+    coordination_model: "hierarchical"
+    state_coordination: "persistent"
+    transaction_boundaries: "per_regulation"
+    
+    # Workflow Coordination
+    workflow_management:
+      workflow_engine: "kubernetes_workflows"
+      parallel_execution: true
+      max_concurrent_workflows: 50
+      workflow_timeout: "12h"
+      retry_failed_workflows: true
+      compliance_checkpoints: true
+      audit_trail_generation: true
+      
+    # Agent Coordination
+    agent_coordination:
+      coordination_protocol: "grpc"
+      service_discovery: "kubernetes_dns"
+      load_balancing: "least_connections"
+      health_check_interval: "30s"
+      
+      managed_agents:
+        - name: "compliance-monitor"
+          instances: 4
+          coordination_endpoint: "base-compliance-monitor-service:9000"
+          responsibilities: ["regulatory_framework_compliance", "policy_enforcement", "violation_detection"]
+          compliance_frameworks: ["MiFID_II", "EMIR", "Dodd_Frank", "Basel_III", "GDPR", "SOX"]
+          
+        - name: "audit-tracker"
+          instances: 2
+          coordination_endpoint: "base-audit-tracker-service:9000"
+          responsibilities: ["audit_trail_creation", "evidence_collection", "compliance_reporting"]
+          
+        - name: "policy-enforcer"
+          instances: 3
+          coordination_endpoint: "base-policy-enforcer-service:9000"
+          responsibilities: ["policy_application", "compliance_rule_enforcement", "violation_remediation"]
+          
+        - name: "regulatory-reporter"
+          instances: 2
+          coordination_endpoint: "base-regulatory-reporter-service:9000"
+          responsibilities: ["regulatory_report_generation", "submission_management", "deadline_tracking"]
+          
+        - name: "privacy-controller"
+          instances: 2
+          coordination_endpoint: "base-privacy-controller-service:9000"
+          responsibilities: ["pii_detection", "data_privacy_compliance", "consent_management"]
+    
+    # State Management
+    state_management:
+      persistence_backend: "postgresql"
+      state_store_connection: "postgres://state-db:5432/compliance_orchestrator_state"
+      state_retention_days: 2555  # 7 years for regulatory compliance
+      checkpoint_interval: "1m"
+      state_consistency: "strong"
+      compliance_state_encryption: true
+      
+    # Event-Driven Coordination
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "compliance.framework.evaluation.started"
+          partitions: 12
+          replication_factor: 3
+        - name: "compliance.framework.evaluation.completed"
+          partitions: 12
+          replication_factor: 3
+        - name: "compliance.violation.detected"
+          partitions: 8
+          replication_factor: 3
+        - name: "compliance.audit.required"
+          partitions: 6
+          replication_factor: 3
+        - name: "compliance.report.generated"
+          partitions: 4
+          replication_factor: 3
+        - name: "compliance.privacy.violation"
+          partitions: 6
+          replication_factor: 3
+      
+      event_processing:
+        consumer_group: "compliance-orchestrator"
+        batch_size: 50
+        processing_timeout: "60s"
+        retry_attempts: 5
+        dead_letter_queue: "compliance.dlq"
+        
+  resources:
+    # Deployment Configuration
+    deployment:
+      replicas: 3  # High availability for compliance coordination
+      deployment_strategy: "blue_green"
+      leader_election: true
+      leader_lease_duration: "45s"
+      leader_renew_deadline: "30s"
+      
+    # Resource Allocation
+    resource_allocation:
+      cpu:
+        requests: "2"
+        limits: "6"
+      memory:
+        requests: "4Gi"
+        limits: "16Gi"
+      storage:
+        requests: "50Gi"  # Extended storage for audit trails
+        limits: "200Gi"
+        
+    # Auto-scaling Configuration
+    auto_scaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 6
+      scaling_metrics:
+        - type: "cpu"
+          target_utilization: 60
+        - type: "memory"
+          target_utilization: 70
+        - type: "custom"
+          metric_name: "compliance_evaluations_pending"
+          target_value: 50
+          
+    # Performance Optimization
+    performance:
+      connection_pooling:
+        database_connections: 40
+        agent_connections: 80
+        connection_timeout: "45s"
+        idle_timeout: "10m"
+        
+      caching:
+        regulatory_framework_cache_size: "2GB"
+        policy_cache_ttl: "4h"
+        compliance_rules_cache_ttl: "2h"
+        audit_cache_ttl: "24h"
+        
+      batch_processing:
+        batch_size: 25
+        batch_timeout: "30s"
+        max_batch_wait: "60s"
+        
+  # Workflow Management Configuration
+  workflow_orchestration:
+    # Workflow Types
+    supported_workflows:
+      - name: "mifid_ii_compliance_assessment"
+        description: "MiFID II regulatory compliance evaluation"
+        steps: 
+          - "transaction_reporting_compliance"
+          - "best_execution_validation"
+          - "market_data_completeness_check"
+          - "client_classification_validation"
+          - "record_keeping_compliance"
+          - "audit_trail_verification"
+          - "mifid_ii_report_generation"
+        regulatory_framework: "MiFID_II"
+        audit_required: true
+        retention_period: "5y"
+        timeout: "8h"
+        
+      - name: "emir_compliance_assessment"
+        description: "European Market Infrastructure Regulation compliance"
+        steps:
+          - "derivative_transaction_reporting"
+          - "clearing_obligation_compliance"
+          - "risk_mitigation_validation"
+          - "trade_repository_reporting"
+          - "emir_audit_trail_creation"
+        regulatory_framework: "EMIR"
+        audit_required: true
+        timeout: "6h"
+        
+      - name: "dodd_frank_compliance_assessment"
+        description: "Dodd-Frank Act compliance evaluation"
+        steps:
+          - "swap_data_repository_reporting"
+          - "volcker_rule_compliance"
+          - "capital_adequacy_validation"
+          - "stress_testing_compliance"
+          - "systemic_risk_assessment"
+        regulatory_framework: "Dodd_Frank"
+        jurisdiction: "US"
+        timeout: "10h"
+        
+      - name: "basel_iii_compliance_assessment"
+        description: "Basel III regulatory framework compliance"
+        steps:
+          - "capital_ratio_validation"
+          - "liquidity_coverage_ratio_check"
+          - "net_stable_funding_ratio_check"
+          - "credit_risk_assessment"
+          - "operational_risk_validation"
+        regulatory_framework: "Basel_III"
+        risk_category: "banking"
+        timeout: "12h"
+        
+      - name: "gdpr_privacy_compliance_assessment"
+        description: "GDPR data privacy compliance evaluation"
+        steps:
+          - "personal_data_identification"
+          - "lawful_basis_validation"
+          - "consent_verification"
+          - "data_subject_rights_compliance"
+          - "breach_notification_readiness"
+          - "privacy_impact_assessment"
+        regulatory_framework: "GDPR"
+        privacy_focused: true
+        timeout: "4h"
+        
+    # Workflow Execution Engine
+    execution_engine:
+      engine_type: "kubernetes_native"
+      workflow_crd: "ComplianceWorkflow"
+      step_execution: "containers"
+      
+      execution_options:
+        parallel_execution: false  # Sequential for compliance integrity
+        pipeline_optimization: true
+        resource_optimization: true
+        failure_isolation: true
+        compliance_validation: true
+        audit_logging: true
+        
+      monitoring:
+        step_level_monitoring: true
+        performance_tracking: true
+        resource_utilization_tracking: true
+        compliance_metrics_tracking: true
+        audit_trail_tracking: true
+        
+    # Workflow Scheduling
+    workflow_scheduling:
+      scheduling_strategy: "compliance_deadline_based"
+      priority_levels:
+        regulatory_deadline: 1
+        audit_preparation: 2
+        risk_assessment: 3
+        periodic_compliance: 4
+        exploratory_compliance: 5
+        
+      scheduling_constraints:
+        resource_constraints: true
+        dependency_constraints: true
+        regulatory_deadline_constraints: true
+        jurisdiction_constraints: true
+        
+      queue_management:
+        max_queue_size: 500
+        queue_overflow_strategy: "escalate_to_manual_review"
+        queue_monitoring: true
+        deadline_prioritization: true
+        
+  # Integration Configuration
+  integration:
+    # Upstream Integrations
+    upstream_services:
+      quality_manager:
+        service: "base-data-quality-orchestrator-quality-manager"
+        endpoint: "/api/v1/compliance-requests"
+        timeout: "60s"
+        
+      validation_coordinator:
+        service: "base-data-quality-orchestrator-validation-coordinator"
+        endpoint: "/api/v1/validation-results"
+        timeout: "45s"
+        
+      policy_engine:
+        service: "base-policy-engine"
+        endpoint: "/api/v1/regulatory-policies"
+        timeout: "30s"
+        
+      external_regulatory_apis:
+        - name: "esma_api"
+          endpoint: "https://api.esma.europa.eu/mifid"
+          authentication: "certificate"
+          timeout: "120s"
+        - name: "cftc_api"
+          endpoint: "https://api.cftc.gov/swap-data"
+          authentication: "api_key"
+          timeout: "180s"
+          
+    # Downstream Integrations
+    downstream_services:
+      reporting_manager:
+        service: "base-data-quality-orchestrator-reporting-manager"
+        endpoint: "/api/v1/compliance-reports"
+        timeout: "90s"
+        
+      data_security:
+        service: "base-data-security"
+        endpoint: "/api/v1/compliance-classification"
+        timeout: "60s"
+        
+      audit_service:
+        service: "base-audit-service"
+        endpoint: "/api/v1/audit-events"
+        timeout: "30s"
+        
+      external_reporting:
+        - name: "regulatory_submission_service"
+          endpoint: "https://submission.regulator.gov/api/v1/submit"
+          authentication: "certificate"
+          timeout: "300s"
+        
+    # Cross-cutting Integrations
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        kafka_brokers: "${KAFKA_BROKERS}"
+        
+      metadata_discovery:
+        service: "base-metadata-discovery"
+        endpoint: "/api/v1/compliance-catalog"
+        
+      monitoring_service:
+        service: "base-monitoring"
+        metrics_endpoint: "/metrics"
+        alerts_endpoint: "/alerts"
+        
+  # Monitoring and Observability
+  observability:
+    # Metrics Collection
+    metrics:
+      business_metrics:
+        - name: "compliance_assessments_total"
+          type: "counter"
+          description: "Total number of compliance assessments performed"
+          labels: ["regulatory_framework", "assessment_result", "jurisdiction"]
+          
+        - name: "compliance_assessment_duration"
+          type: "histogram"
+          description: "Time taken to complete compliance assessments"
+          buckets: [300, 900, 1800, 3600, 7200, 14400, 28800]
+          
+        - name: "compliance_violations_detected"
+          type: "counter"
+          description: "Number of compliance violations detected"
+          labels: ["violation_type", "severity", "regulatory_framework"]
+          
+        - name: "regulatory_deadlines_met"
+          type: "gauge"
+          description: "Percentage of regulatory deadlines met"
+          labels: ["regulatory_framework", "report_type"]
+          
+        - name: "audit_readiness_score"
+          type: "gauge"
+          description: "Overall audit readiness score"
+          labels: ["regulatory_framework"]
+          
+      technical_metrics:
+        - name: "compliance_orchestrator_cpu_utilization"
+          type: "gauge"
+          description: "CPU utilization of compliance orchestrator"
+          
+        - name: "compliance_orchestrator_memory_utilization"
+          type: "gauge"
+          description: "Memory utilization of compliance orchestrator"
+          
+        - name: "compliance_audit_trail_size"
+          type: "gauge"
+          description: "Size of compliance audit trail storage"
+          
+    # Health Checks
+    health_checks:
+      liveness_check:
+        endpoint: "/health/live"
+        interval: "15s"
+        timeout: "10s"
+        failure_threshold: 3
+        
+      readiness_check:
+        endpoint: "/health/ready"
+        interval: "10s"
+        timeout: "5s"
+        failure_threshold: 3
+        
+      dependency_checks:
+        - name: "database_connection"
+          check: "postgres_ping"
+          critical: true
+          
+        - name: "kafka_connection"
+          check: "kafka_broker_health"
+          critical: true
+          
+        - name: "regulatory_api_connectivity"
+          check: "external_api_health"
+          critical: false
+          
+    # Alerting
+    alerting:
+      alert_rules:
+        critical_alerts:
+          - name: "compliance_orchestrator_down"
+            condition: "up == 0"
+            duration: "1m"
+            
+          - name: "critical_compliance_violation"
+            condition: "compliance_violations_detected{severity=\"critical\"} > 0"
+            duration: "0s"  # Immediate alert
+            
+          - name: "regulatory_deadline_missed"
+            condition: "regulatory_deadlines_met < 1.0"
+            duration: "1m"
+            
+        warning_alerts:
+          - name: "compliance_assessment_backlog"
+            condition: "compliance_evaluations_pending > 25"
+            duration: "30m"
+            
+          - name: "audit_readiness_degradation"
+            condition: "audit_readiness_score < 0.8"
+            duration: "1h"
+            
+      notification_channels:
+        critical: ["pagerduty", "slack", "email", "regulatory_team"]
+        warning: ["slack", "email", "compliance_team"]
+        info: ["email"]
+        
+  # Security Configuration
+  security:
+    # Access Control
+    access_control:
+      rbac_enabled: true
+      service_account: "base-compliance-orchestrator"
+      
+      permissions:
+        - apiGroups: ["base.io"]
+          resources: ["agents", "workflows", "compliance-policies", "audit-trails"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+          
+        - apiGroups: ["apps"]
+          resources: ["deployments", "replicasets"]
+          verbs: ["get", "list", "watch"]
+          
+    # Network Security
+    network_security:
+      network_policies: true
+      allowed_ingress:
+        - from_namespaces: ["base-data-quality", "base-monitoring", "base-audit"]
+          ports: [8080, 9090]
+          
+      allowed_egress:
+        - to_namespaces: ["base-data-quality", "base-platform", "base-data-security"]
+          ports: [5432, 9092, 8080]
+        - to_external: ["regulatory_apis"]
+          ports: [443]
+          
+    # Data Security
+    data_security:
+      encryption_in_transit: true
+      encryption_at_rest: true
+      secret_management: "kubernetes_secrets"
+      compliance_data_classification: "confidential"
+      
+      audit_logging:
+        enabled: true
+        log_level: "debug"  # Enhanced logging for compliance
+        retention_days: 2555  # 7 years regulatory requirement
+        immutable_logs: true
+        
+  # Disaster Recovery
+  disaster_recovery:
+    backup_strategy:
+      state_backup:
+        frequency: "every_10m"
+        retention: "7y"  # Regulatory requirement
+        destination: "s3://base-backups/compliance-orchestrator-state/"
+        encryption: "AES256"
+        
+      configuration_backup:
+        frequency: "daily"
+        retention: "7y"
+        version_control: true
+        
+      audit_trail_backup:
+        frequency: "hourly"
+        retention: "7y"
+        immutable_storage: true
+        
+    recovery_procedures:
+      rto_target: "30m"
+      rpo_target: "5m"
+      
+      recovery_steps:
+        - "restore_compliance_configuration"
+        - "restore_compliance_state"
+        - "restore_audit_trails"
+        - "verify_regulatory_connectivity"
+        - "resume_compliance_workflows"
+        - "validate_compliance_continuity"
+        
+    failover_configuration:
+      cross_region_failover: true
+      multi_az_deployment: true
+      leader_election_enabled: true
+      compliance_continuity_validation: true

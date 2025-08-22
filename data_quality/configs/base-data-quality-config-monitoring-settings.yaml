@@ -1,0 +1,691 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-quality-monitoring-settings
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: monitoring-settings
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: config
+    base.io/function: monitoring-settings
+spec:
+  configType: "monitoring-settings"
+  data:
+    # Core Monitoring Configuration
+    monitoring_framework:
+      # Data Quality Metrics Collection
+      metrics_collection:
+        collection_frequency:
+          real_time_metrics: "5s"
+          summary_metrics: "1m"
+          trend_metrics: "5m"
+          historical_metrics: "1h"
+          reporting_metrics: "24h"
+          
+        metric_categories:
+          accuracy_metrics:
+            enabled: true
+            collection_method: "streaming"
+            storage_retention: "90d"
+            aggregation_levels:
+              - "field_level"
+              - "record_level"
+              - "dataset_level"
+              - "source_system_level"
+            thresholds:
+              critical: 95.0
+              warning: 98.0
+              target: 99.5
+              
+          completeness_metrics:
+            enabled: true
+            collection_method: "batch"
+            storage_retention: "365d"
+            aggregation_levels:
+              - "field_level"
+              - "record_level"
+              - "table_level"
+              - "database_level"
+            thresholds:
+              critical: 90.0
+              warning: 95.0
+              target: 99.0
+              
+          consistency_metrics:
+            enabled: true
+            collection_method: "scheduled"
+            schedule: "0 */6 * * *"  # Every 6 hours
+            storage_retention: "180d"
+            cross_validation_checks:
+              - "cross_system_consistency"
+              - "temporal_consistency"
+              - "referential_integrity"
+            thresholds:
+              critical: 85.0
+              warning: 90.0
+              target: 98.0
+              
+          timeliness_metrics:
+            enabled: true
+            collection_method: "real_time"
+            storage_retention: "30d"
+            sla_tracking:
+              real_time_data: "< 1s"
+              near_real_time_data: "< 5s"
+              batch_data: "< 1h"
+              historical_data: "< 24h"
+            thresholds:
+              critical: 80.0
+              warning: 90.0
+              target: 99.0
+              
+          validity_metrics:
+            enabled: true
+            collection_method: "streaming"
+            storage_retention: "60d"
+            validation_types:
+              - "format_validation"
+              - "range_validation"
+              - "business_rule_validation"
+              - "schema_validation"
+            thresholds:
+              critical: 95.0
+              warning: 98.0
+              target: 99.8
+              
+          uniqueness_metrics:
+            enabled: true
+            collection_method: "batch"
+            schedule: "0 2 * * *"  # Daily at 2 AM
+            storage_retention: "180d"
+            duplicate_detection_methods:
+              - "exact_match"
+              - "fuzzy_match"
+              - "semantic_similarity"
+            thresholds:
+              critical: 95.0
+              warning: 98.0
+              target: 99.9
+              
+      # Performance Monitoring
+      performance_monitoring:
+        throughput_metrics:
+          records_processed_per_second:
+            target: 10000
+            warning_threshold: 5000
+            critical_threshold: 1000
+            measurement_window: "5m"
+            
+          data_volume_processed:
+            target: "100GB/hour"
+            warning_threshold: "50GB/hour"
+            critical_threshold: "10GB/hour"
+            measurement_window: "1h"
+            
+        latency_metrics:
+          processing_latency:
+            target: "100ms"
+            warning_threshold: "500ms"
+            critical_threshold: "2s"
+            percentiles:
+              - 50
+              - 90
+              - 95
+              - 99
+              
+          end_to_end_latency:
+            target: "1s"
+            warning_threshold: "5s"
+            critical_threshold: "30s"
+            measurement_points:
+              - "data_ingestion"
+              - "quality_validation"
+              - "quality_scoring"
+              - "quality_reporting"
+              
+        resource_utilization:
+          cpu_utilization:
+            target: "70%"
+            warning_threshold: "85%"
+            critical_threshold: "95%"
+            
+          memory_utilization:
+            target: "70%"
+            warning_threshold: "85%"
+            critical_threshold: "95%"
+            
+          disk_utilization:
+            target: "70%"
+            warning_threshold: "85%"
+            critical_threshold: "95%"
+            
+          network_utilization:
+            target: "70%"
+            warning_threshold: "85%"
+            critical_threshold: "95%"
+            
+    # Alert Configuration
+    alerting_framework:
+      # Alert Categories
+      alert_categories:
+        data_quality_alerts:
+          critical_quality_degradation:
+            alert_id: "DQ_CRIT_001"
+            name: "Critical Data Quality Degradation"
+            description: "Overall data quality score dropped below critical threshold"
+            trigger_condition: "overall_quality_score < 70.0"
+            evaluation_window: "5m"
+            severity: "critical"
+            channels:
+              - "pagerduty"
+              - "sms"
+              - "slack_critical"
+            escalation_policy: "immediate"
+            auto_remediation: false
+            
+          accuracy_threshold_breach:
+            alert_id: "DQ_ACC_001"
+            name: "Data Accuracy Threshold Breach"
+            description: "Data accuracy dropped below acceptable levels"
+            trigger_condition: "accuracy_score < 95.0 FOR 10m"
+            severity: "high"
+            channels:
+              - "slack_alerts"
+              - "email_operations"
+            escalation_policy: "15m_escalation"
+            auto_remediation: true
+            remediation_actions:
+              - "trigger_data_revalidation"
+              - "notify_data_stewards"
+              
+          completeness_issues:
+            alert_id: "DQ_COMP_001"
+            name: "Data Completeness Issues"
+            description: "Significant increase in missing or incomplete data"
+            trigger_condition: "completeness_score < 90.0 FOR 30m"
+            severity: "high"
+            channels:
+              - "slack_alerts"
+              - "email_data_team"
+            escalation_policy: "30m_escalation"
+            auto_remediation: false
+            
+        performance_alerts:
+          processing_latency_high:
+            alert_id: "PERF_LAT_001"
+            name: "High Processing Latency"
+            description: "Data quality processing latency exceeded thresholds"
+            trigger_condition: "p95_processing_latency > 2s FOR 5m"
+            severity: "high"
+            channels:
+              - "slack_performance"
+              - "email_engineering"
+            escalation_policy: "20m_escalation"
+            auto_remediation: true
+            remediation_actions:
+              - "scale_processing_workers"
+              - "enable_performance_mode"
+              
+          throughput_degradation:
+            alert_id: "PERF_THR_001"
+            name: "Throughput Degradation"
+            description: "Data processing throughput below expected levels"
+            trigger_condition: "records_per_second < 5000 FOR 10m"
+            severity: "medium"
+            channels:
+              - "slack_performance"
+            escalation_policy: "1h_escalation"
+            auto_remediation: true
+            remediation_actions:
+              - "increase_parallel_workers"
+              - "optimize_batch_size"
+              
+          resource_exhaustion:
+            alert_id: "PERF_RES_001"
+            name: "Resource Exhaustion Warning"
+            description: "System resources approaching limits"
+            trigger_condition: "cpu_utilization > 90% OR memory_utilization > 90%"
+            severity: "medium"
+            channels:
+              - "slack_infrastructure"
+              - "email_devops"
+            escalation_policy: "45m_escalation"
+            auto_remediation: true
+            remediation_actions:
+              - "trigger_auto_scaling"
+              - "reduce_processing_load"
+              
+        business_impact_alerts:
+          sla_breach_imminent:
+            alert_id: "BIZ_SLA_001"
+            name: "SLA Breach Imminent"
+            description: "Data quality issues may lead to SLA breach"
+            trigger_condition: "sla_compliance_risk > 80%"
+            severity: "critical"
+            channels:
+              - "pagerduty"
+              - "sms_executives"
+              - "slack_critical"
+            escalation_policy: "executive_escalation"
+            auto_remediation: false
+            
+          regulatory_compliance_risk:
+            alert_id: "BIZ_REG_001"
+            name: "Regulatory Compliance Risk"
+            description: "Data quality issues may impact regulatory compliance"
+            trigger_condition: "compliance_score < 95.0"
+            severity: "critical"
+            channels:
+              - "pagerduty"
+              - "email_compliance_officer"
+              - "slack_compliance"
+            escalation_policy: "compliance_escalation"
+            auto_remediation: false
+            
+          client_impact_detected:
+            alert_id: "BIZ_CLI_001"
+            name: "Client Impact Detected"
+            description: "Data quality issues affecting client-facing services"
+            trigger_condition: "client_facing_quality_score < 98.0"
+            severity: "high"
+            channels:
+              - "slack_client_services"
+              - "email_relationship_managers"
+            escalation_policy: "client_escalation"
+            auto_remediation: false
+            
+      # Notification Channels
+      notification_channels:
+        slack_channels:
+          slack_critical:
+            webhook_url: "${SLACK_CRITICAL_WEBHOOK}"
+            channel: "#data-quality-critical"
+            mention_groups: ["@data-quality-oncall"]
+            
+          slack_alerts:
+            webhook_url: "${SLACK_ALERTS_WEBHOOK}"
+            channel: "#data-quality-alerts"
+            mention_groups: ["@data-quality-team"]
+            
+          slack_performance:
+            webhook_url: "${SLACK_PERFORMANCE_WEBHOOK}"
+            channel: "#performance-alerts"
+            mention_groups: ["@performance-team"]
+            
+          slack_compliance:
+            webhook_url: "${SLACK_COMPLIANCE_WEBHOOK}"
+            channel: "#compliance-alerts"
+            mention_groups: ["@compliance-team"]
+            
+        email_channels:
+          email_operations:
+            smtp_server: "${SMTP_SERVER}"
+            recipients:
+              - "operations-team@company.com"
+              - "data-quality-lead@company.com"
+            subject_prefix: "[DATA QUALITY]"
+            
+          email_compliance_officer:
+            smtp_server: "${SMTP_SERVER}"
+            recipients:
+              - "compliance-officer@company.com"
+              - "risk-officer@company.com"
+            subject_prefix: "[COMPLIANCE ALERT]"
+            encryption: true
+            
+          email_executives:
+            smtp_server: "${SMTP_SERVER}"
+            recipients:
+              - "cto@company.com"
+              - "cro@company.com"
+            subject_prefix: "[EXECUTIVE ALERT]"
+            encryption: true
+            
+        pagerduty_channels:
+          pagerduty_critical:
+            integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+            service_id: "data-quality-critical"
+            escalation_policy: "data-quality-oncall"
+            
+        sms_channels:
+          sms_critical:
+            provider: "twilio"
+            account_sid: "${TWILIO_ACCOUNT_SID}"
+            auth_token: "${TWILIO_AUTH_TOKEN}"
+            recipients:
+              - "+1-555-0101"  # Data Quality Lead
+              - "+1-555-0102"  # Operations Manager
+              
+      # Escalation Policies
+      escalation_policies:
+        immediate:
+          escalation_levels:
+            level_1:
+              delay: "0m"
+              targets: ["data_quality_oncall"]
+              
+        15m_escalation:
+          escalation_levels:
+            level_1:
+              delay: "0m"
+              targets: ["data_quality_team"]
+            level_2:
+              delay: "15m"
+              targets: ["data_quality_lead"]
+              
+        executive_escalation:
+          escalation_levels:
+            level_1:
+              delay: "0m"
+              targets: ["data_quality_oncall"]
+            level_2:
+              delay: "10m"
+              targets: ["data_quality_manager"]
+            level_3:
+              delay: "30m"
+              targets: ["cto", "cro"]
+              
+        compliance_escalation:
+          escalation_levels:
+            level_1:
+              delay: "0m"
+              targets: ["compliance_team"]
+            level_2:
+              delay: "15m"
+              targets: ["compliance_officer"]
+            level_3:
+              delay: "45m"
+              targets: ["chief_compliance_officer"]
+              
+    # Dashboard Configuration
+    dashboard_configuration:
+      # Executive Dashboard
+      executive_dashboard:
+        dashboard_id: "executive_dq_overview"
+        name: "Data Quality Executive Overview"
+        refresh_interval: "5m"
+        access_control:
+          roles: ["executive", "senior_management"]
+          
+        widgets:
+          overall_quality_score:
+            widget_type: "gauge"
+            metric: "overall_quality_score"
+            target: 95.0
+            thresholds:
+              red: 70.0
+              yellow: 85.0
+              green: 95.0
+              
+          sla_compliance:
+            widget_type: "gauge"
+            metric: "sla_compliance_percentage"
+            target: 99.0
+            
+          regulatory_compliance:
+            widget_type: "status_grid"
+            metrics:
+              - "sox_compliance_score"
+              - "mifid_compliance_score"
+              - "gdpr_compliance_score"
+              
+          quality_trend:
+            widget_type: "line_chart"
+            metrics:
+              - "daily_quality_score"
+            time_range: "30d"
+            
+          top_quality_issues:
+            widget_type: "table"
+            data_source: "quality_issues"
+            columns:
+              - "issue_type"
+              - "severity"
+              - "impact"
+              - "status"
+            limit: 10
+            
+      # Operations Dashboard
+      operations_dashboard:
+        dashboard_id: "operations_dq_detailed"
+        name: "Data Quality Operations Dashboard"
+        refresh_interval: "1m"
+        access_control:
+          roles: ["operations", "data_quality_team"]
+          
+        widgets:
+          quality_metrics_grid:
+            widget_type: "metrics_grid"
+            metrics:
+              - "accuracy_score"
+              - "completeness_score"
+              - "consistency_score"
+              - "timeliness_score"
+              - "validity_score"
+              
+          processing_performance:
+            widget_type: "line_chart"
+            metrics:
+              - "records_processed_per_second"
+              - "processing_latency_p95"
+            time_range: "6h"
+            
+          data_source_health:
+            widget_type: "heatmap"
+            dimensions:
+              x_axis: "data_source"
+              y_axis: "quality_dimension"
+            metric: "quality_score"
+            
+          active_alerts:
+            widget_type: "alert_list"
+            severity_filter: ["critical", "high"]
+            status_filter: ["firing", "pending"]
+            
+          quality_trend_by_source:
+            widget_type: "multi_line_chart"
+            metrics:
+              - "bloomberg_quality_score"
+              - "reuters_quality_score"
+              - "internal_db_quality_score"
+            time_range: "24h"
+            
+      # Technical Dashboard
+      technical_dashboard:
+        dashboard_id: "technical_dq_metrics"
+        name: "Data Quality Technical Metrics"
+        refresh_interval: "30s"
+        access_control:
+          roles: ["engineering", "devops", "data_quality_team"]
+          
+        widgets:
+          system_performance:
+            widget_type: "metrics_grid"
+            metrics:
+              - "cpu_utilization"
+              - "memory_utilization"
+              - "disk_utilization"
+              - "network_throughput"
+              
+          processing_queues:
+            widget_type: "bar_chart"
+            metrics:
+              - "validation_queue_depth"
+              - "scoring_queue_depth"
+              - "reporting_queue_depth"
+              
+          error_rates:
+            widget_type: "line_chart"
+            metrics:
+              - "validation_error_rate"
+              - "processing_error_rate"
+              - "alert_error_rate"
+            time_range: "2h"
+            
+          resource_scaling:
+            widget_type: "area_chart"
+            metrics:
+              - "active_workers"
+              - "pending_scale_events"
+            time_range: "12h"
+            
+    # Health Check Configuration
+    health_checks:
+      # Service Health Checks
+      service_health_checks:
+        quality_validation_service:
+          endpoint: "/health/validation"
+          interval: "30s"
+          timeout: "5s"
+          failure_threshold: 3
+          success_threshold: 2
+          
+        quality_scoring_service:
+          endpoint: "/health/scoring"
+          interval: "30s"
+          timeout: "10s"
+          failure_threshold: 3
+          success_threshold: 2
+          
+        quality_monitoring_service:
+          endpoint: "/health/monitoring"
+          interval: "1m"
+          timeout: "15s"
+          failure_threshold: 2
+          success_threshold: 1
+          
+        quality_alerting_service:
+          endpoint: "/health/alerting"
+          interval: "1m"
+          timeout: "10s"
+          failure_threshold: 2
+          success_threshold: 1
+          
+      # Data Pipeline Health Checks
+      pipeline_health_checks:
+        ingestion_pipeline:
+          check_type: "data_freshness"
+          max_age_threshold: "5m"
+          check_interval: "1m"
+          
+        validation_pipeline:
+          check_type: "processing_rate"
+          min_rate_threshold: "1000 records/min"
+          check_interval: "5m"
+          
+        scoring_pipeline:
+          check_type: "output_completeness"
+          completeness_threshold: "99%"
+          check_interval: "10m"
+          
+        alerting_pipeline:
+          check_type: "alert_delivery"
+          max_delivery_time: "30s"
+          check_interval: "2m"
+          
+      # External Dependency Health Checks
+      dependency_health_checks:
+        database_connections:
+          postgres_primary:
+            connection_string: "${POSTGRES_CONNECTION}"
+            max_connection_time: "5s"
+            check_interval: "1m"
+            
+          mongodb_cluster:
+            connection_string: "${MONGODB_CONNECTION}"
+            max_connection_time: "3s"
+            check_interval: "1m"
+            
+        message_queues:
+          kafka_cluster:
+            brokers: "${KAFKA_BROKERS}"
+            health_topic: "health-check"
+            check_interval: "30s"
+            
+          rabbitmq_cluster:
+            connection_string: "${RABBITMQ_CONNECTION}"
+            check_interval: "30s"
+            
+        external_apis:
+          data_source_apis:
+            bloomberg_api:
+              endpoint: "${BLOOMBERG_HEALTH_ENDPOINT}"
+              timeout: "10s"
+              check_interval: "5m"
+              
+            reuters_api:
+              endpoint: "${REUTERS_HEALTH_ENDPOINT}"
+              timeout: "10s"
+              check_interval: "5m"
+              
+    # Integration Settings
+    integration:
+      # Metrics Export
+      metrics_export:
+        prometheus:
+          enabled: true
+          endpoint: "/metrics"
+          port: 8090
+          scrape_interval: "15s"
+          
+        datadog:
+          enabled: true
+          api_key: "${DATADOG_API_KEY}"
+          namespace: "dataqualiy"
+          tags:
+            - "environment:${ENVIRONMENT}"
+            - "service:data-quality"
+            
+        cloudwatch:
+          enabled: true
+          region: "${AWS_REGION}"
+          namespace: "DataQuality"
+          
+      # Log Integration
+      log_integration:
+        elasticsearch:
+          enabled: true
+          hosts: "${ELASTICSEARCH_HOSTS}"
+          index_pattern: "data-quality-logs-*"
+          
+        splunk:
+          enabled: true
+          hec_endpoint: "${SPLUNK_HEC_ENDPOINT}"
+          hec_token: "${SPLUNK_HEC_TOKEN}"
+          
+      # Event Streaming
+      event_streaming:
+        kafka_topics:
+          quality_metrics:
+            topic: "data.quality.metrics"
+            partitions: 12
+            replication_factor: 3
+            
+          quality_alerts:
+            topic: "data.quality.alerts"
+            partitions: 6
+            replication_factor: 3
+            
+          quality_events:
+            topic: "data.quality.events"
+            partitions: 24
+            replication_factor: 3
+            
+      # Downstream Services
+      downstream_services:
+        event_coordination:
+          service: "base-event-coordination"
+          endpoint: "/quality-events"
+          timeout: "10s"
+          
+        compliance_frameworks:
+          service: "base-compliance-frameworks"
+          endpoint: "/compliance-monitoring"
+          timeout: "30s"
+          
+        data_storage:
+          service: "base-data-storage"
+          endpoint: "/quality-metadata"
+          timeout: "15s"

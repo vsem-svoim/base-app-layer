@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: base-data-quality-prompts
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+resources:
+- base-data-quality-prompt-validator-configmap.yaml
+- base-data-quality-prompt-assessor-configmap.yaml
+- base-data-quality-prompt-enforcer-configmap.yaml
+- base-data-quality-prompt-detector-configmap.yaml
+- base-data-quality-prompt-monitor-configmap.yaml
+- base-data-quality-prompt-reporter-configmap.yaml
+
+commonLabels:
+  app.kubernetes.io/name: base-data-quality
+  app.kubernetes.io/component: prompts
+  app.kubernetes.io/part-of: base-layer
+  module.type: data-quality
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "3"
+  module.description: "AI prompts for data quality agents"

@@ -1,0 +1,39 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-storage-lifecycle-prediction-model
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: lifecycle-prediction-model
+    base.io/category: data_storage
+    base.io/type: model
+    base.io/function: lifecycle-prediction
+spec:
+  type: "regression"
+  algorithm: "ensemble_regressor"
+  deployment:
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/predict-lifecycle-prediction"
+  training:
+    algorithm_details:
+      ensemble_methods: ["random_forest", "gradient_boosting", "neural_net"]
+      cross_validation: 5
+    feature_engineering:
+      feature_types:
+        - name: "storage_metrics"
+          features: ["size", "access_frequency", "age_days"]
+        - name: "cost_factors"
+          features: ["storage_tier", "region", "replication_factor"]
+  financial_domain:
+    cost_optimization: true
+    compliance_requirements: ["SOX", "GDPR"]
+    retention_policies: ["7_years", "5_years", "3_years"]

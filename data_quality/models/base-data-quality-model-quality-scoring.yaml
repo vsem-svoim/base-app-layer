@@ -1,0 +1,74 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-quality-quality-scoring-model
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: quality-scoring-model
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: model
+    base.io/function: quality-scoring
+spec:
+  type: "multi_output_regression"
+  algorithm: "weighted_ensemble_scoring"
+  deployment:
+    deployment_type: "kubernetes"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/calculate-quality-score"
+      real_time_prediction: true
+  training:
+    algorithm_details:
+      ensemble_method: "stacked_regressor_neural_net"
+      base_models: ["xgboost", "lightgbm", "catboost", "neural_network"]
+      meta_learner: "ridge_regression"
+      cv_folds: 5
+      learning_rate: 0.02
+      n_estimators: 800
+      max_depth: 10
+      l1_ratio: 0.15
+      alpha: 0.01
+      early_stopping_rounds: 100
+    feature_engineering:
+      feature_types:
+        - name: "quality_dimensions"
+          features: ["completeness_score", "accuracy_score", "consistency_score", "timeliness_score", "validity_score"]
+        - name: "weighted_metrics"
+          features: ["business_weighted_score", "regulatory_weighted_score", "risk_adjusted_score"]
+        - name: "composite_indicators"
+          features: ["overall_health_index", "trend_quality_score", "stability_index", "reliability_metric"]
+        - name: "contextual_quality"
+          features: ["use_case_fitness", "downstream_impact_score", "lineage_quality_score"]
+        - name: "benchmarking_features"
+          features: ["peer_comparison_score", "industry_standard_alignment", "historical_performance_trend"]
+  inference:
+    scoring_dimensions:
+      - "overall_quality_score"
+      - "dimension_specific_scores"
+      - "weighted_composite_score"
+      - "risk_adjusted_score"
+    prediction_config:
+      score_range: [0, 100]
+      quality_threshold: 80
+      confidence_threshold: 0.85
+      financial_context: true
+      regulatory_weighting: true
+  financial_domain:
+    critical_fields:
+      market_data: ["price_quality_score", "volume_reliability", "reference_data_completeness", "market_microstructure_quality"]
+      trade_data: ["trade_lifecycle_quality", "settlement_data_integrity", "counterparty_data_quality", "regulatory_reporting_readiness"]
+      reference_data: ["master_data_quality", "corporate_actions_completeness", "instrument_classification_accuracy", "issuer_data_reliability"]
+    regulatory_requirements:
+      mifid_ii: ["transaction_reporting_quality", "best_execution_data_quality", "systematic_internalizer_reporting"]
+      emir: ["derivative_reporting_completeness", "risk_mitigation_data_quality", "clearing_obligation_compliance"]
+      dodd_frank: ["swap_data_repository_quality", "real_time_reporting_timeliness", "position_reporting_accuracy"]

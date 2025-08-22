@@ -1,0 +1,37 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-storage-orchestrator-backup-coordinator
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: backup-coordinator
+    base.io/category: data_storage
+    base.io/type: orchestrator
+    base.io/function: backup-coordinator
+spec:
+  type: "specialized_coordinator"
+  coordination:
+    orchestration_pattern: "saga"
+    coordination_model: "centralized"
+  resources:
+    deployment:
+      replicas: 2
+    resource_allocation:
+      cpu:
+        requests: "500m"
+        limits: "2"
+      memory:
+        requests: "1Gi"
+        limits: "4Gi"
+  integration:
+    upstream_services:
+      data_quality:
+        service: "base-data-quality"
+        endpoint: "/api/v1/data"
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        events:
+          - "backup-coordinator_started"
+          - "backup-coordinator_completed"
+          - "backup-coordinator_failed"

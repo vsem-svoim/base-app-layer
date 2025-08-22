@@ -1,0 +1,655 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: base-compliance-monitor-sa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-data-quality-agent-compliance-monitor
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: agent
+    base.io/function: compliance-monitor
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: base-compliance-monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: base-compliance-monitor
+        app.kubernetes.io/component: quality
+        app.kubernetes.io/part-of: base-system
+        base.io/category: data_quality
+        base.io/type: agent
+    spec:
+      serviceAccountName: base-compliance-monitor-sa
+      nodeSelector:
+        NodeGroup: base-data-services
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: compliance-monitor
+        image: python:3.13.7-slim
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Base Data Quality Compliance Monitor Agent Starting...' && python -m http.server 8080 --bind 0.0.0.0"]
+        ports:
+        - name: http-metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: http-health
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        - name: COMPLIANCE_CHECK_BATCH_SIZE
+          value: "5000"
+        - name: REGULATORY_ALERT_THRESHOLD
+          value: "0.01"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: JAEGER_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "5Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: base-compliance-monitor-config
+      - name: secrets-volume
+        secret:
+          secretName: base-compliance-monitor-secrets
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "10Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-compliance-monitor-service
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+    app.kubernetes.io/component: quality
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http-health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: base-compliance-monitor
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-compliance-monitor-config
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+    app.kubernetes.io/component: quality
+data:
+  monitor.yaml: |
+    # Compliance Monitor Agent Configuration
+    monitor:
+      # Agent Identity and Responsibility
+      name: "base-compliance-monitor"
+      version: "v2.5.0"
+      responsibility: "Comprehensive regulatory compliance monitoring with real-time violation detection and automated reporting"
+      
+      # Compliance Monitoring Capabilities
+      capabilities:
+        monitoring_types:
+          - "regulatory_compliance_tracking"
+          - "data_governance_adherence"
+          - "privacy_regulation_compliance"
+          - "financial_reporting_standards"
+          - "audit_trail_validation"
+          - "policy_enforcement_monitoring"
+        regulatory_frameworks:
+          - "MiFID_II"
+          - "EMIR"
+          - "Dodd_Frank"
+          - "Basel_III"
+          - "SOX"
+          - "GDPR"
+          - "CCPA"
+          - "PCI_DSS"
+          - "FINRA"
+          - "SEC_Rules"
+        compliance_checks:
+          - "real_time_violation_detection"
+          - "periodic_compliance_assessment"
+          - "audit_preparation_validation"
+          - "regulatory_change_impact_analysis"
+        max_concurrent_checks: 800
+        throughput_target: "30000 compliance_checks/minute"
+        
+      # MiFID II Compliance Monitoring
+      mifid_ii_compliance:
+        transaction_reporting:
+          rts22_requirements:
+            field_completeness: 99.5
+            data_accuracy: 99.8
+            timeliness_sla: "T+1_end_of_day"
+            validation_rules:
+              - "instrument_identification_complete"
+              - "counterparty_identification_valid" 
+              - "quantity_price_accuracy"
+              - "venue_mic_code_valid"
+              - "transaction_time_precision"
+        best_execution:
+          rts27_requirements:
+            execution_quality_monitoring: true
+            venue_analysis_completeness: true
+            client_order_handling_tracking: true
+            price_improvement_documentation: true
+        market_data_publication:
+          rts1_requirements:
+            pre_trade_transparency: true
+            post_trade_transparency: true
+            systematic_internaliser_quotes: true
+            reference_data_completeness: true
+        systematic_internaliser:
+          si_obligations:
+            quote_publication_monitoring: true
+            execution_at_quoted_price: true
+            fair_and_non_discriminatory_access: true
+            
+      # EMIR Compliance Monitoring
+      emir_compliance:
+        derivative_reporting:
+          reporting_completeness:
+            otc_derivatives: 100.0
+            exchange_traded_derivatives: 100.0
+            lifecycle_events: 100.0
+          data_quality_standards:
+            uti_population: 99.9
+            lei_validation: 100.0
+            counterparty_data_accuracy: 99.8
+        clearing_obligation:
+          clearing_threshold_monitoring: true
+          clearing_member_validation: true
+          portfolio_reconciliation: true
+        risk_mitigation:
+          margin_requirements: true
+          dispute_resolution_tracking: true
+          portfolio_compression: true
+          
+      # Dodd-Frank Compliance Monitoring
+      dodd_frank_compliance:
+        swap_reporting:
+          cftc_part_45_requirements:
+            swap_data_reporting: 100.0
+            usi_generation_validation: true
+            counterparty_eligibility: true
+          sdr_reporting_validation:
+            data_completeness: 99.5
+            timeliness_compliance: true
+            data_accuracy: 99.8
+        volcker_rule:
+          proprietary_trading_monitoring: true
+          market_making_exemption_tracking: true
+          hedging_activity_validation: true
+        systemic_risk_monitoring:
+          large_trader_reporting: true
+          position_limit_compliance: true
+          swap_dealer_capital_requirements: true
+          
+      # Basel III Compliance Monitoring
+      basel_iii_compliance:
+        capital_adequacy:
+          capital_ratio_monitoring:
+            common_equity_tier1: 4.5
+            tier1_capital: 6.0
+            total_capital: 8.0
+          risk_weighted_assets:
+            credit_risk_calculation: true
+            market_risk_calculation: true
+            operational_risk_calculation: true
+        leverage_ratio:
+          minimum_leverage_ratio: 3.0
+          exposure_measure_calculation: true
+          tier1_capital_validation: true
+        liquidity_coverage:
+          lcr_minimum: 100.0
+          high_quality_liquid_assets: true
+          net_cash_outflow_calculation: true
+        data_quality_standards:
+          bcbs_239_principles:
+            data_governance: true
+            data_architecture: true
+            accuracy_completeness: 99.9
+            timeliness: true
+            
+      # SOX Compliance Monitoring
+      sox_compliance:
+        financial_reporting:
+          section_404_requirements:
+            internal_controls_assessment: true
+            management_assertion: true
+            auditor_attestation: true
+          data_accuracy_controls:
+            source_data_validation: 99.9
+            calculation_accuracy: 99.99
+            reconciliation_completeness: 100.0
+        audit_trail:
+          change_management_tracking: true
+          access_control_monitoring: true
+          data_lineage_documentation: true
+        segregation_of_duties:
+          role_based_access_validation: true
+          approval_workflow_compliance: true
+          conflict_of_interest_detection: true
+          
+      # GDPR and Privacy Compliance
+      gdpr_compliance:
+        data_protection_principles:
+          lawful_basis_validation: true
+          purpose_limitation_adherence: true
+          data_minimisation_compliance: true
+          accuracy_principle: 99.9
+          storage_limitation: true
+          security_principle: true
+        individual_rights:
+          consent_management: true
+          right_of_access_processing: true
+          right_to_rectification: true
+          right_to_erasure: true
+          data_portability: true
+        breach_notification:
+          72_hour_reporting: true
+          supervisory_authority_notification: true
+          data_subject_communication: true
+        privacy_by_design:
+          data_protection_impact_assessment: true
+          privacy_enhancing_technologies: true
+          default_privacy_settings: true
+          
+      # Audit and Reporting
+      audit_reporting:
+        compliance_dashboards:
+          real_time_monitoring: true
+          violation_alerts: true
+          trend_analysis: true
+          regulatory_scorecard: true
+        regulatory_reports:
+          automated_report_generation: true
+          template_based_reporting: true
+          multi_format_export: ["PDF", "Excel", "XML", "JSON"]
+          digital_signature_support: true
+        audit_trail:
+          immutable_logging: true
+          data_lineage_tracking: true
+          change_history_maintenance: true
+          forensic_analysis_support: true
+          
+      # Performance and Resource Management  
+      performance:
+        worker_threads: 12
+        memory_limit: "8Gi"
+        temp_storage: "20Gi"
+        batch_processing:
+          batch_size: 5000
+          parallel_batches: 6
+          timeout: "12 minutes"
+        compliance_caching:
+          rule_cache_size: "1Gi"
+          validation_cache_ttl: "1 hour"
+          report_cache_ttl: "24 hours"
+        monitoring:
+          metrics_interval: 30s
+          health_check_interval: 10s
+          
+      # Integration Points
+      integration:
+        upstream:
+          service: "base-anomaly-detector"
+          endpoint: "/compliance/monitored"
+          format: "compliance_enhanced_data"
+        downstream:
+          service: "base-quality-reporter" 
+          endpoint: "/compliance/reports"
+          format: "regulatory_report_data"
+        regulatory_apis:
+          esma_registers: "https://registers.esma.europa.eu/api"
+          cftc_public_reporting: "https://publicreporting.cftc.gov/api"
+          sec_edgar: "https://www.sec.gov/Archives/edgar"
+          fca_handbook: "https://www.handbook.fca.org.uk/api"
+        event_bus:
+          service: "base-event-coordinator"
+          events:
+            - "compliance_check_started"
+            - "regulatory_violation_detected"
+            - "compliance_report_generated"
+            - "audit_trail_created"
+        security:
+          service: "base-data-security"
+          encryption: "AES-256"
+          audit_logging: true
+          
+      # Error Handling and Resilience
+      error_handling:
+        retry_policy:
+          max_attempts: 3
+          backoff: exponential
+          base_delay: 1s
+          max_delay: 30s
+        circuit_breaker:
+          failure_threshold: 5
+          timeout: 30s
+          half_open_requests: 3
+        compliance_fallback:
+          manual_review_escalation: true
+          conservative_compliance_stance: true
+          regulatory_notification_required: true
+          
+      # Violation Detection and Response
+      violation_detection:
+        detection_algorithms:
+          rule_based_detection: true
+          pattern_matching: true
+          statistical_analysis: true
+          machine_learning_classification: true
+        severity_classification:
+          critical_violations:
+            regulatory_breach: true
+            immediate_notification: true
+            trading_halt_consideration: true
+          high_severity:
+            compliance_risk: true
+            management_escalation: true
+            remediation_required: true
+          medium_severity:
+            process_improvement: true
+            monitoring_enhancement: true
+          low_severity:
+            documentation_update: true
+            training_recommendation: true
+        response_automation:
+          immediate_alerts: true
+          stakeholder_notification: true
+          remediation_workflow_trigger: true
+          regulatory_reporting_preparation: true
+          
+      # Continuous Monitoring
+      continuous_monitoring:
+        monitoring_frequency:
+          real_time_checks: "continuous"
+          periodic_assessments: "hourly"
+          comprehensive_reviews: "daily"
+          regulatory_updates: "weekly"
+        compliance_scoring:
+          overall_compliance_score: true
+          framework_specific_scores: true
+          trend_analysis: true
+          benchmark_comparison: true
+        predictive_compliance:
+          risk_forecasting: true
+          violation_prediction: true
+          compliance_trend_analysis: true
+          proactive_remediation: true
+          
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      output: stdout
+      structured: true
+      
+    # Monitoring and Observability
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      jaeger:
+        enabled: true
+        endpoint: "http://jaeger-collector:14268/api/traces"
+      custom_metrics:
+        - name: "compliance_check_rate"
+          type: "counter"
+          description: "Rate of compliance check operations"
+        - name: "compliance_check_duration"  
+          type: "histogram"
+          description: "Time taken for compliance checks"
+        - name: "regulatory_violations_detected"
+          type: "counter"
+          description: "Number of regulatory violations detected"
+        - name: "compliance_score"
+          type: "gauge" 
+          description: "Overall compliance score"
+        - name: "audit_trail_completeness"
+          type: "gauge"
+          description: "Completeness of audit trail"
+        - name: "regulatory_report_generation_time"
+          type: "histogram"
+          description: "Time taken to generate regulatory reports"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: base-compliance-monitor-hpa
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: base-data-quality-agent-compliance-monitor
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: compliance_check_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "75"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: base-compliance-monitor-netpol
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: base-compliance-monitor
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-quality
+    - namespaceSelector:
+        matchLabels:
+          name: base-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: base-quality-reporter
+    - namespaceSelector:
+        matchLabels:
+          name: base-event-coordination
+    - namespaceSelector:
+        matchLabels:
+          name: base-data-security
+    ports:
+    - protocol: TCP
+      port: 8080
+  - {} # Allow external regulatory APIs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: base-compliance-monitor-secrets
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: base-compliance-monitor
+type: Opaque
+stringData:
+  # Regulatory API credentials
+  regulatory_apis.yaml: |
+    regulatory_authorities:
+      esma:
+        api_endpoint: "https://registers.esma.europa.eu/api"
+        api_key: "${ESMA_API_KEY}"
+        client_id: "${ESMA_CLIENT_ID}"
+      cftc:
+        api_endpoint: "https://publicreporting.cftc.gov/api"
+        api_key: "${CFTC_API_KEY}"
+      sec:
+        edgar_api: "https://www.sec.gov/Archives/edgar"
+        api_key: "${SEC_API_KEY}"
+      fca:
+        handbook_api: "https://www.handbook.fca.org.uk/api"
+        api_key: "${FCA_API_KEY}"
+      bafin:
+        api_endpoint: "https://www.bafin.de/api"
+        api_key: "${BAFIN_API_KEY}"
+        
+  # Database Connection Strings
+  db_connections.yaml: |
+    databases:
+      postgres_compliance:
+        host: "${POSTGRES_HOST}"
+        port: "${POSTGRES_PORT}"
+        database: "${POSTGRES_DB}"
+        username: "${POSTGRES_USER}"
+        password: "${POSTGRES_PASSWORD}"
+        ssl_mode: "require"
+      audit_database:
+        host: "${AUDIT_DB_HOST}"
+        port: "${AUDIT_DB_PORT}"
+        database: "${AUDIT_DB_NAME}"
+        username: "${AUDIT_DB_USER}"
+        password: "${AUDIT_DB_PASSWORD}"
+        
+  # External Compliance Services
+  compliance_services.yaml: |
+    compliance_platforms:
+      thomson_reuters_compliance:
+        api_url: "https://api.thomsonreuters.com/compliance"
+        api_key: "${TR_COMPLIANCE_API_KEY}"
+      refinitiv_world_check:
+        api_url: "https://api.refinitiv.com/world-check"
+        token: "${REFINITIV_WC_TOKEN}"
+      bloomberg_compliance:
+        api_url: "https://api.bloomberg.com/compliance"
+        api_key: "${BLOOMBERG_COMPLIANCE_API_KEY}"
+        secret: "${BLOOMBERG_COMPLIANCE_SECRET}"

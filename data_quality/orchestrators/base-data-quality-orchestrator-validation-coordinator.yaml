@@ -1,0 +1,483 @@
+apiVersion: base.io/v1
+kind: Orchestrator
+metadata:
+  name: base-data-quality-orchestrator-validation-coordinator
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: validation-coordinator
+    app.kubernetes.io/component: validation
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: orchestrator
+    base.io/function: validation-coordination
+spec:
+  type: "specialized_coordinator"
+  coordination:
+    # Saga Pattern Implementation
+    orchestration_pattern: "choreography"
+    coordination_model: "distributed"
+    state_coordination: "persistent"
+    transaction_boundaries: "per_validation_rule"
+    
+    # Workflow Coordination
+    workflow_management:
+      workflow_engine: "kubernetes_workflows"
+      parallel_execution: true
+      max_concurrent_workflows: 100
+      workflow_timeout: "3h"
+      retry_failed_workflows: true
+      validation_checkpoints: true
+      
+    # Agent Coordination
+    agent_coordination:
+      coordination_protocol: "grpc"
+      service_discovery: "kubernetes_dns"
+      load_balancing: "weighted_round_robin"
+      health_check_interval: "20s"
+      
+      managed_agents:
+        - name: "data-validator"
+          instances: 6
+          coordination_endpoint: "base-data-validator-service:9000"
+          responsibilities: ["field_validation", "type_checking", "constraint_validation"]
+          weight: 3
+          
+        - name: "schema-validator"
+          instances: 3
+          coordination_endpoint: "base-schema-validator-service:9000"
+          responsibilities: ["schema_compliance", "structure_validation", "format_checking"]
+          weight: 2
+          
+        - name: "business-rule-validator"
+          instances: 4
+          coordination_endpoint: "base-business-validator-service:9000"
+          responsibilities: ["business_logic_validation", "cross_field_validation", "temporal_validation"]
+          weight: 2
+          
+        - name: "reference-validator"
+          instances: 2
+          coordination_endpoint: "base-reference-validator-service:9000"
+          responsibilities: ["referential_integrity", "lookup_validation", "cross_dataset_validation"]
+          weight: 1
+          
+        - name: "format-validator"
+          instances: 3
+          coordination_endpoint: "base-format-validator-service:9000"
+          responsibilities: ["data_format_validation", "encoding_validation", "pattern_matching"]
+          weight: 2
+    
+    # State Management
+    state_management:
+      persistence_backend: "postgresql"
+      state_store_connection: "postgres://state-db:5432/validation_orchestrator_state"
+      state_retention_days: 60
+      checkpoint_interval: "2m"
+      state_consistency: "strong"
+      validation_state_tracking: true
+      
+    # Event-Driven Coordination
+    event_coordination:
+      event_bus: "apache_kafka"
+      event_topics:
+        - name: "validation.rule.started"
+          partitions: 20
+          replication_factor: 3
+        - name: "validation.rule.completed"
+          partitions: 20
+          replication_factor: 3
+        - name: "validation.rule.failed"
+          partitions: 10
+          replication_factor: 3
+        - name: "validation.batch.processed"
+          partitions: 15
+          replication_factor: 3
+        - name: "validation.violation.detected"
+          partitions: 12
+          replication_factor: 3
+      
+      event_processing:
+        consumer_group: "validation-coordinator"
+        batch_size: 200
+        processing_timeout: "30s"
+        retry_attempts: 4
+        dead_letter_queue: "validation.dlq"
+        
+  resources:
+    # Deployment Configuration
+    deployment:
+      replicas: 4  # High availability for validation coordination
+      deployment_strategy: "rolling_update"
+      leader_election: false  # Distributed coordination
+      max_surge: 2
+      max_unavailable: 1
+      
+    # Resource Allocation
+    resource_allocation:
+      cpu:
+        requests: "1.5"
+        limits: "5"
+      memory:
+        requests: "3Gi"
+        limits: "10Gi"
+      storage:
+        requests: "15Gi"
+        limits: "75Gi"
+        
+    # Auto-scaling Configuration
+    auto_scaling:
+      enabled: true
+      min_replicas: 4
+      max_replicas: 12
+      scaling_metrics:
+        - type: "cpu"
+          target_utilization: 70
+        - type: "memory"
+          target_utilization: 80
+        - type: "custom"
+          metric_name: "validation_queue_depth"
+          target_value: 150
+          
+    # Performance Optimization
+    performance:
+      connection_pooling:
+        database_connections: 25
+        agent_connections: 120
+        connection_timeout: "25s"
+        idle_timeout: "3m"
+        
+      caching:
+        validation_rules_cache_size: "1.5GB"
+        schema_cache_ttl: "2h"
+        reference_data_cache_ttl: "30m"
+        
+      batch_processing:
+        batch_size: 100
+        batch_timeout: "10s"
+        max_batch_wait: "30s"
+        parallel_validation: true
+        
+  # Workflow Management Configuration
+  workflow_orchestration:
+    # Workflow Types
+    supported_workflows:
+      - name: "comprehensive_data_validation"
+        description: "Complete validation workflow for all data types"
+        steps: 
+          - "schema_structure_validation"
+          - "data_type_validation"
+          - "constraint_validation"
+          - "business_rule_validation"
+          - "referential_integrity_validation"
+          - "format_compliance_validation"
+          - "validation_result_aggregation"
+        parallelizable_steps: ["data_type_validation", "constraint_validation", "format_compliance_validation"]
+        retry_strategy: "linear_backoff"
+        timeout: "2h"
+        
+      - name: "incremental_validation"
+        description: "Validation of incremental data changes"
+        steps:
+          - "change_detection"
+          - "delta_validation"
+          - "impact_analysis"
+          - "incremental_rule_application"
+          - "validation_result_merge"
+        delta_processing: true
+        timeout: "45m"
+        
+      - name: "realtime_stream_validation"
+        description: "Real-time validation for streaming data"
+        steps:
+          - "stream_schema_validation"
+          - "realtime_constraint_checking"
+          - "immediate_violation_flagging"
+          - "stream_quality_scoring"
+        continuous: true
+        latency_target: "< 100ms"
+        throughput_target: "10000 records/sec"
+        
+      - name: "cross_dataset_validation"
+        description: "Validation across multiple related datasets"
+        steps:
+          - "dataset_relationship_identification"
+          - "cross_reference_validation"
+          - "consistency_checking"
+          - "referential_integrity_verification"
+          - "cross_dataset_constraint_validation"
+        parallel_workers: 8
+        timeout: "6h"
+        
+      - name: "historical_validation_reprocessing"
+        description: "Revalidation of historical data with updated rules"
+        steps:
+          - "rule_change_impact_analysis"
+          - "historical_data_identification"
+          - "batch_revalidation"
+          - "validation_result_comparison"
+          - "discrepancy_reporting"
+        batch_size: "1GB"
+        timeout: "12h"
+        
+    # Workflow Execution Engine
+    execution_engine:
+      engine_type: "kubernetes_native"
+      workflow_crd: "ValidationWorkflow"
+      step_execution: "containers"
+      
+      execution_options:
+        parallel_execution: true
+        pipeline_optimization: true
+        resource_optimization: true
+        failure_isolation: true
+        validation_checkpointing: true
+        
+      monitoring:
+        step_level_monitoring: true
+        performance_tracking: true
+        resource_utilization_tracking: true
+        validation_metrics_tracking: true
+        
+    # Workflow Scheduling
+    workflow_scheduling:
+      scheduling_strategy: "validation_priority_based"
+      priority_levels:
+        critical_validation: 1
+        compliance_required: 2
+        business_critical: 3
+        standard_validation: 4
+        background_validation: 5
+        
+      scheduling_constraints:
+        resource_constraints: true
+        dependency_constraints: true
+        time_window_constraints: true
+        data_freshness_constraints: true
+        
+      queue_management:
+        max_queue_size: 2000
+        queue_overflow_strategy: "reject_lowest_priority"
+        queue_monitoring: true
+        validation_rule_prioritization: true
+        
+  # Integration Configuration
+  integration:
+    # Upstream Integrations
+    upstream_services:
+      data_ingestion:
+        service: "base-data-ingestion"
+        endpoint: "/api/v1/ingested-data"
+        timeout: "45s"
+        
+      schema_contracts:
+        service: "base-schema-contracts"
+        endpoint: "/api/v1/validation-schemas"
+        timeout: "20s"
+        
+      quality_manager:
+        service: "base-data-quality-orchestrator-quality-manager"
+        endpoint: "/api/v1/validation-requests"
+        timeout: "30s"
+        
+    # Downstream Integrations
+    downstream_services:
+      anomaly_coordinator:
+        service: "base-data-quality-orchestrator-anomaly-coordinator"
+        endpoint: "/api/v1/validated-data"
+        timeout: "60s"
+        
+      compliance_manager:
+        service: "base-data-quality-orchestrator-compliance-manager"
+        endpoint: "/api/v1/validation-results"
+        timeout: "45s"
+        
+      reporting_manager:
+        service: "base-data-quality-orchestrator-reporting-manager"
+        endpoint: "/api/v1/validation-metrics"
+        timeout: "30s"
+        
+      data_storage:
+        service: "base-data-storage"
+        endpoint: "/api/v1/validation-metadata"
+        timeout: "40s"
+        
+    # Cross-cutting Integrations
+    platform_services:
+      event_coordination:
+        service: "base-event-coordinator"
+        kafka_brokers: "${KAFKA_BROKERS}"
+        
+      metadata_discovery:
+        service: "base-metadata-discovery"
+        endpoint: "/api/v1/validation-catalog"
+        
+      monitoring_service:
+        service: "base-monitoring"
+        metrics_endpoint: "/metrics"
+        alerts_endpoint: "/alerts"
+        
+  # Monitoring and Observability
+  observability:
+    # Metrics Collection
+    metrics:
+      business_metrics:
+        - name: "validation_rules_executed_total"
+          type: "counter"
+          description: "Total number of validation rules executed"
+          labels: ["rule_type", "validation_result", "dataset"]
+          
+        - name: "validation_execution_duration"
+          type: "histogram"
+          description: "Time taken to execute validation rules"
+          buckets: [0.1, 0.5, 1, 5, 15, 30, 60, 300]
+          
+        - name: "validation_success_rate"
+          type: "gauge"
+          description: "Success rate of validation executions"
+          labels: ["rule_category", "dataset_type"]
+          
+        - name: "validation_violations_detected"
+          type: "counter"
+          description: "Number of validation violations detected"
+          labels: ["violation_severity", "rule_type", "dataset"]
+          
+        - name: "validation_throughput"
+          type: "gauge"
+          description: "Records validated per second"
+          
+      technical_metrics:
+        - name: "validation_coordinator_cpu_utilization"
+          type: "gauge"
+          description: "CPU utilization of validation coordinator"
+          
+        - name: "validation_coordinator_memory_utilization"
+          type: "gauge"
+          description: "Memory utilization of validation coordinator"
+          
+        - name: "validation_queue_depth"
+          type: "gauge"
+          description: "Current depth of validation queue"
+          
+    # Health Checks
+    health_checks:
+      liveness_check:
+        endpoint: "/health/live"
+        interval: "10s"
+        timeout: "5s"
+        failure_threshold: 3
+        
+      readiness_check:
+        endpoint: "/health/ready"
+        interval: "5s"
+        timeout: "3s"
+        failure_threshold: 3
+        
+      dependency_checks:
+        - name: "database_connection"
+          check: "postgres_ping"
+          critical: true
+          
+        - name: "kafka_connection"
+          check: "kafka_broker_health"
+          critical: true
+          
+        - name: "validation_agent_connectivity"
+          check: "agent_ping_all"
+          critical: true
+          
+    # Alerting
+    alerting:
+      alert_rules:
+        critical_alerts:
+          - name: "validation_coordinator_down"
+            condition: "up == 0"
+            duration: "1m"
+            
+          - name: "high_validation_failure_rate"
+            condition: "rate(validation_rules_executed_total{validation_result=\"failed\"}[5m]) > 0.1"
+            duration: "3m"
+            
+          - name: "validation_queue_overload"
+            condition: "validation_queue_depth > 1500"
+            duration: "2m"
+            
+        warning_alerts:
+          - name: "validation_performance_degradation"
+            condition: "avg(validation_execution_duration) > 30"
+            duration: "10m"
+            
+          - name: "validation_agent_failures"
+            condition: "rate(validation_agent_errors[5m]) > 0.05"
+            duration: "5m"
+            
+      notification_channels:
+        critical: ["pagerduty", "slack"]
+        warning: ["slack", "email"]
+        info: ["email"]
+        
+  # Security Configuration
+  security:
+    # Access Control
+    access_control:
+      rbac_enabled: true
+      service_account: "base-validation-coordinator"
+      
+      permissions:
+        - apiGroups: ["base.io"]
+          resources: ["agents", "workflows", "validation-rules", "schemas"]
+          verbs: ["get", "list", "watch", "create", "update", "patch"]
+          
+        - apiGroups: ["apps"]
+          resources: ["deployments", "replicasets"]
+          verbs: ["get", "list", "watch"]
+          
+    # Network Security
+    network_security:
+      network_policies: true
+      allowed_ingress:
+        - from_namespaces: ["base-data-quality", "base-monitoring", "base-data-ingestion"]
+          ports: [8080, 9090]
+          
+      allowed_egress:
+        - to_namespaces: ["base-data-quality", "base-platform", "base-schema-contracts"]
+          ports: [5432, 9092, 8080]
+          
+    # Data Security
+    data_security:
+      encryption_in_transit: true
+      encryption_at_rest: true
+      secret_management: "kubernetes_secrets"
+      
+      audit_logging:
+        enabled: true
+        log_level: "info"
+        retention_days: 180
+        include_validation_details: true
+        
+  # Disaster Recovery
+  disaster_recovery:
+    backup_strategy:
+      state_backup:
+        frequency: "every_15m"
+        retention: "14d"
+        destination: "s3://base-backups/validation-coordinator-state/"
+        
+      configuration_backup:
+        frequency: "daily"
+        retention: "60d"
+        version_control: true
+        
+    recovery_procedures:
+      rto_target: "5m"
+      rpo_target: "1m"
+      
+      recovery_steps:
+        - "restore_validation_configuration"
+        - "restore_validation_state"
+        - "verify_agent_connectivity"
+        - "resume_validation_workflows"
+        - "validate_validation_continuity"
+        
+    failover_configuration:
+      cross_region_failover: false
+      multi_az_deployment: true
+      leader_election_enabled: false  # Distributed coordination

@@ -1,0 +1,530 @@
+apiVersion: base.io/v1
+kind: Config
+metadata:
+  name: base-data-quality-validation-rules
+  namespace: base-data-quality
+  labels:
+    app.kubernetes.io/name: validation-rules
+    app.kubernetes.io/component: quality
+    app.kubernetes.io/part-of: base-system
+    base.io/category: data_quality
+    base.io/type: config
+    base.io/function: validation-rules
+spec:
+  configType: "validation-rules"
+  data:
+    # Core Validation Rule Categories
+    validation_categories:
+      # Data Type Validation Rules
+      data_type_validation:
+        numeric_rules:
+          price_validation:
+            rule_id: "DT_PRICE_001"
+            name: "Price Numeric Validation"
+            description: "Validate price fields are positive numeric values"
+            rule_type: "data_type"
+            severity: "critical"
+            validation_logic: "price IS NOT NULL AND price > 0 AND price < 1000000"
+            error_message: "Price must be a positive number less than 1,000,000"
+            applicable_fields:
+              - "bid_price"
+              - "ask_price"
+              - "last_price"
+              - "settlement_price"
+              - "strike_price"
+              
+          quantity_validation:
+            rule_id: "DT_QTY_001"
+            name: "Quantity Numeric Validation"
+            description: "Validate quantity fields are non-zero numeric values"
+            rule_type: "data_type"
+            severity: "critical"
+            validation_logic: "quantity IS NOT NULL AND quantity != 0 AND ABS(quantity) < 1000000000"
+            error_message: "Quantity must be non-zero and within valid range"
+            applicable_fields:
+              - "position_quantity"
+              - "trade_quantity"
+              - "shares_outstanding"
+              - "volume"
+              
+          percentage_validation:
+            rule_id: "DT_PCT_001"
+            name: "Percentage Range Validation"
+            description: "Validate percentage fields are within valid ranges"
+            rule_type: "data_type"
+            severity: "high"
+            validation_logic: "percentage IS NOT NULL AND percentage >= -100 AND percentage <= 100"
+            error_message: "Percentage must be between -100% and 100%"
+            applicable_fields:
+              - "return_percentage"
+              - "allocation_percentage"
+              - "weight_percentage"
+              
+        string_rules:
+          currency_code_validation:
+            rule_id: "DT_CUR_001"
+            name: "Currency Code Format Validation"
+            description: "Validate currency codes follow ISO 4217 standard"
+            rule_type: "data_type"
+            severity: "critical"
+            validation_logic: "currency_code REGEXP '^[A-Z]{3}$'"
+            error_message: "Currency code must be 3 uppercase letters (ISO 4217)"
+            reference_data: "iso_4217_currency_codes"
+            applicable_fields:
+              - "base_currency"
+              - "quote_currency"
+              - "settlement_currency"
+              
+          instrument_id_validation:
+            rule_id: "DT_INST_001"
+            name: "Instrument ID Format Validation"
+            description: "Validate instrument identifiers follow standard formats"
+            rule_type: "data_type"
+            severity: "critical"
+            validation_patterns:
+              isin: "^[A-Z]{2}[A-Z0-9]{9}[0-9]{1}$"
+              cusip: "^[A-Z0-9]{8}[0-9]{1}$"
+              sedol: "^[A-Z0-9]{6}[0-9]{1}$"
+              ticker: "^[A-Z]{1,5}(\.[A-Z]{1,3})?$"
+            error_message: "Instrument ID format invalid for specified type"
+            
+        date_time_rules:
+          date_format_validation:
+            rule_id: "DT_DATE_001"
+            name: "Date Format Validation"
+            description: "Validate dates follow ISO 8601 format"
+            rule_type: "data_type"
+            severity: "high"
+            validation_logic: "date_field REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'"
+            error_message: "Date must follow YYYY-MM-DD format"
+            applicable_fields:
+              - "trade_date"
+              - "settlement_date"
+              - "maturity_date"
+              - "ex_dividend_date"
+              
+          timestamp_validation:
+            rule_id: "DT_TS_001"
+            name: "Timestamp Validation"
+            description: "Validate timestamps are within reasonable ranges"
+            rule_type: "data_type"
+            severity: "high"
+            validation_logic: "timestamp BETWEEN '2000-01-01 00:00:00' AND DATE_ADD(NOW(), INTERVAL 1 DAY)"
+            error_message: "Timestamp must be between 2000-01-01 and tomorrow"
+            time_zone_aware: true
+            
+      # Business Rule Validation
+      business_rule_validation:
+        trading_rules:
+          settlement_date_validation:
+            rule_id: "BR_SET_001"
+            name: "Settlement Date Business Rule"
+            description: "Settlement date must be after trade date"
+            rule_type: "business_rule"
+            severity: "critical"
+            validation_logic: "settlement_date >= trade_date"
+            error_message: "Settlement date cannot be before trade date"
+            exceptions:
+              - "cash_trades"  # T+0 settlement
+              - "repo_trades"  # Can have backdated settlements
+              
+          market_hours_validation:
+            rule_id: "BR_MKT_001"
+            name: "Market Hours Validation"
+            description: "Trades must occur during market hours"
+            rule_type: "business_rule"
+            severity: "high"
+            validation_logic: "trade_time BETWEEN market_open AND market_close"
+            error_message: "Trade timestamp outside market hours"
+            market_calendars:
+              nyse: "us_market_calendar"
+              lse: "uk_market_calendar"
+              tse: "japan_market_calendar"
+            exceptions:
+              - "after_hours_trading"
+              - "crossing_session"
+              
+          position_limits_validation:
+            rule_id: "BR_POS_001"
+            name: "Position Limits Validation"
+            description: "Positions must not exceed defined limits"
+            rule_type: "business_rule"
+            severity: "critical"
+            validation_logic: "ABS(position_value) <= position_limit"
+            error_message: "Position exceeds defined limit"
+            limit_types:
+              - "single_name_limit"
+              - "sector_limit"
+              - "country_limit"
+              - "leverage_limit"
+              
+        portfolio_rules:
+          cash_balance_validation:
+            rule_id: "BR_CASH_001"
+            name: "Cash Balance Validation"
+            description: "Cash balances must reconcile with positions"
+            rule_type: "business_rule"
+            severity: "critical"
+            validation_logic: "total_cash + total_positions = nav"
+            error_message: "Cash and position balances do not reconcile"
+            tolerance: 0.01
+            
+          allocation_validation:
+            rule_id: "BR_ALLOC_001"
+            name: "Allocation Percentage Validation"
+            description: "Portfolio allocations must sum to 100%"
+            rule_type: "business_rule"
+            severity: "high"
+            validation_logic: "SUM(allocation_percentage) = 100"
+            error_message: "Portfolio allocations do not sum to 100%"
+            tolerance: 0.1  # 0.1% tolerance
+            
+          benchmark_validation:
+            rule_id: "BR_BENCH_001"
+            name: "Benchmark Alignment Validation"
+            description: "Portfolio must maintain benchmark alignment within tolerance"
+            rule_type: "business_rule"
+            severity: "medium"
+            validation_logic: "ABS(portfolio_weight - benchmark_weight) <= tracking_error_limit"
+            error_message: "Portfolio deviates from benchmark beyond allowed tolerance"
+            
+        risk_management_rules:
+          var_validation:
+            rule_id: "BR_VAR_001"
+            name: "Value at Risk Validation"
+            description: "VaR calculations must be within expected ranges"
+            rule_type: "business_rule"
+            severity: "high"
+            validation_logic: "var_amount BETWEEN 0 AND portfolio_value * 0.1"
+            error_message: "VaR calculation appears invalid"
+            confidence_levels:
+              - 95
+              - 99
+              - 99.9
+              
+          stress_test_validation:
+            rule_id: "BR_STRESS_001"
+            name: "Stress Test Result Validation"
+            description: "Stress test results must be reasonable"
+            rule_type: "business_rule"
+            severity: "high"
+            validation_logic: "stress_loss <= portfolio_value"
+            error_message: "Stress test loss exceeds portfolio value"
+            scenarios:
+              - "market_crash"
+              - "interest_rate_shock"
+              - "credit_spread_widening"
+              
+      # Cross-System Consistency Rules
+      consistency_validation:
+        cross_reference_rules:
+          instrument_master_consistency:
+            rule_id: "CS_INST_001"
+            name: "Instrument Master Consistency"
+            description: "Instrument data must be consistent across systems"
+            rule_type: "consistency"
+            severity: "critical"
+            primary_system: "instrument_master"
+            validation_fields:
+              - "instrument_name"
+              - "currency"
+              - "sector"
+              - "country"
+            tolerance_levels:
+              exact_match: ["instrument_name", "currency"]
+              fuzzy_match: ["sector", "country"]
+              
+          price_consistency:
+            rule_id: "CS_PRICE_001"
+            name: "Cross-Vendor Price Consistency"
+            description: "Prices from different vendors should be within tolerance"
+            rule_type: "consistency"
+            severity: "high"
+            validation_logic: "ABS(price1 - price2) / ((price1 + price2) / 2) <= tolerance"
+            tolerance: 0.001  # 0.1% tolerance
+            vendors:
+              - "bloomberg"
+              - "reuters"
+              - "vendor_x"
+              
+          position_reconciliation:
+            rule_id: "CS_POS_001"
+            name: "Position Reconciliation Rule"
+            description: "Positions must reconcile across systems"
+            rule_type: "consistency"
+            severity: "critical"
+            systems:
+              - "portfolio_management"
+              - "prime_brokerage"
+              - "custodian"
+            tolerance: 0.01
+            reconciliation_frequency: "daily"
+            
+        temporal_consistency_rules:
+          price_continuity:
+            rule_id: "TC_PRICE_001"
+            name: "Price Continuity Validation"
+            description: "Price changes should be reasonable over time"
+            rule_type: "temporal_consistency"
+            severity: "high"
+            validation_logic: "ABS(LOG(price_t / price_t-1)) <= daily_volatility_limit"
+            daily_volatility_limits:
+              equities: 0.20  # 20% daily limit
+              bonds: 0.05     # 5% daily limit
+              fx: 0.10        # 10% daily limit
+              commodities: 0.15  # 15% daily limit
+              
+          trade_sequence_validation:
+            rule_id: "TC_TRADE_001"
+            name: "Trade Sequence Validation"
+            description: "Trade sequences must be logically consistent"
+            rule_type: "temporal_consistency"
+            severity: "critical"
+            validation_rules:
+              - "trade_id sequences are ascending"
+              - "timestamps are monotonically increasing"
+              - "running balances are consistent"
+              
+    # Financial Industry Specific Rules
+    financial_industry_rules:
+      # Regulatory Compliance Rules
+      regulatory_rules:
+        sox_compliance:
+          rule_id: "REG_SOX_001"
+          name: "SOX Data Integrity Rule"
+          description: "Data must maintain audit trail for SOX compliance"
+          rule_type: "regulatory"
+          severity: "critical"
+          requirements:
+            - "created_by field mandatory"
+            - "created_timestamp mandatory"
+            - "last_modified_by field mandatory"
+            - "last_modified_timestamp mandatory"
+          validation_logic: "created_by IS NOT NULL AND created_timestamp IS NOT NULL"
+          
+        mifid_ii_compliance:
+          rule_id: "REG_MIFID_001"
+          name: "MiFID II Transaction Reporting"
+          description: "Transaction data must meet MiFID II reporting requirements"
+          rule_type: "regulatory"
+          severity: "critical"
+          required_fields:
+            - "trading_venue"
+            - "execution_timestamp"
+            - "instrument_identification"
+            - "buyer_identification"
+            - "seller_identification"
+            - "transmission_of_order_indicator"
+          
+        gdpr_compliance:
+          rule_id: "REG_GDPR_001"
+          name: "GDPR Personal Data Protection"
+          description: "Personal data must be properly classified and protected"
+          rule_type: "regulatory"
+          severity: "critical"
+          pii_detection_patterns:
+            - "email_pattern: [a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+            - "phone_pattern: \\+?[1-9]\\d{1,14}"
+            - "ssn_pattern: \\d{3}-\\d{2}-\\d{4}"
+          encryption_requirements:
+            - "pii_fields_encrypted: true"
+            - "encryption_algorithm: AES-256"
+            
+      # Risk Management Rules
+      risk_management_rules:
+        counterparty_risk:
+          rule_id: "RISK_CP_001"
+          name: "Counterparty Credit Rating Validation"
+          description: "Counterparty credit ratings must be current and valid"
+          rule_type: "risk_management"
+          severity: "high"
+          validation_logic: "rating_date >= DATE_SUB(NOW(), INTERVAL 6 MONTH)"
+          rating_agencies:
+            - "moodys"
+            - "sp"
+            - "fitch"
+          minimum_rating: "BBB-"
+          
+        market_risk:
+          rule_id: "RISK_MKT_001"
+          name: "Market Risk Exposure Validation"
+          description: "Market risk exposures must be within limits"
+          rule_type: "risk_management"
+          severity: "critical"
+          exposure_limits:
+            single_name: 0.05      # 5% of portfolio
+            sector: 0.20           # 20% of portfolio
+            country: 0.30          # 30% of portfolio
+            currency: 0.25         # 25% of portfolio
+            
+        liquidity_risk:
+          rule_id: "RISK_LIQ_001"
+          name: "Liquidity Risk Assessment"
+          description: "Portfolio liquidity must meet redemption requirements"
+          rule_type: "risk_management"
+          severity: "high"
+          liquidity_buckets:
+            daily: 0.20    # 20% daily liquid
+            weekly: 0.40   # 40% weekly liquid
+            monthly: 0.80  # 80% monthly liquid
+          
+    # Data Quality Validation Workflows
+    validation_workflows:
+      # Real-time Validation Workflow
+      real_time_validation:
+        workflow_id: "WF_RT_001"
+        name: "Real-time Data Validation"
+        trigger: "data_ingestion_event"
+        execution_order:
+          1:
+            stage: "data_type_validation"
+            rules:
+              - "DT_PRICE_001"
+              - "DT_QTY_001"
+              - "DT_CUR_001"
+            failure_action: "reject_record"
+            
+          2:
+            stage: "business_rule_validation"
+            rules:
+              - "BR_SET_001"
+              - "BR_MKT_001"
+            failure_action: "flag_for_review"
+            
+          3:
+            stage: "consistency_validation"
+            rules:
+              - "CS_PRICE_001"
+            failure_action: "alert_operations"
+            
+        performance_targets:
+          max_latency: "100ms"
+          throughput: "10000 records/sec"
+          
+      # Batch Validation Workflow
+      batch_validation:
+        workflow_id: "WF_BATCH_001"
+        name: "End-of-Day Batch Validation"
+        trigger: "scheduled_daily_23:00"
+        execution_order:
+          1:
+            stage: "comprehensive_validation"
+            rules: "all_configured_rules"
+            parallel_execution: true
+            
+          2:
+            stage: "cross_system_reconciliation"
+            rules:
+              - "CS_POS_001"
+              - "CS_INST_001"
+            
+          3:
+            stage: "regulatory_compliance_check"
+            rules:
+              - "REG_SOX_001"
+              - "REG_MIFID_001"
+              - "REG_GDPR_001"
+              
+          4:
+            stage: "quality_reporting"
+            action: "generate_quality_report"
+            
+        performance_targets:
+          max_duration: "4h"
+          parallel_workers: 20
+          
+    # Rule Configuration Management
+    rule_management:
+      # Rule Lifecycle
+      rule_lifecycle:
+        development:
+          status: "draft"
+          testing_required: true
+          approval_required: false
+          
+        testing:
+          status: "test"
+          testing_environment: "validation_test"
+          test_data_sets: ["historical_sample", "synthetic_data"]
+          
+        production:
+          status: "active"
+          deployment_approval: "required"
+          change_management: "required"
+          
+        deprecated:
+          status: "deprecated"
+          sunset_date: "required"
+          replacement_rule: "required"
+          
+      # Rule Categories and Priorities
+      rule_priorities:
+        p1_critical:
+          sla_impact: "immediate_failure"
+          escalation: "automatic"
+          business_impact: "trading_halt"
+          
+        p2_high:
+          sla_impact: "degraded_service"
+          escalation: "within_15min"
+          business_impact: "manual_override"
+          
+        p3_medium:
+          sla_impact: "warning_only"
+          escalation: "within_1hour"
+          business_impact: "monitoring_alert"
+          
+        p4_low:
+          sla_impact: "none"
+          escalation: "daily_review"
+          business_impact: "quality_metrics"
+          
+    # Integration and Event Handling
+    integration:
+      # Downstream Services
+      downstream_services:
+        quality_monitoring:
+          service: "base-quality-monitoring"
+          endpoint: "/rule-violations"
+          timeout: "30s"
+          
+        event_coordination:
+          service: "base-event-coordination"
+          endpoint: "/validation-events"
+          timeout: "5s"
+          
+        compliance_frameworks:
+          service: "base-compliance-frameworks"
+          endpoint: "/compliance-validation"
+          timeout: "60s"
+          
+      # Event Publishing
+      event_publishing:
+        rule_violation_events:
+          topic: "quality.rule.violations"
+          schema: "rule_violation_v1"
+          
+        validation_completion_events:
+          topic: "quality.validation.complete"
+          schema: "validation_result_v1"
+          
+        quality_trend_events:
+          topic: "quality.trends"
+          schema: "quality_trend_v1"
+          
+    # Monitoring and Metrics
+    monitoring:
+      rule_execution_metrics:
+        execution_time: "track_per_rule"
+        success_rate: "track_per_rule"
+        failure_patterns: "analyze_hourly"
+        
+      validation_effectiveness:
+        false_positive_rate: "track_weekly"
+        false_negative_rate: "track_weekly"
+        business_value_impact: "track_monthly"
+        
+      performance_monitoring:
+        throughput_metrics: "real_time"
+        latency_metrics: "real_time"
+        resource_utilization: "5min_intervals"

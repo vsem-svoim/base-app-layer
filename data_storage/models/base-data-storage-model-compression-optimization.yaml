@@ -1,0 +1,45 @@
+apiVersion: base.io/v1
+kind: Model
+metadata:
+  name: base-data-storage-compression-optimization-model
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: compression-optimization-model
+    base.io/category: data_storage
+    base.io/type: model
+    base.io/function: compression-optimization
+spec:
+  type: "classification"
+  algorithm: "gradient_boosting"
+  deployment:
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    serving:
+      framework: "tensorflow"
+      inference_endpoint: "/optimize-compression"
+  training:
+    algorithm_details:
+      boosting_rounds: 500
+      learning_rate: 0.1
+    feature_engineering:
+      feature_types:
+        - name: "data_characteristics"
+          features: ["file_size", "data_type", "redundancy_score"]
+        - name: "performance_requirements"
+          features: ["access_frequency", "latency_requirement", "throughput_requirement"]
+  inference:
+    prediction_parameters:
+      - "optimal_compression_algorithm"
+      - "expected_compression_ratio"
+      - "compression_time_estimate"
+  financial_domain:
+    data_types:
+      market_data: ["lz4", "fast_compression"]
+      regulatory_data: ["brotli", "maximum_compression"]
+      trading_data: ["zstd", "balanced"]

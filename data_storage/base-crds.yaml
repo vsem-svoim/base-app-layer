@@ -1,0 +1,131 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: storagepolicies.base.io
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-data-storage
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+spec:
+  group: base.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              storageType:
+                type: string
+                enum: ["HOT", "WARM", "COLD", "ARCHIVE"]
+              retentionPolicy:
+                type: object
+                properties:
+                  duration:
+                    type: string
+                  legalHold:
+                    type: boolean
+                  complianceRequirement:
+                    type: string
+              tieringRules:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    condition:
+                      type: string
+                    targetTier:
+                      type: string
+                    afterDays:
+                      type: integer
+              compressionSettings:
+                type: object
+                properties:
+                  algorithm:
+                    type: string
+                  compressionRatio:
+                    type: number
+          status:
+            type: object
+            properties:
+              currentTier:
+                type: string
+              storageUsed:
+                type: string
+              lastTierChange:
+                type: string
+                format: date-time
+              complianceStatus:
+                type: string
+  scope: Namespaced
+  names:
+    plural: storagepolicies
+    singular: storagepolicy
+    kind: StoragePolicy
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: storagelifecycles.base.io
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: base-data-storage
+    app.kubernetes.io/component: data-platform
+    app.kubernetes.io/part-of: base-layer
+spec:
+  group: base.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              datasetId:
+                type: string
+              lifecycleStage:
+                type: string
+                enum: ["ACTIVE", "INACTIVE", "ARCHIVED", "DELETED"]
+              accessPatterns:
+                type: object
+                properties:
+                  frequency:
+                    type: string
+                  lastAccessed:
+                    type: string
+                    format: date-time
+                  accessCount:
+                    type: integer
+              costOptimization:
+                type: object
+                properties:
+                  currentCost:
+                    type: number
+                  projectedSavings:
+                    type: number
+                  optimizationStrategy:
+                    type: string
+          status:
+            type: object
+            properties:
+              lifecycleStatus:
+                type: string
+              nextAction:
+                type: string
+              scheduledDate:
+                type: string
+                format: date-time
+  scope: Namespaced
+  names:
+    plural: storagelifecycles
+    singular: storagelifecycle
+    kind: StorageLifecycle

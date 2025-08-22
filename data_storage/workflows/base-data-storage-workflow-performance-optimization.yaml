@@ -1,0 +1,52 @@
+apiVersion: base.io/v1
+kind: Workflow
+metadata:
+  name: base-data-storage-workflow-performance-optimization
+  namespace: base-data-storage
+  labels:
+    app.kubernetes.io/name: performance-optimization-workflow
+    base.io/category: data_storage
+    base.io/type: workflow
+    base.io/function: performance-optimization
+spec:
+  steps:
+    - name: "workflow_initialization"
+      agent: "performance-manager"
+      action: "initialize_performance_optimization"
+      timeout: "5m"
+      dependencies: []
+      
+    - name: "execution_phase"
+      agent: "performance-manager"
+      action: "execute_performance_optimization"
+      timeout: "30m"
+      retry_attempts: 3
+      dependencies: ["workflow_initialization"]
+      
+    - name: "validation_phase"
+      agent: "performance-manager"
+      action: "validate_performance_optimization"
+      timeout: "10m"
+      dependencies: ["execution_phase"]
+      
+    - name: "completion_notification"
+      agent: "external"
+      service: "base-event-coordinator"
+      action: "notify_performance_optimization_completed"
+      timeout: "2m"
+      dependencies: ["validation_phase"]
+      
+  triggers:
+    schedule:
+      cron: "0 3 * * *"  # Daily at 3 AM
+      timezone: "UTC"
+    event:
+      - "performance_optimization_requested"
+      - "compliance_audit_scheduled"
+      
+  dependencies:
+    external_services:
+      - "base-event-coordinator"
+    infrastructure:
+      - "storage_systems"
+      - "backup_infrastructure"
