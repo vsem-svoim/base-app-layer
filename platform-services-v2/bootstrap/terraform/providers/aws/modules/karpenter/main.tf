@@ -94,7 +94,7 @@ resource "helm_release" "karpenter_crds" {
   count = var.enable_karpenter ? 1 : 0
 
   name       = "karpenter-crd"
-  repository = "https://charts.karpenter.sh"
+  repository = "oci://public.ecr.aws/karpenter"
   chart      = "karpenter-crd"
   version    = var.karpenter_version
   namespace  = "kube-system"
@@ -114,7 +114,7 @@ resource "helm_release" "karpenter" {
   count = var.enable_karpenter ? 1 : 0
 
   name       = "karpenter"
-  repository = "https://charts.karpenter.sh"
+  repository = "oci://public.ecr.aws/karpenter"
   chart      = "karpenter"
   version    = var.karpenter_version
   namespace  = kubernetes_namespace.karpenter[0].metadata[0].name
@@ -352,6 +352,7 @@ resource "kubernetes_manifest" "karpenter_nodeclass_data_processing" {
         templatefile("${path.module}/templates/userdata.sh.tpl", {
           cluster_name     = var.cluster_name
           cluster_endpoint = var.cluster_endpoint
+          cluster_ca       = var.cluster_certificate_authority_data
         })
       )
       

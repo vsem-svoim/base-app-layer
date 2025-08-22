@@ -107,6 +107,14 @@ output "irsa_role_arns" {
   }
 }
 
+# Pod Identity
+output "pod_identity_role_arns" {
+  description = "Map of Pod Identity role ARNs"
+  value = {
+    for k, v in aws_iam_role.pod_identity : k => v.arn
+  }
+}
+
 # KMS
 output "kms_key_id" {
   description = "The globally unique identifier for the key"

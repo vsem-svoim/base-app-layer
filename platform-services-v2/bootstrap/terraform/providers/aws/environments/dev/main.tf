@@ -366,10 +366,11 @@ module "karpenter_base_cluster" {
 
   cluster_name           = module.eks_base_cluster[0].cluster_name
   cluster_endpoint       = module.eks_base_cluster[0].cluster_endpoint
+  cluster_certificate_authority_data = module.eks_base_cluster[0].cluster_certificate_authority_data
   
   enable_karpenter       = var.enable_karpenter
   karpenter_version      = var.karpenter_version
-  karpenter_irsa_role_arn = module.eks_base_cluster[0].pod_identity_role_arns["karpenter"]
+  karpenter_irsa_role_arn = lookup(module.eks_base_cluster[0].pod_identity_role_arns, "karpenter", "")
   
   vpc_id                 = module.vpc.vpc_id
   subnet_ids             = module.vpc.private_subnets

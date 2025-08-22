@@ -12,6 +12,11 @@ variable "cluster_endpoint" {
   type        = string
 }
 
+variable "cluster_certificate_authority_data" {
+  description = "EKS cluster certificate authority data"
+  type        = string
+}
+
 variable "enable_karpenter" {
   description = "Enable Karpenter node provisioning"
   type        = bool
