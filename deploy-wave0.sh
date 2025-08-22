@@ -379,7 +379,50 @@ spec:
   - port: 8200
     targetPort: 8200
   type: ClusterIP
+EOF
+    
+    wait_for_pods "vault" 120
+    
+    # Deploy ServiceAccount and RBAC first, then Jobs
+    log_info "Creating ServiceAccount and RBAC for Vault automation..."
+    cat <<'EOF' | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-init
+  namespace: vault
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-init
+  namespace: vault
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-init
+  namespace: vault
+subjects:
+- kind: ServiceAccount
+  name: vault-init
+  namespace: vault
+roleRef:
+  kind: Role
+  name: vault-init
+  apiGroup: rbac.authorization.k8s.io
+EOF
+
+    # Wait a moment for RBAC to propagate
+    sleep 5
+    
+    # Now deploy the Jobs
+    log_info "Deploying Vault automation Jobs..."
+    cat <<'EOF' | kubectl apply -f -
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -427,39 +470,7 @@ spec:
           defaultMode: 0755
       restartPolicy: OnFailure
   backoffLimit: 3
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: vault-init
-  namespace: vault
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: vault-init
-  namespace: vault
-rules:
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["create", "get", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: vault-init
-  namespace: vault
-subjects:
-- kind: ServiceAccount
-  name: vault-init
-  namespace: vault
-roleRef:
-  kind: Role
-  name: vault-init
-  apiGroup: rbac.authorization.k8s.io
 EOF
-    
-    wait_for_pods "vault" 120
     
     # Let Kubernetes Jobs handle initialization and unsealing
     log_info "Starting Vault initialization and unsealing via Kubernetes Jobs..."
