@@ -702,6 +702,10 @@ data:
                                 </div>
                             </div>
                             
+                            <!-- Wave 0: Core Infrastructure -->
+                            <div class="category-header">
+                                <h4>Wave 0 - Core Infrastructure</h4>
+                            </div>
                             <div class="row">
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-1">
@@ -719,33 +723,48 @@ data:
                                         <div class="service-status">DEPLOYED</div>
                                         <span class="icon"><i class="fas fa-shield-alt"></i></span>
                                         <div class="desc">
-                                            <h3>Vault</h3>
-                                            <p>Secrets management</p>
+                                            <h3>HashiCorp Vault</h3>
+                                            <p>Secrets and credentials management</p>
                                             <button onclick="window.open('/vault/', '_blank')" class="service-link">Launch Vault</button>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-4 text-center animate-box">
-                                    <div class="services color-3">
-                                        <div class="service-status">DEPLOYED</div>
-                                        <span class="icon"><i class="fas fa-bolt"></i></span>
+                                    <div class="services color-6">
+                                        <div class="service-status warning">NOT DEPLOYED</div>
+                                        <span class="icon"><i class="fas fa-sitemap"></i></span>
                                         <div class="desc">
-                                            <h3>Airflow</h3>
-                                            <p>Workflow orchestration</p>
-                                            <button onclick="window.open('/airflow/', '_blank')" class="service-link">Launch Airflow</button>
+                                            <h3>Istio Service Mesh</h3>
+                                            <p>Traffic management and security</p>
+                                            <button onclick="alert('Istio not deployed. Deploy monitoring stack first.')" class="service-link">Deploy Istio</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
+                            <!-- Wave 2: Orchestration Services -->
+                            <div class="category-header">
+                                <h4>Wave 2 - Orchestration Services</h4>
+                            </div>
                             <div class="row">
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-3">
+                                        <div class="service-status">DEPLOYED</div>
+                                        <span class="icon"><i class="fas fa-wind"></i></span>
+                                        <div class="desc">
+                                            <h3>Apache Airflow</h3>
+                                            <p>Workflow orchestration platform</p>
+                                            <button onclick="window.open('/airflow/', '_blank')" class="service-link">Launch Airflow</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-4">
                                         <div class="service-status">DEPLOYED</div>
-                                        <span class="icon"><i class="fas fa-robot"></i></span>
+                                        <span class="icon"><i class="fas fa-flask"></i></span>
                                         <div class="desc">
                                             <h3>MLflow</h3>
-                                            <p>ML lifecycle management</p>
+                                            <p>ML lifecycle and model management</p>
                                             <button onclick="window.open('/mlflow/', '_blank')" class="service-link">Launch MLflow</button>
                                         </div>
                                     </div>
@@ -753,22 +772,65 @@ data:
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-5">
                                         <div class="service-status">DEPLOYED</div>
-                                        <span class="icon"><i class="fas fa-network-wired"></i></span>
+                                        <span class="icon"><i class="fas fa-brain"></i></span>
                                         <div class="desc">
                                             <h3>Kubeflow</h3>
-                                            <p>ML workflow orchestration</p>
+                                            <p>ML workflows and pipeline orchestration</p>
                                             <button onclick="window.open('/kubeflow/', '_blank')" class="service-link">Launch Kubeflow</button>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <div class="row">
                                 <div class="col-md-4 text-center animate-box">
                                     <div class="services color-6">
                                         <div class="service-status">DEPLOYED</div>
-                                        <span class="icon"><i class="fas fa-chart-bar"></i></span>
+                                        <span class="icon"><i class="fas fa-chart-line"></i></span>
                                         <div class="desc">
-                                            <h3>Superset</h3>
-                                            <p>Business intelligence</p>
+                                            <h3>Apache Superset</h3>
+                                            <p>Business intelligence and data visualization</p>
                                             <button onclick="window.open('/superset/', '_blank')" class="service-link">Launch Superset</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Monitoring Stack (Not Deployed) -->
+                            <div class="category-header">
+                                <h4>Monitoring & Observability Stack - Not Deployed</h4>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-1">
+                                        <div class="service-status error">NOT DEPLOYED</div>
+                                        <span class="icon"><i class="fas fa-chart-area"></i></span>
+                                        <div class="desc">
+                                            <h3>Grafana</h3>
+                                            <p>Metrics visualization and dashboards</p>
+                                            <button onclick="alert('Grafana not deployed. Deploy monitoring stack first.')" class="service-link">Deploy Grafana</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-2">
+                                        <div class="service-status error">NOT DEPLOYED</div>
+                                        <span class="icon"><i class="fas fa-database"></i></span>
+                                        <div class="desc">
+                                            <h3>Prometheus</h3>
+                                            <p>Metrics collection and alerting</p>
+                                            <button onclick="alert('Prometheus not deployed. Deploy monitoring stack first.')" class="service-link">Deploy Prometheus</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center animate-box">
+                                    <div class="services color-3">
+                                        <div class="service-status error">NOT DEPLOYED</div>
+                                        <span class="icon"><i class="fas fa-search"></i></span>
+                                        <div class="desc">
+                                            <h3>Kibana</h3>
+                                            <p>Log analysis and visualization</p>
+                                            <button onclick="alert('Kibana not deployed. Deploy ELK stack first.')" class="service-link">Deploy Kibana</button>
                                         </div>
                                     </div>
                                 </div>
