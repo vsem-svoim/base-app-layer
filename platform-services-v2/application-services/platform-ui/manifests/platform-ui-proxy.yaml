@@ -1202,10 +1202,11 @@ data:
                                             <li><strong>GitOps:</strong> ArgoCD ApplicationSets for automated deployments</li>
                                         </ul>
                                         <h4>Access Commands:</h4>
-                                        <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
-kubectl get pods -A
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-kubectl get applications -n argocd</pre>
+                                        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; font-family: monospace;">
+                                            <p>kubectl get pods -A</p>
+                                            <p>kubectl port-forward svc/argocd-server -n argocd 8080:443</p>
+                                            <p>kubectl get applications -n argocd</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
